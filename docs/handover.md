@@ -2,6 +2,7 @@
 
 **Tarih:** 15.08.2026 · **Durum:** Altyapı kurulumu tamamlandı, geliştirmeye hazır
 **Devreden:** Claude Opus 5 oturumu (Windows 11, yerel) · **Devralan:** yeni ortam
+**Güncelleme:** 19.08.2026 — uçtan uca `docker compose` provası yapıldı ve geçti (§2.1)
 
 Bu belge, projeyi GitHub'dan çekip devam edecek kişi/oturum için yazılmıştır.
 Günlük çalışma kuralları `CLAUDE.md`'dedir; burada **ne yapıldı, ne doğrulandı,
@@ -24,7 +25,7 @@ ERP adaptörleri gerçek kurumlara/sistemlere bağlanmayı bekliyor.
 | API (8 endpoint grubu) | **Tamam** | Swagger, 5 rol, otomatik audit log |
 | Python worker'ları | **İskelet** | Akış uçtan uca yazıldı; kurum bazlı seçiciler yok |
 | Web paneli | **Tamam** | 8 ekran, gerçek API sözleşmesine bağlı |
-| docker-compose + CI | **Yazıldı** | Uçtan uca ayağa kalkma provası yapılmadı (§4) |
+| docker-compose + CI | **Doğrulandı** | 19.08.2026'da sekiz servis birlikte ayağa kalktı (§2.1) |
 
 ---
 
@@ -49,10 +50,31 @@ Ayrıca **GitHub Actions'ta beş işin beşi de yeşil** (koşu `32040784548`): 
 Python lint+test, web derleme+lint, sözleşme senkronu ve üç Docker imajının derlenmesi.
 İmajlar: `govai-web` 52.7 MB, `govai-worker` 184 MB, `govai-api` 371 MB.
 
-**Doğrulanmadı:** `docker compose up` ile servislerin **birlikte** ayağa kalkması.
-İmajların derlendiği CI'da kanıtlandı, ancak API'nin veritabanına bağlanması,
-migration'ın açılışta uygulanması ve worker'ların API'ye kimlik doğrulaması
-uçtan uca hiç denenmedi (bu makinede Docker CLI yoktu).
+### 2.1 Uçtan uca orkestrasyon — doğrulandı (19.08.2026)
+
+15.08 teslimindeki tek açık uç, `docker compose up` ile servislerin **birlikte** ayağa
+kalkmasıydı; o makinede Docker CLI yoktu. Prova yeni bir ortamda yapıldı ve geçti
+(Windows 11 Home · .NET SDK 10.0.400 · Node 24.19.0 · Python 3.12.10 · WSL2 2.7.12 ·
+Docker Engine 29.7.2 / Compose v5.4.0):
+
+| Kontrol | Sonuç |
+|---|---|
+| `docker compose up -d --build` | Sekiz servisin tamamı ayakta; postgres/redis/rabbitmq `healthy` |
+| API açılışı | Migration açılışta uygulandı, `/health` → `Healthy` |
+| Seed | 1 firma, 5 kaynak, 3 çağrı yüklendi |
+| `POST /api/auth/login` | Seed hesabıyla JWT alındı |
+| Panel (`:5180`) | Giriş, panel, eşleşme listesi ve gerekçe ekranı gerçek veriyle çalışıyor |
+| "Yeniden skorla" | Üç çağrı 0,37 sn'de değerlendirildi, ortalama skor 87,19 |
+| Worker'lar | collector/parser doğru kuyrukları tüketiyor, scheduler üç işi kaydetti |
+| Gerçek tarama | Çukurova Kalkınma Ajansı'ndan 50 doküman alındı; EKAP TLS el sıkışmasında hata verdi ve hata sayacı arttı — kaynak sağlığı mantığı çalışıyor |
+| Yönetici özeti (OpenAI anahtarı **yok**) | Kural tabanlı yedek metin üretildi; ADR-0002 davranışı doğrulandı |
+
+Yukarıdaki tablo da aynı ortamda baştan koşuldu ve aynı sonuçları verdi.
+
+**Provada bulunan tek hata:** `web/src/api/client.ts` yalnızca 204'ü gövdesiz sayıyor,
+diğer tüm 2xx yanıtlarda JSON gövde bekliyordu. `POST /api/sources/{id}/crawl` **202 Accepted**
+ve boş gövde döndüğü için "Şimdi tara" düğmesi `Unexpected end of JSON input` hatası veriyordu.
+İstemci, gövdesiz yanıtları durum koduna bakmadan tolere edecek biçimde düzeltildi.
 
 ---
 
@@ -86,22 +108,24 @@ docker compose up -d --build
 Beklenen sonuç: http://localhost:5180 açılır, seed hesabıyla giriş yapılır,
 panelde bir demo firma ve üç demo çağrı görünür, "Yeniden skorla" butonu skor üretir.
 
-**İmajların derlendiği doğrulandı, ancak bu orkestrasyon adımı henüz hiç denenmedi.**
-Takılırsan ilk bakılacak yerler: `.env` değişkenlerinin API'ye geçmesi, migration'ın
-açılışta uygulanması, worker'ların API'ye kimlik doğrulaması (`GOVAI_API_PASSWORD`
-seed parolasıyla aynı olmalı) ve hibrit geliştirmede `POSTGRES_PASSWORD` ile
-`appsettings.Development.json` parolasının eşleşmesi.
+**Bu adım 19.08.2026'da yapıldı ve beklenen sonucu verdi (§2.1).** Takılırsan ilk bakılacak
+yerler: `.env` değişkenlerinin API'ye geçmesi, migration'ın açılışta uygulanması, worker'ların
+API'ye kimlik doğrulaması (`GOVAI_API_PASSWORD` seed parolasıyla aynı olmalı — compose bunu
+`SEED_ADMIN_PASSWORD`'ten türettiği için elle eşitlemek gerekmez) ve hibrit geliştirmede
+`POSTGRES_PASSWORD` ile `appsettings.Development.json` parolasının eşleşmesi.
+
+Seed skor üretmez: ilk açılışta `eligibility_assessments` boştur ve eşleşme listesi boş gelir.
+Panelde bir kez "Yeniden skorla"ya basılması (veya
+`POST /api/eligibility/companies/{id}/rescore`) gerekir — bu beklenen davranıştır, hata değil.
 
 ---
 
 ## 4. Devam için önerilen sıra
 
-Yol haritasının tamamı `docs/roadmap.md`'de. Bugünkü noktadan bakınca en mantıklı ilk üç iş:
+Yol haritasının tamamı `docs/roadmap.md`'de. Compose provası tamamlandığına göre (§2.1)
+bugünkü noktadan bakınca en mantıklı ilk iki iş:
 
-**1. Compose'u uçtan uca ayağa kaldır ve akışı doğrula (§3).**
-Bunu yapmadan üstüne kod yazmak, hataları birikmiş hâlde bulmak demektir.
-
-**2. Gerçek bir kaynağı bağla.** Tek bir kurumla başla — örneğin Çukurova Kalkınma Ajansı.
+**1. Gerçek bir kaynağı bağla.** Tek bir kurumla başla — örneğin Çukurova Kalkınma Ajansı.
 `sources` kaydındaki `configurationJson` alanına CSS seçicilerini yaz:
 
 ```json
@@ -119,7 +143,7 @@ Sonra `govai-parser --url <ilan-adresi>` ile kural çıkarımının o kurumun me
 ürettiğine bak. Kalıp kütüphanesini (`rule_extractor.py`) gerçek metne göre genişlet.
 Bu, ürünün en çok emek isteyen ve en çok değer üreten kısmıdır.
 
-**3. Danışman onay ekranını tamamla.** API tarafı hazır
+**2. Danışman onay ekranını tamamla.** API tarafı hazır
 (`PUT /api/opportunities/{id}/rules/{ruleId}`, `POST /{id}/review`), panelde karşılığı yok.
 Kural kalitesi danışman onayına bağlı olduğu için bu, pilot öncesi zorunlu adımdır.
 

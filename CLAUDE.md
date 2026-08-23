@@ -225,10 +225,8 @@ Bunlar hata değil, bilinçli ertelemedir. Tamamı gerekçesi ve hedef ayıyla
 | Web birim testleri | Yok — API sözleşmesi oturmadan yazmak erken görüldü |
 | Kod bölme | Bundle ~714 KB, tek parça |
 
-Üç Docker imajının da derlendiği CI'da doğrulandı, ancak `docker compose up` ile
-servislerin **birlikte** ayağa kalkması hiç denenmedi (bu makinede Docker CLI yoktu).
-API'nin veritabanına bağlanması, migration'ın açılışta uygulanması ve worker'ların
-API'ye kimlik doğrulaması açık uçlar. Devralan taraf için ilk doğrulama adımı budur.
+`docker compose up` ile servislerin **birlikte** ayağa kalkması 19.08.2026'da denendi ve
+geçti; ayrıntı `docs/handover.md` §2.1'de. Bu artık açık uç değildir.
 
 CI'da `actions/setup-dotnet` ve `docker/setup-buildx-action` bilerek kullanılmıyor;
 gerekçe `.github/workflows/ci.yml` içindeki notlarda. "Sadeleştirme" amacıyla standart

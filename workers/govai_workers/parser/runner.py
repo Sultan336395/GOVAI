@@ -47,7 +47,7 @@ def process_document(client: GovAiClient, document: dict[str, Any]) -> None:
     """Bir dokümanı ayrıştırır ve fırsat kaydına çevirir."""
     url = document["url"]
     source_id = document["sourceId"]
-    document_id = document["id"]
+    document_id = document["documentId"]
 
     log.info("parse_started", document_id=document_id, url=url)
 

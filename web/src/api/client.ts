@@ -62,11 +62,10 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     throw new ApiError(response.status, detail, problem)
   }
 
-  if (response.status === 204) {
-    return undefined as T
-  }
+  // 202 (Accepted) ve 204 gibi gövdesiz yanıtlar da başarılıdır; boş gövdede json() patlar.
+  const body = await response.text()
 
-  return (await response.json()) as T
+  return (body ? (JSON.parse(body) as T) : (undefined as T))
 }
 
 function query(params: Record<string, unknown>): string {

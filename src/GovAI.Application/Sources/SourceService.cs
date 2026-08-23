@@ -17,7 +17,8 @@ public sealed record SourceDto(
     DateTimeOffset? LastRunAt,
     CrawlStatus LastRunStatus,
     string? LastRunMessage,
-    int ConsecutiveFailureCount);
+    int ConsecutiveFailureCount,
+    string? ConfigurationJson);
 
 public sealed record UpsertSourceRequest(string Name, SourceType Type, string BaseUrl, string CronExpression, string? ConfigurationJson);
 
@@ -125,7 +126,7 @@ public sealed class SourceService(
     /// </summary>
     public async Task<IngestDocumentResult> IngestDocumentAsync(IngestDocumentRequest request, CancellationToken cancellationToken = default)
     {
-        _ = await sources.GetAsync(request.SourceId, cancellationToken)
+        var source = await sources.GetAsync(request.SourceId, cancellationToken)
             ?? throw new NotFoundException("Kaynak", request.SourceId);
 
         var existing = await documents.GetByUrlAsync(request.SourceId, request.Url, cancellationToken);
@@ -139,7 +140,7 @@ public sealed class SourceService(
 
             await events.PublishAsync(
                 QueueNames.DocumentParseRequested,
-                new { DocumentId = document.Id, document.Url, document.MediaType },
+                ParsePayload(source, document),
                 cancellationToken);
 
             return new IngestDocumentResult(document.Id, IsNew: true, ContentChanged: true, document.Revision);
@@ -152,7 +153,7 @@ public sealed class SourceService(
         {
             await events.PublishAsync(
                 QueueNames.DocumentParseRequested,
-                new { DocumentId = existing.Id, existing.Url, existing.MediaType },
+                ParsePayload(source, existing),
                 cancellationToken);
 
             logger.LogInformation(
@@ -179,6 +180,22 @@ public sealed class SourceService(
         }
     }
 
+    /// <summary>
+    /// Parser worker'ının ihtiyaç duyduğu alanların tamamı mesajda taşınır: worker'ın
+    /// veritabanına erişimi yoktur, eksik alan sessizce "Bilinmiyor" kaydına dönüşür.
+    /// </summary>
+    private static object ParsePayload(Source source, SourceDocument document) => new
+    {
+        DocumentId = document.Id,
+        SourceId = source.Id,
+        SourceName = source.Name,
+        SourceType = source.Type.ToString(),
+        document.Url,
+        document.Title,
+        document.MediaType,
+        document.CollectedAt,
+    };
+
     private static SourceDto ToDto(Source source) => new(
         source.Id,
         source.Name,
@@ -189,5 +206,6 @@ public sealed class SourceService(
         source.LastRunAt,
         source.LastRunStatus,
         source.LastRunMessage,
-        source.ConsecutiveFailureCount);
+        source.ConsecutiveFailureCount,
+        source.ConfigurationJson);
 }

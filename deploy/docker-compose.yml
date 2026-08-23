@@ -123,6 +123,9 @@ services:
     build:
       context: ../workers
       dockerfile: Dockerfile
+      args:
+        APT_MIRROR: ${APT_MIRROR:-}
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-}
     restart: unless-stopped
     command: ["govai-collector"]
     depends_on:
@@ -145,6 +148,9 @@ services:
     build:
       context: ../workers
       dockerfile: Dockerfile
+      args:
+        APT_MIRROR: ${APT_MIRROR:-}
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-}
     restart: unless-stopped
     command: ["govai-parser"]
     depends_on:
@@ -158,6 +164,9 @@ services:
     build:
       context: ../workers
       dockerfile: Dockerfile
+      args:
+        APT_MIRROR: ${APT_MIRROR:-}
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-}
     restart: unless-stopped
     command: ["govai-scheduler"]
     depends_on:

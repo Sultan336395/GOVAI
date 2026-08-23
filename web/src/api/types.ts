@@ -352,4 +352,5 @@ export interface SourceDto {
   lastRunStatus: 'Pending' | 'Running' | 'Succeeded' | 'Failed' | 'Skipped'
   lastRunMessage: string | null
   consecutiveFailureCount: number
+  configurationJson: string | null
 }
