@@ -26,7 +26,7 @@ var connectionString = builder.Configuration.GetConnectionString("Postgres")
     ?? throw new InvalidOperationException("ConnectionStrings:Postgres tanımlı değil.");
 
 builder.Services.AddPersistence(connectionString);
-builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddInfrastructure(builder.Configuration, builder.Environment.EnvironmentName);
 builder.Services.AddApplication();
 builder.Services.AddScoped<DatabaseSeeder>();
 

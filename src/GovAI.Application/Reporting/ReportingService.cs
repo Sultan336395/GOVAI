@@ -48,6 +48,7 @@ public sealed class ReportingService(
     EligibilityService eligibility,
     IReportRenderer renderer,
     ICurrentUser currentUser,
+    CompanyAccessGuard access,
     IDateTimeProvider clock,
     ILogger<ReportingService> logger)
 {
@@ -55,13 +56,8 @@ public sealed class ReportingService(
 
     public async Task<DashboardDto> GetDashboardAsync(Guid companyId, CancellationToken cancellationToken = default)
     {
-        var company = await companies.GetWithDetailsAsync(companyId, cancellationToken)
-                      ?? throw new NotFoundException("Firma", companyId);
-
-        if (!currentUser.CanAccessCompany(companyId))
-        {
-            throw new ForbiddenException("Bu firmaya erişim yetkiniz yok.");
-        }
+        // Kiracı + yetki doğrulaması; şirket nesnesi ancak bu kapıdan geçtikten sonra elde edilir.
+        var company = await access.LoadAccessibleAsync(companyId, cancellationToken);
 
         var all = await assessments.ListLatestForCompanyAsync(companyId, cancellationToken);
         var now = clock.UtcNow;

@@ -37,6 +37,7 @@ public sealed class AuthenticationService(
     IPasswordHasher passwordHasher,
     ITokenService tokenService,
     IUnitOfWork unitOfWork,
+    ICurrentUser currentUser,
     IDateTimeProvider clock,
     ILogger<AuthenticationService> logger)
 {
@@ -116,8 +117,7 @@ public sealed class AuthenticationService(
 
     public async Task<UserDto> ChangeRoleAsync(Guid userId, UserRole role, CancellationToken cancellationToken = default)
     {
-        var user = await users.GetAsync(userId, cancellationToken)
-                   ?? throw new NotFoundException("Kullanıcı", userId);
+        var user = await LoadUserInTenantAsync(userId, cancellationToken);
 
         user.ChangeRole(role);
         await unitOfWork.SaveChangesAsync(cancellationToken);
@@ -127,8 +127,7 @@ public sealed class AuthenticationService(
 
     public async Task<UserDto> SetActiveAsync(Guid userId, bool isActive, CancellationToken cancellationToken = default)
     {
-        var user = await users.GetAsync(userId, cancellationToken)
-                   ?? throw new NotFoundException("Kullanıcı", userId);
+        var user = await LoadUserInTenantAsync(userId, cancellationToken);
 
         if (isActive)
         {
@@ -160,6 +159,29 @@ public sealed class AuthenticationService(
             // burada güvenli taraf, kullanıcıyı hiçbir firmaya erişemez saymaktır.
             return [Guid.Empty];
         }
+    }
+
+    /// <summary>
+    /// Yönetim işlemleri için kullanıcıyı yükler ve <b>çağıranın kiracısına ait olduğunu</b>
+    /// doğrular. Eskiden bu kontrol yoktu: bir kiracının yöneticisi başka kiracının
+    /// kullanıcısının rolünü değiştirebiliyordu (Faz 0 / D3).
+    ///
+    /// Başka kiracının kullanıcısı "bulunamadı" sayılır; varlığı doğrulanmaz.
+    /// </summary>
+    private async Task<AppUser> LoadUserInTenantAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var tenantId = currentUser.TenantId
+                       ?? throw new ForbiddenException("İstek bir kiracıya bağlı değil.");
+
+        var user = await users.GetAsync(userId, cancellationToken)
+                   ?? throw new NotFoundException("Kullanıcı", userId);
+
+        if (user.TenantId != tenantId)
+        {
+            throw new NotFoundException("Kullanıcı", userId);
+        }
+
+        return user;
     }
 
     private static UserDto ToDto(AppUser user) => new(

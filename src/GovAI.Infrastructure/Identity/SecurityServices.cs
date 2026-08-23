@@ -17,8 +17,20 @@ public static class GovAiClaims
     public const string TenantId = "tenant_id";
     public const string Role = "govai_role";
 
-    /// <summary>Danışman rolünün erişebileceği firma kimlikleri; boşsa kiracıdaki tüm firmalar.</summary>
+    /// <summary>Kapsamı sınırlanmış kullanıcının erişebileceği firma kimlikleri (virgülle ayrık).</summary>
     public const string ScopedCompanies = "scoped_companies";
+
+    /// <summary>
+    /// Firma erişim kapsamının <b>açık</b> bildirimi. Bu claim yoksa erişim reddedilir —
+    /// "bilgi yoksa izin ver" davranışı bilinçli olarak kaldırılmıştır (Faz 0 / D1).
+    /// </summary>
+    public const string CompanyScope = "company_scope";
+
+    /// <summary>Kullanıcı kendi kiracısındaki tüm firmalara erişebilir. Kiracı sınırı ayrıca uygulanır.</summary>
+    public const string CompanyScopeTenant = "tenant";
+
+    /// <summary>Kullanıcı yalnızca <see cref="ScopedCompanies"/> listesindeki firmalara erişebilir.</summary>
+    public const string CompanyScopeList = "list";
 }
 
 /// <summary>
@@ -86,9 +98,15 @@ public sealed class JwtTokenService(IOptions<JwtOptions> options) : ITokenServic
             new(ClaimTypes.Role, role.ToString())
         };
 
+        // Kapsam her zaman açıkça yazılır; alıcı taraf claim'in yokluğunu "sınırsız" saymaz.
         if (scopedCompanyIds.Count > 0)
         {
+            claims.Add(new Claim(GovAiClaims.CompanyScope, GovAiClaims.CompanyScopeList));
             claims.Add(new Claim(GovAiClaims.ScopedCompanies, string.Join(',', scopedCompanyIds)));
+        }
+        else
+        {
+            claims.Add(new Claim(GovAiClaims.CompanyScope, GovAiClaims.CompanyScopeTenant));
         }
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.SigningKey));
@@ -115,8 +133,10 @@ public sealed class SystemDateTimeProvider : IDateTimeProvider
 
 /// <summary>
 /// HTTP isteğindeki JWT'den aktif kullanıcıyı okur.
-/// Worker/arka plan bağlamında HttpContext yoktur; bu durumda kullanıcı "kimliksiz" kabul edilir
-/// ve <see cref="CanAccessCompany"/> her zaman true döner (sistem içi iş).
+///
+/// Güvenlik duruşu (Faz 0): erişim <b>yalnızca açıkça doğrulanabildiğinde</b> verilir.
+/// Kimlik doğrulanmamış istekler ve kapsamı bildirilmemiş jetonlar firmaya erişemez.
+/// Arka plan işleri bu sınıfı kullanmaz; onların yolu <see cref="SystemCurrentUser"/>'dır.
 /// </summary>
 public sealed class HttpContextCurrentUser(IHttpContextAccessor accessor) : ICurrentUser
 {
@@ -143,27 +163,47 @@ public sealed class HttpContextCurrentUser(IHttpContextAccessor accessor) : ICur
 
     public bool CanAccessCompany(Guid companyId)
     {
+        // Kimlik yoksa erişim yoktur. Eskiden burada true dönülüyordu; bu, kimliksiz
+        // her isteğe tüm firmaları açan sessiz bir açıktı.
         if (!IsAuthenticated)
         {
-            // Arka plan işleri (worker, zamanlanmış görev) kiracı filtresine servis seviyesinde tabidir.
-            return true;
+            return false;
         }
 
-        var scoped = Principal?.FindFirstValue(GovAiClaims.ScopedCompanies);
-        if (string.IsNullOrWhiteSpace(scoped))
+        var scope = Principal?.FindFirstValue(GovAiClaims.CompanyScope);
+
+        // Kiracı genelinde yetki. Kiracı sınırının kendisi ayrıca uygulanır
+        // (EF sorgu filtresi + servis katmanındaki CompanyAccessGuard).
+        if (string.Equals(scope, GovAiClaims.CompanyScopeTenant, StringComparison.Ordinal))
         {
             return true;
         }
 
-        return scoped
-            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Any(id => Guid.TryParse(id, out var parsed) && parsed == companyId);
+        if (string.Equals(scope, GovAiClaims.CompanyScopeList, StringComparison.Ordinal))
+        {
+            var scoped = Principal?.FindFirstValue(GovAiClaims.ScopedCompanies);
+            if (string.IsNullOrWhiteSpace(scoped))
+            {
+                return false;
+            }
+
+            return scoped
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Any(id => Guid.TryParse(id, out var parsed) && parsed == companyId);
+        }
+
+        // Kapsam açıkça bildirilmemiş: eski biçimli veya elle üretilmiş jeton. Reddet.
+        return false;
     }
 
     private static Guid? TryGuid(string? value) => Guid.TryParse(value, out var parsed) ? parsed : null;
 }
 
-/// <summary>Arka plan worker'ları ve seed işlemleri için kullanıcı bağlamı.</summary>
+/// <summary>
+/// Sistem aktörü: yalnızca uygulama içi, HTTP'siz işlemler (açılış seed'i gibi) için.
+/// DI'da <see cref="ICurrentUser"/> olarak kayıtlı <b>değildir</b>; bir HTTP isteğinden
+/// erişilemez. Kiracı sınırı <see cref="TenantId"/> açıkça atanarak kurulur.
+/// </summary>
 public sealed class SystemCurrentUser : ICurrentUser
 {
     public Guid? UserId => null;

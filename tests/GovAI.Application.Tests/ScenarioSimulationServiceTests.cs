@@ -1,3 +1,4 @@
+using GovAI.Application.Common;
 using GovAI.Application.Companies;
 using GovAI.Application.Simulation;
 using GovAI.Domain.Common;
@@ -104,6 +105,7 @@ public class ScenarioSimulationServiceTests
             scenarios,
             new FakeUnitOfWork(),
             currentUser,
+            new CompanyAccessGuard(companies, currentUser),
             new FixedClock(Now),
             NullLogger<ScenarioSimulationService>.Instance);
 

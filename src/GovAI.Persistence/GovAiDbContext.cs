@@ -22,6 +22,21 @@ public class GovAiDbContext(
 {
     public const string Schema = "govai";
 
+    /// <summary>
+    /// Bu bağlamın hizmet verdiği kiracı. Bağlam oluşturulurken bir kez çözülür;
+    /// istek ortasında değişemez.
+    ///
+    /// Kiracı çözülemezse <see cref="Guid.Empty"/> kalır ve sorgu filtreleri
+    /// <b>hiçbir satırla eşleşmez</b>. Bu bilinçlidir: kimliği belirsiz bir bağlam
+    /// veri göremez ("bilgi yoksa reddet"). Filtreyi devre dışı bırakan bir yol yoktur;
+    /// <c>IgnoreQueryFilters()</c> kod tabanında kullanılmaz.
+    ///
+    /// Sistem işlemleri (açılış seed'i) yalnızca kiracıya bağlı olmayan tablolara
+    /// (<see cref="Tenants"/>, <see cref="Sources"/>, <see cref="Opportunities"/>)
+    /// okuma yapar; yazma işlemleri sorgu filtresinden etkilenmez.
+    /// </summary>
+    private readonly Guid _tenantId = currentUser?.TenantId ?? Guid.Empty;
+
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<AppUser> Users => Set<AppUser>();
     public DbSet<Company> Companies => Set<Company>();
@@ -38,7 +53,44 @@ public class GovAiDbContext(
         modelBuilder.HasDefaultSchema(Schema);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(GovAiDbContext).Assembly);
 
+        ApplyTenantFilters(modelBuilder);
+
         base.OnModelCreating(modelBuilder);
+    }
+
+    /// <summary>
+    /// Kiracıya ait varlıklara zorunlu kiracı sınırı uygular. Savunmanın ilk katmanıdır;
+    /// servis katmanındaki yetki kontrolü (CompanyAccessGuard) ikinci katmandır ve
+    /// bu filtre var diye kaldırılmaz.
+    ///
+    /// <b>Bilinçli olarak kapsam dışı:</b> Sources, SourceDocuments, Opportunities,
+    /// OpportunityRules, OpportunityDocuments. Bunlar resmî çağrı kataloğudur ve
+    /// tasarım gereği tüm kiracılar tarafından ortak kullanılır (bkz. docs/data-model.md).
+    ///
+    /// Yumuşak silme filtresi de burada birleştirilir: <c>HasQueryFilter</c> aynı varlık
+    /// için ikinci kez çağrıldığında öncekini <b>değiştirir</b>, eklemez.
+    /// </summary>
+    private void ApplyTenantFilters(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Company>()
+            .HasQueryFilter(c => !c.IsDeleted && c.TenantId == _tenantId);
+
+        modelBuilder.Entity<AppUser>()
+            .HasQueryFilter(u => !u.IsDeleted && u.TenantId == _tenantId);
+
+        modelBuilder.Entity<EligibilityAssessment>()
+            .HasQueryFilter(a => a.TenantId == _tenantId);
+
+        modelBuilder.Entity<ScenarioSimulation>()
+            .HasQueryFilter(s => s.TenantId == _tenantId);
+
+        modelBuilder.Entity<Notification>()
+            .HasQueryFilter(n => n.TenantId == _tenantId);
+
+        // AuditLogEntry.TenantId nullable'dır (kiracı belirlenemeden oluşan kayıtlar için).
+        // Kiracısı olmayan kayıtlar hiçbir kiracıya gösterilmez.
+        modelBuilder.Entity<AuditLogEntry>()
+            .HasQueryFilter(a => a.TenantId == _tenantId);
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

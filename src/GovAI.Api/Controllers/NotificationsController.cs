@@ -1,5 +1,6 @@
 using GovAI.Api.Infrastructure;
 using GovAI.Application.Abstractions.Persistence;
+using GovAI.Application.Abstractions.Services;
 using GovAI.Application.Notifications;
 using GovAI.Domain.Common;
 using Microsoft.AspNetCore.Authorization;
@@ -14,7 +15,7 @@ namespace GovAI.Api.Controllers;
 [Route("api/notifications")]
 [Authorize(Policy = Policies.Read)]
 [Produces("application/json")]
-public sealed class NotificationsController(NotificationService service) : ControllerBase
+public sealed class NotificationsController(NotificationService service, ICurrentUser currentUser) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<PagedResult<NotificationDto>>> List(
@@ -27,6 +28,9 @@ public sealed class NotificationsController(NotificationService service) : Contr
     {
         var query = new NotificationQuery
         {
+            // Servis bu değeri oturumdan yeniden yazar; burada verilmesinin tek sebebi
+            // alanın zorunlu olması ve hiçbir çağrı yerinin kiracıyı atlayamamasıdır.
+            TenantId = currentUser.TenantId ?? Guid.Empty,
             CompanyId = companyId,
             OnlyUnread = onlyUnread,
             Kinds = kinds,

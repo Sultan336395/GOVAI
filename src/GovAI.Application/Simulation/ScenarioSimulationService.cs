@@ -23,6 +23,7 @@ public sealed class ScenarioSimulationService(
     IScenarioSimulationRepository simulations,
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
+    CompanyAccessGuard access,
     IDateTimeProvider clock,
     ILogger<ScenarioSimulationService> logger)
 {
@@ -32,13 +33,7 @@ public sealed class ScenarioSimulationService(
         bool persist = true,
         CancellationToken cancellationToken = default)
     {
-        var company = await companies.GetWithDetailsAsync(companyId, cancellationToken)
-                      ?? throw new NotFoundException("Firma", companyId);
-
-        if (!currentUser.CanAccessCompany(companyId))
-        {
-            throw new ForbiddenException("Bu firmaya erişim yetkiniz yok.");
-        }
+        var company = await access.LoadAccessibleAsync(companyId, cancellationToken);
 
         var now = clock.UtcNow;
         var openOpportunities = await opportunities.ListForEvaluationAsync(now, request.Categories, cancellationToken);
@@ -118,10 +113,7 @@ public sealed class ScenarioSimulationService(
 
     public async Task<IReadOnlyList<ScenarioSummaryDto>> ListAsync(Guid companyId, CancellationToken cancellationToken = default)
     {
-        if (!currentUser.CanAccessCompany(companyId))
-        {
-            throw new ForbiddenException("Bu firmaya erişim yetkiniz yok.");
-        }
+        await access.EnsureAccessAsync(companyId, cancellationToken);
 
         var items = await simulations.ListForCompanyAsync(companyId, cancellationToken);
 

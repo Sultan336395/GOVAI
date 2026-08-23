@@ -121,7 +121,9 @@ public sealed class NotificationRepository(GovAiDbContext context) : INotificati
 
     public async Task<PagedResult<Notification>> ListAsync(NotificationQuery query, CancellationToken cancellationToken = default)
     {
-        var source = context.Notifications.AsQueryable();
+        // Kiracı sınırı her zaman ilk uygulanan koşuldur; diğer filtreler ve sayfalama
+        // yalnızca bu kümenin içinde çalışır. (EF genel sorgu filtresi de ayrıca devrededir.)
+        var source = context.Notifications.Where(n => n.TenantId == query.TenantId);
 
         if (query.CompanyId is not null)
         {

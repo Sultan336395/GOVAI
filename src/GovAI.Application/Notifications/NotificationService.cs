@@ -26,18 +26,24 @@ public sealed class NotificationService(
     INotificationRepository notifications,
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
+    CompanyAccessGuard access,
     IDateTimeProvider clock,
     IEventPublisher events,
     ILogger<NotificationService> logger)
 {
     public async Task<PagedResult<NotificationDto>> ListAsync(NotificationQuery query, CancellationToken cancellationToken = default)
     {
-        if (query.CompanyId is not null && !currentUser.CanAccessCompany(query.CompanyId.Value))
+        // Kiracı her zaman oturumdan yeniden yazılır; çağıranın gönderdiği değere güvenilmez.
+        var scoped = query with { TenantId = access.RequireTenant() };
+
+        // Firma verildiyse ayrıca o firmanın bu kiracıya ait olduğu ve kullanıcının
+        // erişebildiği doğrulanır. Firma verilmediyse kiracı sınırı tek başına yeterlidir.
+        if (scoped.CompanyId is not null)
         {
-            throw new ForbiddenException("Bu firmaya erişim yetkiniz yok.");
+            await access.EnsureAccessAsync(scoped.CompanyId.Value, cancellationToken);
         }
 
-        var page = await notifications.ListAsync(query, cancellationToken);
+        var page = await notifications.ListAsync(scoped, cancellationToken);
 
         return new PagedResult<NotificationDto>(
             page.Items.Select(ToDto).ToList(),
@@ -48,12 +54,20 @@ public sealed class NotificationService(
 
     public async Task<NotificationDto> MarkReadAsync(Guid notificationId, CancellationToken cancellationToken = default)
     {
+        var tenantId = access.RequireTenant();
+
         var notification = await notifications.GetAsync(notificationId, cancellationToken)
                            ?? throw new NotFoundException("Bildirim", notificationId);
 
-        if (notification.CompanyId is not null && !currentUser.CanAccessCompany(notification.CompanyId.Value))
+        // Başka kiracının bildirimi "yok" sayılır; varlığı doğrulanmaz.
+        if (notification.TenantId != tenantId)
         {
-            throw new ForbiddenException("Bu bildirime erişim yetkiniz yok.");
+            throw new NotFoundException("Bildirim", notificationId);
+        }
+
+        if (notification.CompanyId is not null)
+        {
+            await access.EnsureAccessAsync(notification.CompanyId.Value, cancellationToken);
         }
 
         notification.MarkRead(clock.UtcNow);

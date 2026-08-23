@@ -70,7 +70,8 @@ public sealed class CompanyConfiguration : IEntityTypeConfiguration<Company>
 
         UseBackingFields(builder, "NaceCodes", "Locations", "Certificates", "ActiveInvestments");
 
-        builder.HasQueryFilter(c => !c.IsDeleted);
+        // Sorgu filtresi GovAiDbContext.ApplyTenantFilters içinde tanımlıdır
+        // (yumuşak silme + kiracı sınırı birlikte).
     }
 
     internal static void UseBackingFields<T>(EntityTypeBuilder<T> builder, params string[] navigations) where T : class

@@ -27,6 +27,7 @@ public sealed class EligibilityService(
     INotificationRepository notifications,
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
+    CompanyAccessGuard access,
     IDateTimeProvider clock,
     IAiExplanationClient ai,
     ILogger<EligibilityService> logger)
@@ -320,18 +321,12 @@ public sealed class EligibilityService(
         }
     }
 
-    private async Task<Company> LoadCompanyAsync(Guid companyId, CancellationToken cancellationToken)
-    {
-        var company = await companies.GetWithDetailsAsync(companyId, cancellationToken)
-                      ?? throw new NotFoundException("Firma", companyId);
-
-        if (currentUser.IsAuthenticated && !currentUser.CanAccessCompany(companyId))
-        {
-            throw new ForbiddenException("Bu firmaya erişim yetkiniz yok.");
-        }
-
-        return company;
-    }
+    /// <summary>
+    /// Kiracı ve yetki doğrulaması merkezî kapıya devredilmiştir. Eskiden burada yalnızca
+    /// <c>CanAccessCompany</c> çağrılıyor, kiracı hiç karşılaştırılmıyordu (Faz 0 / D1).
+    /// </summary>
+    private Task<Company> LoadCompanyAsync(Guid companyId, CancellationToken cancellationToken) =>
+        access.LoadAccessibleAsync(companyId, cancellationToken);
 
     private async Task EnsureCompanyAccessAsync(Guid companyId, CancellationToken cancellationToken)
     {

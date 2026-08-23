@@ -1,3 +1,4 @@
+using GovAI.Application.Common;
 using GovAI.Application.Companies;
 using GovAI.Application.Eligibility;
 using GovAI.Application.Identity;
@@ -18,6 +19,9 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
+        // Şirket erişim kapısı: servislerden önce kaydedilir, hepsi buna bağımlıdır.
+        services.AddScoped<CompanyAccessGuard>();
+
         services.AddScoped<CompanyProfileService>();
         services.AddScoped<OpportunityService>();
         services.AddScoped<SourceService>();

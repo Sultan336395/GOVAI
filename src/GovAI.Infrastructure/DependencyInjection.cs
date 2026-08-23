@@ -9,18 +9,31 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using StackExchange.Redis;
 
 namespace GovAI.Infrastructure;
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
+    /// <param name="environmentName">
+    /// Barındırma ortamı adı. JWT anahtar doğrulaması buna göre sıkılaşır: depodaki
+    /// geliştirme anahtarı yalnızca Development'ta kabul edilir. Verilmezse en katı
+    /// davranış uygulanır (üretim varsayılır).
+    /// </param>
+    public static IServiceCollection AddInfrastructure(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        string? environmentName = null)
     {
         services.AddOptions<JwtOptions>()
             .Bind(configuration.GetSection(JwtOptions.SectionName))
             .ValidateDataAnnotations()
             .ValidateOnStart();
+
+        // Uzunluk kontrolü yetmiyor: örnek anahtar 45 karakter olduğu için onu da geçiyordu.
+        services.AddSingleton<IValidateOptions<JwtOptions>>(
+            new JwtOptionsValidator(environmentName ?? "Production"));
 
         services.Configure<OpenAiOptions>(configuration.GetSection(OpenAiOptions.SectionName));
         services.Configure<RedisOptions>(configuration.GetSection(RedisOptions.SectionName));

@@ -16,6 +16,7 @@ public sealed class CompanyProfileService(
     ITenantRepository tenants,
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
+    CompanyAccessGuard access,
     IDateTimeProvider clock,
     IEventPublisher events,
     ICacheService cache,
@@ -189,20 +190,9 @@ public sealed class CompanyProfileService(
         company.ReplaceInvestments(request.ActiveInvestments.Select(ToDomain));
     }
 
-    private async Task<Company> LoadAccessibleAsync(Guid companyId, CancellationToken cancellationToken)
-    {
-        var tenantId = RequireTenant();
-
-        var company = await companies.GetWithDetailsAsync(companyId, cancellationToken)
-                      ?? throw new NotFoundException("Firma", companyId);
-
-        if (company.TenantId != tenantId || !currentUser.CanAccessCompany(companyId))
-        {
-            throw new ForbiddenException("Bu firmaya erişim yetkiniz yok.");
-        }
-
-        return company;
-    }
+    // Bu servisin özgün kontrolü, tüm servislerin ortak kullandığı CompanyAccessGuard'a taşındı.
+    private Task<Company> LoadAccessibleAsync(Guid companyId, CancellationToken cancellationToken) =>
+        access.LoadAccessibleAsync(companyId, cancellationToken);
 
     private async Task EnsureCompanyQuotaAsync(Guid tenantId, CancellationToken cancellationToken)
     {
@@ -218,8 +208,7 @@ public sealed class CompanyProfileService(
         }
     }
 
-    private Guid RequireTenant() =>
-        currentUser.TenantId ?? throw new ForbiddenException("İstek bir kiracıya bağlı değil.");
+    private Guid RequireTenant() => access.RequireTenant();
 
     private Task InvalidateAsync(Guid companyId, CancellationToken cancellationToken) =>
         cache.RemoveByPrefixAsync($"company:{companyId}", cancellationToken);

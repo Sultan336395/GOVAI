@@ -172,7 +172,8 @@ public sealed class AppUserConfiguration : IEntityTypeConfiguration<AppUser>
 
         builder.HasIndex(u => u.Email).IsUnique();
         builder.HasIndex(u => u.TenantId);
-        builder.HasQueryFilter(u => !u.IsDeleted);
+        // Sorgu filtresi GovAiDbContext.ApplyTenantFilters içinde tanımlıdır
+        // (yumuşak silme + kiracı sınırı birlikte).
     }
 }
 

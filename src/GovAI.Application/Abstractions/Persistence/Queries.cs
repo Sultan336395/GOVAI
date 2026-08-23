@@ -80,6 +80,13 @@ public enum AssessmentSort
 
 public sealed record NotificationQuery : PageRequest
 {
+    /// <summary>
+    /// Zorunlu kiracı sınırı. <c>required</c> olması bilinçlidir: yeni bir çağrı yeri
+    /// bu alanı atlamak isterse derleme hatası alır. Değer her zaman oturumdan gelir;
+    /// istemcinin gönderdiği bir kiracı kimliği kabul edilmez (bkz. NotificationService).
+    /// </summary>
+    public required Guid TenantId { get; init; }
+
     public Guid? CompanyId { get; init; }
 
     public bool? OnlyUnread { get; init; }
