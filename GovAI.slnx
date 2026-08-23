@@ -7,6 +7,7 @@
     <Project Path="src/GovAI.Persistence/GovAI.Persistence.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/GovAI.Api.Tests/GovAI.Api.Tests.csproj" />
     <Project Path="tests/GovAI.Application.Tests/GovAI.Application.Tests.csproj" />
     <Project Path="tests/GovAI.Domain.Tests/GovAI.Domain.Tests.csproj" />
   </Folder>

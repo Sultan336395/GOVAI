@@ -42,12 +42,10 @@ public sealed record ExportedFile(string FileName, string ContentType, byte[] Co
 /// Skorları okur, önceliklendirir ve PDF / Excel çıktısı üretir.
 /// </summary>
 public sealed class ReportingService(
-    ICompanyRepository companies,
     IAssessmentRepository assessments,
     IOpportunityRepository opportunities,
     EligibilityService eligibility,
     IReportRenderer renderer,
-    ICurrentUser currentUser,
     CompanyAccessGuard access,
     IDateTimeProvider clock,
     ILogger<ReportingService> logger)

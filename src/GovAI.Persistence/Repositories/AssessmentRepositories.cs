@@ -170,7 +170,13 @@ public sealed class UserRepository(GovAiDbContext context) : IUserRepository
     public Task<AppUser?> GetByEmailAsync(string email, CancellationToken cancellationToken = default)
     {
         var normalized = email.Trim().ToLowerInvariant();
-        return context.Users.FirstOrDefaultAsync(u => u.Email == normalized, cancellationToken);
+
+        // Kod tabanındaki TEK IgnoreQueryFilters kullanımı; gerekçesi IUserRepository'de yazılıdır.
+        // Filtre tümüyle kalktığı için yumuşak silme koşulu ELLE geri konur — aksi hâlde
+        // silinmiş bir hesap yeniden giriş yapabilirdi.
+        return context.Users
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(u => u.Email == normalized && !u.IsDeleted, cancellationToken);
     }
 
     public async Task<IReadOnlyList<AppUser>> ListAsync(Guid tenantId, CancellationToken cancellationToken = default) =>

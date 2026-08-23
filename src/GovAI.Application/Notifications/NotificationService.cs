@@ -25,7 +25,6 @@ public sealed record NotificationDto(
 public sealed class NotificationService(
     INotificationRepository notifications,
     IUnitOfWork unitOfWork,
-    ICurrentUser currentUser,
     CompanyAccessGuard access,
     IDateTimeProvider clock,
     IEventPublisher events,

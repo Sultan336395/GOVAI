@@ -18,11 +18,9 @@ namespace GovAI.Application.Simulation;
 /// aynı deterministik kural motoru çalıştırılır, sonuçlar karşılaştırılır.
 /// </summary>
 public sealed class ScenarioSimulationService(
-    ICompanyRepository companies,
     IOpportunityRepository opportunities,
     IScenarioSimulationRepository simulations,
     IUnitOfWork unitOfWork,
-    ICurrentUser currentUser,
     CompanyAccessGuard access,
     IDateTimeProvider clock,
     ILogger<ScenarioSimulationService> logger)

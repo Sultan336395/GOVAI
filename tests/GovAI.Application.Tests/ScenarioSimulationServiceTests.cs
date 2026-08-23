@@ -100,11 +100,9 @@ public class ScenarioSimulationServiceTests
         var scenarios = new FakeScenarioRepository();
 
         var service = new ScenarioSimulationService(
-            companies,
             opportunities,
             scenarios,
             new FakeUnitOfWork(),
-            currentUser,
             new CompanyAccessGuard(companies, currentUser),
             new FixedClock(Now),
             NullLogger<ScenarioSimulationService>.Instance);

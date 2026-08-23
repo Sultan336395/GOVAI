@@ -124,6 +124,22 @@ public interface IUserRepository
 {
     Task<AppUser?> GetAsync(Guid userId, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// E-posta ile kullanıcı arar. <b>Kiracı sınırını bilinçli olarak aşan tek sorgudur.</b>
+    ///
+    /// Zorunludur, çünkü:
+    /// <list type="bullet">
+    ///   <item>Girişte kiracı, kullanıcı bulunmadan bilinemez; jetondaki kiracı buradan doğar.</item>
+    ///   <item><c>users.email</c> şemada global benzersizdir. Mükerrer kontrolü de kiracılar
+    ///         arası olmak zorundadır; aksi hâlde temiz doğrulama hatası yerine veritabanı
+    ///         kısıt ihlali alınır.</item>
+    /// </list>
+    ///
+    /// Yalnızca <c>AuthenticationService.LoginAsync</c> ve <c>CreateUserAsync</c> çağırır.
+    /// Bulunan kullanıcı çağırana açılmaz; parola doğrulaması ve jeton üretimi dışında kullanılmaz.
+    /// Koruyan testler: <c>Giris_kullaniciyi_kendi_kiracisina_baglar</c>,
+    /// <c>Mukerrer_eposta_farkli_kiracida_da_reddedilir</c>.
+    /// </summary>
     Task<AppUser?> GetByEmailAsync(string email, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<AppUser>> ListAsync(Guid tenantId, CancellationToken cancellationToken = default);

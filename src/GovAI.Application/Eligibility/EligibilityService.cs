@@ -26,7 +26,6 @@ public sealed class EligibilityService(
     IAssessmentRepository assessments,
     INotificationRepository notifications,
     IUnitOfWork unitOfWork,
-    ICurrentUser currentUser,
     CompanyAccessGuard access,
     IDateTimeProvider clock,
     IAiExplanationClient ai,
