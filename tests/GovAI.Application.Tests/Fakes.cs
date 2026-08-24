@@ -20,6 +20,8 @@ internal sealed class FakeCurrentUser : ICurrentUser
 
     public Guid? TenantId { get; init; } = Guid.CreateVersion7();
 
+    public Guid? ActiveCompanyId { get; init; }
+
     public string? Email => "test@govai.local";
 
     public UserRole? Role => UserRole.CompanyManager;

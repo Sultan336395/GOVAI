@@ -23,6 +23,8 @@ public static class DependencyInjection
         services.AddScoped<CompanyAccessGuard>();
 
         services.AddScoped<CompanyProfileService>();
+        services.AddScoped<CompanyRegistryService>();
+        services.AddScoped<CompanyMembershipService>();
         services.AddScoped<OpportunityService>();
         services.AddScoped<SourceService>();
         services.AddScoped<EligibilityService>();

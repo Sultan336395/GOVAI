@@ -2,6 +2,7 @@ using GovAI.Api.Infrastructure;
 using GovAI.Application.Abstractions.Persistence;
 using GovAI.Application.Abstractions.Services;
 using GovAI.Application.Common;
+using GovAI.Application.Companies;
 using GovAI.Application.Identity;
 using GovAI.Domain.Auditing;
 using GovAI.Domain.Common;
@@ -93,7 +94,7 @@ public sealed class AdminController(
 [ApiController]
 [Route("api/auth")]
 [Produces("application/json")]
-public sealed class AuthController(AuthenticationService authentication) : ControllerBase
+public sealed class AuthController(AuthenticationService authentication, CompanyMembershipService membership) : ControllerBase
 {
     [HttpPost("login")]
     [AllowAnonymous]
@@ -101,6 +102,21 @@ public sealed class AuthController(AuthenticationService authentication) : Contr
         [FromBody] LoginRequest request,
         CancellationToken cancellationToken) =>
         Ok(await authentication.LoginAsync(request, cancellationToken));
+
+    /// <summary>
+    /// Aktif şirketi değiştirir.
+    ///
+    /// İstemcinin gönderdiği şirket kimliğine güvenilmez: üyelik veritabanından
+    /// doğrulanır, şirket başka kiracıdaysa veya üyelik pasifse istek reddedilir.
+    /// Doğrulama geçerse aktif şirket bilgisini taşıyan <b>yeni bir jeton</b> döner.
+    /// </summary>
+    [HttpPost("active-company")]
+    [Authorize(Policy = Policies.CompanyData)]
+    [Audited("Auth.ActiveCompanyChanged", "Company")]
+    public async Task<ActionResult<ActiveCompanyResult>> SetActiveCompany(
+        [FromBody] SetActiveCompanyRequest request,
+        CancellationToken cancellationToken) =>
+        Ok(await membership.SetActiveCompanyAsync(request, cancellationToken));
 
     /// <summary>Oturum açmış kullanıcının kendi bilgileri.</summary>
     [HttpGet("me")]

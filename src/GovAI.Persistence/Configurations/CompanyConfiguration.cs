@@ -60,6 +60,15 @@ public sealed class CompanyConfiguration : IEntityTypeConfiguration<Company>
             contact.Property(x => x.Address).HasColumnName("address").HasMaxLength(1000);
         });
 
+        // Registry ve Contact'ın tüm alanları null olabilir. EF, tüm alanları null olan
+        // sahipli bir referansı "yok" sayar; sonradan değer atandığında var olmayan bir satırı
+        // güncellemeye çalışır ve DbUpdateConcurrencyException atar
+        // ("Attempted to update or delete an entity that does not exist in the store").
+        // IsRequired ile sahipli satırın her zaman var olduğu bildirilir.
+        builder.Navigation(c => c.Registry).IsRequired();
+        builder.Navigation(c => c.Contact).IsRequired();
+
+
         // Aynı kiracıda aynı vergi numarası iki kez kayıtlı olamaz.
         builder.HasIndex(c => new { c.TenantId, c.TaxNumber }).IsUnique();
         builder.HasIndex(c => c.TenantId);

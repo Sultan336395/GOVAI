@@ -30,7 +30,10 @@ public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logge
         }
 
         httpContext.Response.StatusCode = problem.Status ?? StatusCodes.Status500InternalServerError;
-        await httpContext.Response.WriteAsJsonAsync(problem, cancellationToken);
+        // Tip BİLE BİLE çalışma zamanından alınır: doğrulama hatalarında nesne aslında
+        // ValidationProblemDetails'tir ve statik tiple yazılırsa System.Text.Json türetilmiş
+        // "errors" sözlüğünü hiç yazmaz — panel hangi alanın hatalı olduğunu göremezdi.
+        await httpContext.Response.WriteAsJsonAsync(problem, problem.GetType(), cancellationToken);
 
         return true;
     }

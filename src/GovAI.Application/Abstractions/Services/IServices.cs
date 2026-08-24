@@ -31,6 +31,12 @@ public interface ICurrentUser
 
     /// <summary>Danışman rolü belirli firmalarla sınırlandırılmışsa erişim kontrolü burada yapılır.</summary>
     bool CanAccessCompany(Guid companyId);
+
+    /// <summary>
+    /// Jetondaki aktif şirket. Yalnızca bilgilendirme amaçlıdır; erişim kararı
+    /// her zaman veritabanındaki üyelikten verilir.
+    /// </summary>
+    Guid? ActiveCompanyId { get; }
 }
 
 /// <summary>Redis üzerinden okuma yoğun sorguların önbelleklenmesi.</summary>
@@ -86,7 +92,8 @@ public interface ITokenService
         Guid tenantId,
         string email,
         UserRole role,
-        IReadOnlyCollection<Guid> scopedCompanyIds);
+        IReadOnlyCollection<Guid> scopedCompanyIds,
+        Guid? activeCompanyId = null);
 
     string CreateRefreshToken();
 }

@@ -44,7 +44,8 @@ public sealed class CompanyProfileService(
 
     public async Task<CompanyDetailDto> GetAsync(Guid companyId, CancellationToken cancellationToken = default)
     {
-        var company = await LoadAccessibleAsync(companyId, cancellationToken);
+        // Okuma için üyelik yeterlidir: CompanyViewer da firma kartını görebilmelidir.
+        var company = await LoadAccessibleAsync(companyId, CompanyPermission.Read, cancellationToken);
         return ToDetail(company);
     }
 
@@ -73,7 +74,7 @@ public sealed class CompanyProfileService(
 
     public async Task<CompanyDetailDto> UpdateAsync(Guid companyId, UpsertCompanyRequest request, CancellationToken cancellationToken = default)
     {
-        var company = await LoadAccessibleAsync(companyId, cancellationToken);
+        var company = await LoadAccessibleAsync(companyId, cancellationToken: cancellationToken);
         var previousVersion = company.ProfileVersion;
 
         Apply(company, request);
@@ -158,7 +159,7 @@ public sealed class CompanyProfileService(
 
     public async Task DeleteAsync(Guid companyId, CancellationToken cancellationToken = default)
     {
-        var company = await LoadAccessibleAsync(companyId, cancellationToken);
+        var company = await LoadAccessibleAsync(companyId, cancellationToken: cancellationToken);
         companies.Remove(company);
         await unitOfWork.SaveChangesAsync(cancellationToken);
         await InvalidateAsync(companyId, cancellationToken);
@@ -200,8 +201,11 @@ public sealed class CompanyProfileService(
     }
 
     // Bu servisin özgün kontrolü, tüm servislerin ortak kullandığı CompanyAccessGuard'a taşındı.
-    private Task<Company> LoadAccessibleAsync(Guid companyId, CancellationToken cancellationToken) =>
-        access.LoadAccessibleAsync(companyId, CompanyPermission.ManageProfile, cancellationToken);
+    private Task<Company> LoadAccessibleAsync(
+        Guid companyId,
+        CompanyPermission required = CompanyPermission.ManageProfile,
+        CancellationToken cancellationToken = default) =>
+        access.LoadAccessibleAsync(companyId, required, cancellationToken);
 
     private async Task EnsureCompanyQuotaAsync(Guid tenantId, CancellationToken cancellationToken)
     {

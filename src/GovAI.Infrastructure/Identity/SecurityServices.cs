@@ -31,6 +31,12 @@ public static class GovAiClaims
 
     /// <summary>Kullanıcı yalnızca <see cref="ScopedCompanies"/> listesindeki firmalara erişebilir.</summary>
     public const string CompanyScopeList = "list";
+
+    /// <summary>
+    /// Kullanıcının seçtiği aktif şirket. Yalnızca istemci kolaylığıdır;
+    /// yetkilendirme kararı bu claim'e dayandırılmaz.
+    /// </summary>
+    public const string ActiveCompany = "active_company";
 }
 
 /// <summary>
@@ -84,7 +90,8 @@ public sealed class JwtTokenService(IOptions<JwtOptions> options) : ITokenServic
         Guid tenantId,
         string email,
         UserRole role,
-        IReadOnlyCollection<Guid> scopedCompanyIds)
+        IReadOnlyCollection<Guid> scopedCompanyIds,
+        Guid? activeCompanyId = null)
     {
         var expiresAt = DateTimeOffset.UtcNow.AddMinutes(_options.AccessTokenMinutes);
 
@@ -107,6 +114,14 @@ public sealed class JwtTokenService(IOptions<JwtOptions> options) : ITokenServic
         else
         {
             claims.Add(new Claim(GovAiClaims.CompanyScope, GovAiClaims.CompanyScopeTenant));
+        }
+
+        // Aktif şirket yalnızca istemciye kolaylık olsun diye jetona yazılır.
+        // Yetki kararı BU CLAIM'DEN VERİLMEZ: erişim her istekte veritabanındaki
+        // üyelikten doğrulanır (bkz. CompanyAccessGuard).
+        if (activeCompanyId is not null)
+        {
+            claims.Add(new Claim(GovAiClaims.ActiveCompany, activeCompanyId.Value.ToString()));
         }
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.SigningKey));
@@ -148,6 +163,8 @@ public sealed class HttpContextCurrentUser(IHttpContextAccessor accessor) : ICur
                                    ?? Principal?.FindFirstValue(ClaimTypes.NameIdentifier));
 
     public Guid? TenantId => TryGuid(Principal?.FindFirstValue(GovAiClaims.TenantId));
+
+    public Guid? ActiveCompanyId => TryGuid(Principal?.FindFirstValue(GovAiClaims.ActiveCompany));
 
     public string? Email => Principal?.FindFirstValue(JwtRegisteredClaimNames.Email)
                             ?? Principal?.FindFirstValue(ClaimTypes.Email);
@@ -207,6 +224,8 @@ public sealed class HttpContextCurrentUser(IHttpContextAccessor accessor) : ICur
 public sealed class SystemCurrentUser : ICurrentUser
 {
     public Guid? UserId => null;
+
+    public Guid? ActiveCompanyId => null;
 
     public Guid? TenantId { get; set; }
 

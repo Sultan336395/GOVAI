@@ -33,6 +33,7 @@ public sealed record CreateUserRequest(string Email, string FullName, UserRole R
 /// </summary>
 public sealed class AuthenticationService(
     IUserRepository users,
+    IUserCompanyRepository memberships,
     ITenantRepository tenants,
     IPasswordHasher passwordHasher,
     ITokenService tokenService,
@@ -74,8 +75,22 @@ public sealed class AuthenticationService(
         user.RecordSuccessfulLogin(now);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        var scopedCompanyIds = ParseScopedCompanies(user);
-        var (token, expiresAt) = tokenService.CreateAccessToken(user.Id, user.TenantId, user.Email, user.Role, scopedCompanyIds);
+        // Şirket erişimi Faz 1'den beri üyelikten okunur. Jetondaki liste yalnızca
+        // istemci kolaylığıdır; yetki kararı her istekte veritabanından verilir.
+        var accessibleCompanies = (await memberships.ListForUserAsync(user.Id, cancellationToken))
+            .Where(m => m.GrantsAccess)
+            .ToList();
+
+        var scopedCompanyIds = accessibleCompanies.Count > 0
+            ? accessibleCompanies.Select(m => m.CompanyId).ToList()
+            : ParseScopedCompanies(user);
+
+        // Girişte kullanıcının varsayılan şirketi aktif olur; yoksa ilk üyeliği.
+        var activeCompanyId = accessibleCompanies.FirstOrDefault(m => m.IsDefault)?.CompanyId
+                              ?? accessibleCompanies.FirstOrDefault()?.CompanyId;
+
+        var (token, expiresAt) = tokenService.CreateAccessToken(
+            user.Id, user.TenantId, user.Email, user.Role, scopedCompanyIds, activeCompanyId);
 
         logger.LogInformation("Giriş başarılı. UserId={UserId} TenantId={TenantId}", user.Id, user.TenantId);
 

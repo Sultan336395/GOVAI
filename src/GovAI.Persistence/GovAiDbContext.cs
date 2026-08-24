@@ -7,6 +7,7 @@ using GovAI.Domain.Identity;
 using GovAI.Domain.Notifications;
 using GovAI.Domain.Opportunities;
 using GovAI.Domain.Sources;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore;
 
 namespace GovAI.Persistence;
@@ -57,9 +58,41 @@ public class GovAiDbContext(
         modelBuilder.HasDefaultSchema(Schema);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(GovAiDbContext).Assembly);
 
+        ApplyDomainGeneratedKeys(modelBuilder);
         ApplyTenantFilters(modelBuilder);
 
         base.OnModelCreating(modelBuilder);
+    }
+
+    /// <summary>
+    /// <see cref="Entity.Id"/> her zaman domain tarafından üretilir (<c>Guid.CreateVersion7()</c>);
+    /// veritabanı hiçbir anahtarı üretmez. EF'in Guid anahtarlar için varsayılan kabulü ise
+    /// "ekleme sırasında üretilir"dir ve bu, sessiz bir veri kaybına yol açar:
+    ///
+    /// İzlenen bir kök nesnenin koleksiyonuna yeni bir alt kayıt eklendiğinde EF, anahtarın
+    /// dolu olmasına bakıp kaydı <c>Added</c> değil <c>Modified</c> sayar; INSERT hiç
+    /// üretilmez, var olmayan satıra UPDATE gider ve istek
+    /// <c>DbUpdateConcurrencyException</c> ile 500 döner. Firma profilindeki ilk konum,
+    /// NACE kodu veya belge eklenirken tetiklenir.
+    ///
+    /// Anahtarın üretimini modelde doğru bildirmek sorunu kaynağında kapatır.
+    /// Koruyan test: <c>Faz1-G. CompanyManager profil alanlarını düzenleyebilir</c>.
+    /// </summary>
+    private static void ApplyDomainGeneratedKeys(ModelBuilder modelBuilder)
+    {
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            if (!typeof(Entity).IsAssignableFrom(entityType.ClrType))
+            {
+                continue;
+            }
+
+            var key = entityType.FindPrimaryKey();
+            if (key is { Properties: [{ ClrType: var clrType } property] } && clrType == typeof(Guid))
+            {
+                property.ValueGenerated = ValueGenerated.Never;
+            }
+        }
     }
 
     /// <summary>
