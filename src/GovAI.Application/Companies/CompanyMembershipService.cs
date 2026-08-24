@@ -22,7 +22,6 @@ namespace GovAI.Application.Companies;
 /// </summary>
 public sealed class CompanyMembershipService(
     IUserCompanyRepository memberships,
-    ICompanyRepository companies,
     IUserRepository users,
     ICompanyInvitationRepository invitations,
     IUnitOfWork unitOfWork,
@@ -180,20 +179,28 @@ public sealed class CompanyMembershipService(
 
         var all = await memberships.ListForUserAsync(userId, cancellationToken);
 
-        // Tek varsayılan kuralı: önce hepsi temizlenir, sonra biri işaretlenir.
-        foreach (var membership in all)
+        // Tek varsayılan kuralını veritabanı da zorlar: user_companies üzerinde
+        // is_default = true için kısmi tekil indeks vardır. Temizleme ile işaretlemeyi
+        // aynı SaveChanges'e koymak yetmez — EF ifadeleri tek toplu işte gönderir ve
+        // PostgreSQL indeksi ifade ifade denetler; işaretleme temizlemeden önce
+        // gönderilirse istek 23505 ile 500 döner. Sıra bu yüzden iki adımda garanti
+        // edilir ve tek işleme alınır: arada varsayılansız bir an kalmaz.
+        await unitOfWork.ExecuteInTransactionAsync(async ct =>
         {
-            if (membership.CompanyId == companyId)
-            {
-                membership.MarkDefault();
-            }
-            else if (membership.IsDefault)
+            foreach (var membership in all.Where(m => m.IsDefault && m.CompanyId != companyId))
             {
                 membership.ClearDefault();
             }
-        }
 
-        await unitOfWork.SaveChangesAsync(cancellationToken);
+            await unitOfWork.SaveChangesAsync(ct);
+
+            var target = all.FirstOrDefault(m => m.CompanyId == companyId);
+            if (target is not null && !target.IsDefault)
+            {
+                target.MarkDefault();
+                await unitOfWork.SaveChangesAsync(ct);
+            }
+        }, cancellationToken);
     }
 
     // ══════════════════════ Aktif şirket ══════════════════════

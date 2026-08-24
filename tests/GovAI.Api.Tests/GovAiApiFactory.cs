@@ -12,6 +12,7 @@ using GovAI.Persistence;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -108,7 +109,13 @@ public sealed class GovAiApiFactory : WebApplicationFactory<Program>
 
             if (PostgresHost is null)
             {
-                services.AddDbContext<GovAiDbContext>(options => options.UseInMemoryDatabase(_databaseName));
+                // Bellek içi sağlayıcı işlem (transaction) desteklemez ve BeginTransaction
+                // çağrısında uyarıyı istisnaya çevirir. Üretimde işlem gerçekten açılır;
+                // burada yok sayılması yalnızca test altyapısına ait bir tavizdir.
+                // Sıra ve kısıt davranışının asıl sınandığı yer gerçek PostgreSQL koşusudur.
+                services.AddDbContext<GovAiDbContext>(options => options
+                    .UseInMemoryDatabase(_databaseName)
+                    .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning)));
             }
             else
             {

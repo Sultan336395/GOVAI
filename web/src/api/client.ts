@@ -49,7 +49,16 @@ export const tokenStore = {
   clear: () => localStorage.removeItem(TOKEN_STORAGE_KEY),
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+/**
+ * @param acceptStatuses Başarısız sayılmayacak durum kodları. Bazı uçlar "hata değil ama
+ * 200 de değil" bir sonuç döner — örneğin mükerrer şirket kaydı 409 ile birlikte ne
+ * yapılabileceğini anlatan bir gövde döner. Bunları istisnaya çevirmek o mesajı kaybettirir.
+ */
+async function request<T>(
+  path: string,
+  init: RequestInit = {},
+  acceptStatuses: number[] = [],
+): Promise<T> {
   const token = tokenStore.get()
 
   const response = await fetch(`${BASE_URL}${path}`, {
@@ -66,7 +75,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     throw new ApiError(401, 'Oturum süresi doldu, lütfen tekrar giriş yapın.')
   }
 
-  if (!response.ok) {
+  if (!response.ok && !acceptStatuses.includes(response.status)) {
     const problem = await response.json().catch(() => undefined)
     const shape = problem as
       | { detail?: string; title?: string; errors?: Record<string, string[]> }
@@ -189,11 +198,14 @@ export const api = {
   /** Kullanıcının üyeliği olan şirketler. Kiracının tümü değil — yalnızca erişebildikleri. */
   listMyCompanies: () => request<MyCompany[]>('/api/companies'),
 
+  // 409 = vergi numarası bu çalışma alanında zaten kayıtlı, 202 = doğrulama talebi açıldı.
+  // İkisi de kullanıcıya gösterilecek anlamlı sonuçtur; hata olarak ele alınmaz.
   createCompany: (body: CreateCompanyRequest) =>
-    request<CreateCompanyResult>('/api/companies', {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }),
+    request<CreateCompanyResult>(
+      '/api/companies',
+      { method: 'POST', body: JSON.stringify(body) },
+      [409],
+    ),
 
   updateCompany: (companyId: string, body: CreateCompanyRequest) =>
     request<MyCompany>(`/api/companies/${companyId}`, {

@@ -75,6 +75,11 @@ public sealed class DatabaseSeeder(
         admin.SetPasswordHash(passwordHasher.Hash(adminPassword));
         await context.Users.AddAsync(admin, cancellationToken);
 
+        // Kiracı ve kullanıcı ÖNCE yazılır. companies.tenant_id üzerindeki yabancı anahtar
+        // Faz 1 ile eklendi; EF bu ilişkiyi modellemediği için tek SaveChanges'te firmayı
+        // kiracıdan önce yazabiliyor ve kurulum yabancı anahtar ihlaliyle düşüyordu.
+        await context.SaveChangesAsync(cancellationToken);
+
         var company = BuildDemoCompany(tenant.Id);
         await context.Companies.AddAsync(company, cancellationToken);
 
@@ -83,6 +88,14 @@ public sealed class DatabaseSeeder(
 
         var opportunities = BuildDemoOpportunities(sources[0].Id, sources[2].Id, clock.UtcNow);
         await context.Opportunities.AddRangeAsync(opportunities, cancellationToken);
+
+        await context.SaveChangesAsync(cancellationToken);
+
+        // Şirket erişimi Faz 1'den beri yalnızca üyelikten okunur. Üyelik açılmazsa
+        // yeni kurulan sistemde yönetici panelde hiçbir şirket göremez.
+        await context.UserCompanies.AddAsync(
+            new UserCompany(tenant.Id, admin.Id, company.Id, CompanyRole.CompanyOwner, isDefault: true),
+            cancellationToken);
 
         await context.SaveChangesAsync(cancellationToken);
 

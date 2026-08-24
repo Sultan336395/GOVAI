@@ -148,6 +148,8 @@ export default function CompanyGroupsPage() {
             onSaved={async (message) => {
               setNotice(message)
               await refresh()
+              // Grup değişince gruptaki şirket sayısı da değişir; tablo tazelenmezse eski kalır.
+              await queryClient.invalidateQueries({ queryKey: ['company-groups'] })
             }}
           />
         ))

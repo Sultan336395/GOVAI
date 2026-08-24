@@ -50,13 +50,16 @@ namespace GovAI.Persistence.Migrations
                 type: "uuid",
                 nullable: true);
 
+            // Varsayılan BİLEREK true: bu sütun yükseltmeyle geliyor ve mevcut şirketlerin
+            // hepsi etkindir. false bırakılırsa müşterinin canlı veritabanındaki her şirket
+            // yükseltmenin hemen ardından pasif görünürdü.
             migrationBuilder.AddColumn<bool>(
                 name: "is_active",
                 schema: "govai",
                 table: "companies",
                 type: "boolean",
                 nullable: false,
-                defaultValue: false);
+                defaultValue: true);
 
             migrationBuilder.AddColumn<bool>(
                 name: "is_head_company",
@@ -470,13 +473,11 @@ namespace GovAI.Persistence.Migrations
                 WHERE id IN (SELECT id FROM ilk_uyelik);
 
                 -- 4) Şirket alanlarının güvenli varsayılanları.
+                --    Sütunlar NOT NULL eklendiği için bu adım normalde hiçbir satıra
+                --    dokunmaz; kısmen uygulanmış bir yükseltmeden dönülürse diye durur.
                 UPDATE govai.companies
                 SET relationship_type = 0
                 WHERE relationship_type IS NULL;
-
-                UPDATE govai.companies
-                SET is_active = true
-                WHERE is_active IS NULL;
                 """);
 
             // ──────────────────────────────────────────────────────────────────
