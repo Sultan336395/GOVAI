@@ -28,8 +28,12 @@ namespace GovAI.Api.Tests;
 /// Böylece izolasyonun sahte nesnelerle değil, üretimdeki kod yoluyla
 /// doğrulandığından emin oluruz.
 ///
-/// Bilinen sınır: <c>EF.Functions.ILike</c> yalnızca Npgsql'de çalışır, bu yüzden
-/// fırsat aramasında <c>search</c> parametresi bu testlerde kullanılmaz.
+/// Varsayılan olarak bellek içi sağlayıcı kullanılır (veritabanı olmayan makinelerde de
+/// <c>dotnet test</c> çalışsın diye). <c>GOVAI_TEST_POSTGRES</c> ortam değişkeni
+/// ayarlanırsa aynı testler gerçek PostgreSQL 17'ye karşı koşar.
+///
+/// Bilinen sınır (yalnızca bellek içi modda): <c>EF.Functions.ILike</c> Npgsql'e özgüdür,
+/// bu yüzden fırsat aramasında <c>search</c> parametresi bu testlerde kullanılmaz.
 /// </summary>
 public sealed class GovAiApiFactory : WebApplicationFactory<Program>
 {
@@ -93,13 +97,76 @@ public sealed class GovAiApiFactory : WebApplicationFactory<Program>
                 services.Remove(descriptor);
             }
 
-            services.AddDbContext<GovAiDbContext>(options => options.UseInMemoryDatabase(_databaseName));
+            if (PostgresHost is null)
+            {
+                services.AddDbContext<GovAiDbContext>(options => options.UseInMemoryDatabase(_databaseName));
+            }
+            else
+            {
+                // Gerçek PostgreSQL: jsonb sütunları, snake_case adlandırma ve sorgu
+                // filtrelerinin SQL'e nasıl çevrildiği bellek içi sağlayıcıda sınanamaz.
+                services.AddDbContext<GovAiDbContext>(options =>
+                {
+                    options.UseNpgsql($"{PostgresHost};Database={_databaseName}");
+                    options.UseSnakeCaseNamingConvention();
+                });
+            }
         });
+    }
+
+    /// <summary>
+    /// Ayarlanmışsa testler gerçek PostgreSQL'e karşı koşar. Her fabrika örneği kendi
+    /// veritabanını oluşturur ve sonunda düşürür; paylaşılan bir şemaya dokunulmaz.
+    /// Ayarlanmamışsa bellek içi sağlayıcı kullanılır, böylece veritabanı olmayan
+    /// makinelerde de <c>dotnet test</c> çalışmaya devam eder.
+    /// </summary>
+    private static string? PostgresHost =>
+        Environment.GetEnvironmentVariable("GOVAI_TEST_POSTGRES") is { Length: > 0 } value ? value : null;
+
+    /// <summary>Gerçek PostgreSQL kullanılıyorsa şemayı kurar.</summary>
+    private void EnsureSchema()
+    {
+        if (PostgresHost is null)
+        {
+            return;
+        }
+
+        using var scope = Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<GovAiDbContext>();
+
+        // Migration çalıştırılmaz; şema doğrudan modelden kurulur ve test sonunda düşürülür.
+        context.Database.EnsureCreated();
+    }
+
+    private bool _databaseDropped;
+
+    protected override void Dispose(bool disposing)
+    {
+        // base.Dispose zincirini yeniden girişli çağırır; test veritabanı yalnızca bir kez
+        // ve servis sağlayıcısı hâlâ ayaktayken düşürülmelidir.
+        if (disposing && PostgresHost is not null && !_databaseDropped)
+        {
+            _databaseDropped = true;
+
+            try
+            {
+                using var scope = Services.CreateScope();
+                scope.ServiceProvider.GetRequiredService<GovAiDbContext>().Database.EnsureDeleted();
+            }
+            catch (ObjectDisposedException)
+            {
+                // Sağlayıcı zaten kapanmışsa temizlik test kabının silinmesiyle tamamlanır.
+            }
+        }
+
+        base.Dispose(disposing);
     }
 
     /// <summary>İki kiracıyı ve her birinin tam veri setini yükler.</summary>
     public async Task SeedAsync()
     {
+        EnsureSchema();
+
         using var scope = Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<GovAiDbContext>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
@@ -118,8 +185,8 @@ public sealed class GovAiApiFactory : WebApplicationFactory<Program>
         context.Sources.Add(source);
         context.Opportunities.Add(opportunity);
 
-        SeedTenant(context, hasher, TenantA, opportunity);
-        SeedTenant(context, hasher, TenantB, opportunity);
+        SeedTenant(context, hasher, TenantA, opportunity, source);
+        SeedTenant(context, hasher, TenantB, opportunity, source);
 
         await context.SaveChangesAsync();
     }
@@ -128,13 +195,19 @@ public sealed class GovAiApiFactory : WebApplicationFactory<Program>
         GovAiDbContext context,
         IPasswordHasher hasher,
         TenantFixture fixture,
-        Opportunity opportunity)
+        Opportunity opportunity,
+        Source source)
     {
         var tenant = new Tenant(fixture.Name, fixture.Slug);
         tenant.SetPlan("Professional", maxCompanies: 25);
 
         var admin = new AppUser(tenant.Id, fixture.Email, $"{fixture.Name} Yöneticisi", UserRole.SuperAdmin);
         admin.SetPasswordHash(hasher.Hash(Password));
+
+        // Operate yetkisine sahip, SuperAdmin OLMAYAN sıradan kiracı kullanıcısı.
+        // Ortak katalog yazma yetkisinin bu kullanıcıya kapalı olduğu sınanır.
+        var operatorUser = new AppUser(tenant.Id, fixture.OperatorEmail, $"{fixture.Name} Operatörü", UserRole.OperationUser);
+        operatorUser.SetPasswordHash(hasher.Hash(Password));
 
         var company = new Company(tenant.Id, $"{fixture.Name} Sanayi A.Ş.", fixture.TaxNumber, LegalType.JointStockCompany);
         company.UpdateWorkforce(new Workforce(40, 15, 10, 5, 1));
@@ -161,6 +234,7 @@ public sealed class GovAiApiFactory : WebApplicationFactory<Program>
 
         context.Tenants.Add(tenant);
         context.Users.Add(admin);
+        context.Users.Add(operatorUser);
         context.Companies.Add(company);
         context.Assessments.Add(assessment);
         context.ScenarioSimulations.Add(simulation);
@@ -168,6 +242,8 @@ public sealed class GovAiApiFactory : WebApplicationFactory<Program>
 
         fixture.TenantId = tenant.Id;
         fixture.UserId = admin.Id;
+        fixture.OperatorUserId = operatorUser.Id;
+        fixture.SourceId = source.Id;
         fixture.CompanyId = company.Id;
         fixture.AssessmentId = assessment.Id;
         fixture.SimulationId = simulation.Id;
@@ -176,11 +252,15 @@ public sealed class GovAiApiFactory : WebApplicationFactory<Program>
     }
 
     /// <summary>Gerçek giriş akışından geçerek jeton alınmış HTTP istemcisi döndürür.</summary>
-    public async Task<HttpClient> CreateAuthenticatedClientAsync(TenantFixture fixture)
+    public Task<HttpClient> CreateAuthenticatedClientAsync(TenantFixture fixture) =>
+        CreateAuthenticatedClientAsync(fixture.Email);
+
+    /// <summary>Belirli bir kullanıcı hesabıyla giriş yapar (rol bazlı yetki testleri için).</summary>
+    public async Task<HttpClient> CreateAuthenticatedClientAsync(string email)
     {
         var client = CreateClient();
 
-        var response = await client.PostAsJsonAsync("/api/auth/login", new { email = fixture.Email, password = Password });
+        var response = await client.PostAsJsonAsync("/api/auth/login", new { email, password = Password });
         response.EnsureSuccessStatusCode();
 
         var payload = await response.Content.ReadFromJsonAsync<LoginPayload>()
@@ -203,8 +283,13 @@ public sealed class TenantFixture(string name, string slug, string email, string
     public string Email { get; } = email;
     public string TaxNumber { get; } = taxNumber;
 
+    /// <summary>Aynı kiracıdaki SuperAdmin olmayan (OperationUser) hesap.</summary>
+    public string OperatorEmail { get; } = $"operator-{email}";
+
     public Guid TenantId { get; set; }
     public Guid UserId { get; set; }
+    public Guid OperatorUserId { get; set; }
+    public Guid SourceId { get; set; }
     public Guid CompanyId { get; set; }
     public Guid AssessmentId { get; set; }
     public Guid SimulationId { get; set; }

@@ -17,4 +17,13 @@ public static class Policies
 
     /// <summary>Salt okuyucu dahil tüm oturum açmış kullanıcılar.</summary>
     public const string Read = "Read";
+
+    /// <summary>
+    /// Ortak çağrı/kaynak kataloğuna <b>yazma</b>. Katalog kiracıya özel değildir:
+    /// bir kiracının yaptığı değişikliği tüm kiracılar görür. Bu yüzden sıradan
+    /// operasyon kullanıcısına açık olamaz (Faz 0B).
+    ///
+    /// Okuma tarafı <see cref="Read"/> ile herkese açık kalır.
+    /// </summary>
+    public const string CatalogWrite = "CatalogWrite";
 }

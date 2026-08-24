@@ -66,6 +66,12 @@ builder.Services.AddAuthorization(options =>
         nameof(GovAI.Domain.Common.UserRole.OperationUser),
         nameof(GovAI.Domain.Common.UserRole.Consultant)));
 
+    // Ortak katalog yazma: yalnızca platform işletimi. Kataloğu tüm kiracılar paylaştığı
+    // için Operate yetkisindeki bir kiracı kullanıcısının burayı değiştirmesi, diğer
+    // kiracıların verisini değiştirmesi anlamına gelirdi.
+    options.AddPolicy(Policies.CatalogWrite, policy => policy.RequireRole(
+        nameof(GovAI.Domain.Common.UserRole.SuperAdmin)));
+
     options.AddPolicy(Policies.Read, policy => policy.RequireAuthenticatedUser());
 });
 

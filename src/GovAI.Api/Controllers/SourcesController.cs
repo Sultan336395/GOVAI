@@ -56,7 +56,7 @@ public sealed class SourcesController(SourceService service) : ControllerBase
 
     /// <summary>Kaynağı takvim beklemeden hemen taramaya alır.</summary>
     [HttpPost("{id:guid}/crawl")]
-    [Authorize(Policy = Policies.Operate)]
+    [Authorize(Policy = Policies.CatalogWrite)]
     [Audited("Source.CrawlTriggered", "Source")]
     public async Task<IActionResult> TriggerCrawl(Guid id, CancellationToken cancellationToken)
     {
@@ -69,7 +69,7 @@ public sealed class SourcesController(SourceService service) : ControllerBase
     /// İçerik değişmediyse hiçbir iş kuyruğa alınmaz.
     /// </summary>
     [HttpPost("documents")]
-    [Authorize(Policy = Policies.Operate)]
+    [Authorize(Policy = Policies.CatalogWrite)]
     public async Task<ActionResult<IngestDocumentResult>> IngestDocument(
         [FromBody] IngestDocumentRequest request,
         CancellationToken cancellationToken) =>
@@ -77,7 +77,7 @@ public sealed class SourcesController(SourceService service) : ControllerBase
 
     /// <summary>Worker'ın tarama sonucunu bildirmesi; üst üste hata alan kaynak otomatik devre dışı kalır.</summary>
     [HttpPost("{id:guid}/runs")]
-    [Authorize(Policy = Policies.Operate)]
+    [Authorize(Policy = Policies.CatalogWrite)]
     public async Task<IActionResult> RecordRun(
         Guid id,
         [FromBody] RecordCrawlRunRequest request,
