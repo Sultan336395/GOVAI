@@ -66,11 +66,37 @@ builder.Services.AddAuthorization(options =>
         nameof(GovAI.Domain.Common.UserRole.OperationUser),
         nameof(GovAI.Domain.Common.UserRole.Consultant)));
 
-    // Ortak katalog yazma: yalnızca platform işletimi. Kataloğu tüm kiracılar paylaştığı
-    // için Operate yetkisindeki bir kiracı kullanıcısının burayı değiştirmesi, diğer
-    // kiracıların verisini değiştirmesi anlamına gelirdi.
-    options.AddPolicy(Policies.CatalogWrite, policy => policy.RequireRole(
-        nameof(GovAI.Domain.Common.UserRole.SuperAdmin)));
+    // ── Platform işletim rolleri ──
+    // Kiracı SuperAdmin'i bu politikaların HİÇBİRİNDE yoktur: ortak katalog tüm
+    // müşterilerce paylaşılır, bir müşterinin yöneticisi orayı değiştiremez.
+
+    options.AddPolicy(Policies.PlatformCatalog, policy => policy.RequireRole(
+        nameof(GovAI.Domain.Common.UserRole.PlatformCatalogManager)));
+
+    options.AddPolicy(Policies.PlatformReview, policy => policy.RequireRole(
+        nameof(GovAI.Domain.Common.UserRole.PlatformCatalogManager),
+        nameof(GovAI.Domain.Common.UserRole.PlatformReviewer)));
+
+    // Worker kimliği. PlatformCatalogManager da elle müdahale edebilsin diye dahildir.
+    options.AddPolicy(Policies.SystemIngest, policy => policy.RequireRole(
+        nameof(GovAI.Domain.Common.UserRole.SystemIngest),
+        nameof(GovAI.Domain.Common.UserRole.PlatformCatalogManager)));
+
+    // Yeniden skorlama: kiracı operasyon rolleri + worker.
+    options.AddPolicy(Policies.Rescore, policy => policy.RequireRole(
+        nameof(GovAI.Domain.Common.UserRole.SuperAdmin),
+        nameof(GovAI.Domain.Common.UserRole.CompanyManager),
+        nameof(GovAI.Domain.Common.UserRole.OperationUser),
+        nameof(GovAI.Domain.Common.UserRole.Consultant),
+        nameof(GovAI.Domain.Common.UserRole.SystemIngest)));
+
+    // Kiracı şirket verisi: platform rolleri dışarıda bırakılır.
+    options.AddPolicy(Policies.CompanyData, policy => policy.RequireRole(
+        nameof(GovAI.Domain.Common.UserRole.SuperAdmin),
+        nameof(GovAI.Domain.Common.UserRole.CompanyManager),
+        nameof(GovAI.Domain.Common.UserRole.OperationUser),
+        nameof(GovAI.Domain.Common.UserRole.Consultant),
+        nameof(GovAI.Domain.Common.UserRole.ReadOnly)));
 
     options.AddPolicy(Policies.Read, policy => policy.RequireAuthenticatedUser());
 });
@@ -188,6 +214,20 @@ static async Task ApplyStartupTasksAsync(WebApplication app)
         ?? throw new InvalidOperationException("Seed:AdminPassword tanımlanmadan başlangıç verisi yüklenemez.");
 
     await seeder.SeedAsync(email, password);
+
+    // Worker kimliği ayrı yapılandırmadan gelir; parola koda veya depoya yazılmaz.
+    var workerEmail = app.Configuration["Seed:WorkerEmail"];
+    var workerPassword = app.Configuration["Seed:WorkerPassword"];
+
+    if (!string.IsNullOrWhiteSpace(workerEmail) && !string.IsNullOrWhiteSpace(workerPassword))
+    {
+        await seeder.SeedWorkerIdentityAsync(workerEmail, workerPassword);
+    }
+    else
+    {
+        app.Logger.LogWarning(
+            "Seed:WorkerEmail / Seed:WorkerPassword verilmedi; worker kimliği oluşturulmadı.");
+    }
 }
 
 /// <summary>Entegrasyon testlerinin <c>WebApplicationFactory&lt;Program&gt;</c> kullanabilmesi için.</summary>

@@ -43,6 +43,15 @@ public sealed class GovAiApiFactory : WebApplicationFactory<Program>
     /// <summary>En az 32 karakter, yer tutucu iz taşımayan geçerli bir imza anahtarı.</summary>
     public const string ValidSigningKey = "govai-test-imza-anahtari-yeterince-uzun-2026";
 
+    /// <summary>Ortak katalog tanımını yönetebilen platform hesabı.</summary>
+    public const string PlatformCatalogEmail = "platform-katalog@govai.test";
+
+    /// <summary>Yalnızca kural düzeltme ve danışman onayı yetkisi olan platform hesabı.</summary>
+    public const string PlatformReviewerEmail = "platform-inceleyici@govai.test";
+
+    /// <summary>Worker'ın kullandığı sınırlı veri toplama kimliği.</summary>
+    public const string SystemIngestEmail = "worker@govai.test";
+
     private readonly string _databaseName = $"govai-tests-{Guid.CreateVersion7()}";
 
     public TenantFixture TenantA { get; } = new("Kiracı A", "kiraci-a", "a@govai.test", "1111111111");
@@ -188,7 +197,30 @@ public sealed class GovAiApiFactory : WebApplicationFactory<Program>
         SeedTenant(context, hasher, TenantA, opportunity, source);
         SeedTenant(context, hasher, TenantB, opportunity, source);
 
+        // Platform işletim hesapları. Kiracıya bağlıdırlar (AppUser kiracı ister) ama
+        // rolleri kiracı rolü değildir; ortak kataloğa ve worker uçlarına erişirler.
+        SeedPlatformUser(context, hasher, TenantA.TenantId, PlatformCatalogEmail,
+            "Platform Katalog Yöneticisi", UserRole.PlatformCatalogManager);
+        SeedPlatformUser(context, hasher, TenantA.TenantId, PlatformReviewerEmail,
+            "Platform İnceleyici", UserRole.PlatformReviewer);
+        SeedPlatformUser(context, hasher, TenantA.TenantId, SystemIngestEmail,
+            "Veri Toplama Servisi", UserRole.SystemIngest);
+
         await context.SaveChangesAsync();
+    }
+
+    /// <summary>Platform işletim hesabı; şirket üyeliği almaz.</summary>
+    private static void SeedPlatformUser(
+        GovAiDbContext context,
+        IPasswordHasher hasher,
+        Guid tenantId,
+        string email,
+        string fullName,
+        UserRole role)
+    {
+        var user = new AppUser(tenantId, email, fullName, role);
+        user.SetPasswordHash(hasher.Hash(Password));
+        context.Users.Add(user);
     }
 
     private static void SeedTenant(

@@ -19,14 +19,14 @@ public sealed class CatalogAndWorkerAccessTests : IAsyncLifetime
     /// <summary>Kiracı A'nın SuperAdmin olmayan operasyon kullanıcısı.</summary>
     private HttpClient _operator = null!;
 
-    /// <summary>Worker'ın kullandığı türde platform işletim hesabı.</summary>
+    /// <summary>Worker'ın gerçekten kullandığı sınırlı veri toplama kimliği.</summary>
     private HttpClient _platform = null!;
 
     public async Task InitializeAsync()
     {
         await _factory.SeedAsync();
         _operator = await _factory.CreateAuthenticatedClientAsync(_factory.TenantA.OperatorEmail);
-        _platform = await _factory.CreateAuthenticatedClientAsync(_factory.TenantA);
+        _platform = await _factory.CreateAuthenticatedClientAsync(GovAiApiFactory.SystemIngestEmail);
     }
 
     public Task DisposeAsync()
@@ -145,7 +145,7 @@ public sealed class CatalogAndWorkerAccessTests : IAsyncLifetime
     [Fact(DisplayName = "S. Reddedilen yazma denemesi kataloğu gerçekten değiştirmez")]
     public async Task Reddedilen_yazma_katalogu_degistirmez()
     {
-        var before = await _platform.GetStringAsync("/api/opportunities?onlyOpen=false");
+        var before = await _operator.GetStringAsync("/api/opportunities?onlyOpen=false");
 
         await _operator.PostAsJsonAsync("/api/opportunities", new
         {
@@ -159,7 +159,7 @@ public sealed class CatalogAndWorkerAccessTests : IAsyncLifetime
             documentChecklist = Array.Empty<object>()
         });
 
-        var after = await _platform.GetStringAsync("/api/opportunities?onlyOpen=false");
+        var after = await _operator.GetStringAsync("/api/opportunities?onlyOpen=false");
 
         Assert.DoesNotContain("ASLA-KAYDEDILMEMELI", after, StringComparison.Ordinal);
         Assert.Equal(before, after);

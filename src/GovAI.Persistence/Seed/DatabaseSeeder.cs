@@ -19,6 +19,46 @@ public sealed class DatabaseSeeder(
     IDateTimeProvider clock,
     ILogger<DatabaseSeeder> logger)
 {
+    /// <summary>
+    /// Worker'ın kullandığı sınırlı kimliği oluşturur. Kimlik bilgileri <b>koda ve depoya
+    /// yazılmaz</b>; dağıtım yapılandırmasından (ortam değişkeni) gelir. Verilmezse hesap
+    /// oluşturulmaz ve worker çalışmaz — sessizce ayrıcalıklı bir hesaba düşmez.
+    ///
+    /// Bilinen sınır: hesap seed edilen kiracıya bağlıdır. Çok kiracılı üretimde her
+    /// kiracı için ayrı ingest kimliği veya kiracıdan bağımsız servis kimliği gerekir.
+    /// </summary>
+    public async Task SeedWorkerIdentityAsync(
+        string workerEmail,
+        string workerPassword,
+        CancellationToken cancellationToken = default)
+    {
+        var tenant = await context.Tenants.FirstOrDefaultAsync(cancellationToken);
+        if (tenant is null)
+        {
+            logger.LogWarning("Kiracı bulunamadığı için worker kimliği oluşturulamadı.");
+            return;
+        }
+
+        var normalized = workerEmail.Trim().ToLowerInvariant();
+        var existing = await context.Users
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(u => u.Email == normalized, cancellationToken);
+
+        if (existing is not null)
+        {
+            logger.LogInformation("Worker kimliği zaten mevcut: {Email}", normalized);
+            return;
+        }
+
+        var worker = new AppUser(tenant.Id, normalized, "GOVAI Veri Toplama Servisi", UserRole.SystemIngest);
+        worker.SetPasswordHash(passwordHasher.Hash(workerPassword));
+
+        await context.Users.AddAsync(worker, cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
+
+        logger.LogInformation("Worker kimliği oluşturuldu: {Email} (SystemIngest)", normalized);
+    }
+
     public async Task SeedAsync(string adminEmail, string adminPassword, CancellationToken cancellationToken = default)
     {
         if (await context.Tenants.AnyAsync(cancellationToken))

@@ -58,7 +58,7 @@ public sealed class OpportunitiesController(OpportunityService service) : Contro
     /// Parser worker'ı ve danışman elle giriş ekranı aynı uçtan geçer.
     /// </summary>
     [HttpPost]
-    [Authorize(Policy = Policies.CatalogWrite)]
+    [Authorize(Policy = Policies.SystemIngest)]
     [Audited("Opportunity.Upserted", "Opportunity")]
     public async Task<ActionResult<OpportunityDetailDto>> Upsert(
         [FromBody] UpsertOpportunityRequest request,
@@ -67,7 +67,7 @@ public sealed class OpportunitiesController(OpportunityService service) : Contro
 
     /// <summary>Danışmanın otomatik çıkarılan bir kuralı düzeltmesi (istisna yönetimi).</summary>
     [HttpPut("{id:guid}/rules/{ruleId:guid}")]
-    [Authorize(Policy = Policies.CatalogWrite)]
+    [Authorize(Policy = Policies.PlatformReview)]
     [Audited("Opportunity.RuleOverridden", "OpportunityRule")]
     public async Task<ActionResult<OpportunityDetailDto>> OverrideRule(
         Guid id,
@@ -78,7 +78,7 @@ public sealed class OpportunitiesController(OpportunityService service) : Contro
 
     /// <summary>Danışman onayı; skor güvenini tavana taşır.</summary>
     [HttpPost("{id:guid}/review")]
-    [Authorize(Policy = Policies.CatalogWrite)]
+    [Authorize(Policy = Policies.PlatformReview)]
     [Audited("Opportunity.Reviewed", "Opportunity")]
     public async Task<ActionResult<OpportunityDetailDto>> MarkReviewed(Guid id, CancellationToken cancellationToken) =>
         Ok(await service.MarkReviewedAsync(id, cancellationToken));

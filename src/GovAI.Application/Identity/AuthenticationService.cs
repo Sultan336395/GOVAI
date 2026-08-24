@@ -82,8 +82,26 @@ public sealed class AuthenticationService(
         return new LoginResponse(token, expiresAt, tokenService.CreateRefreshToken(), ToDto(user));
     }
 
+    /// <summary>
+    /// Platform işletim rolleri (10 ve üzeri) kiracı yöneticileri tarafından atanamaz.
+    /// Bu roller ortak kataloğa ve worker uçlarına erişir; bir müşterinin yöneticisinin
+    /// kendine veya başkasına platform yetkisi verebilmesi, kiracı sınırını anlamsız kılardı.
+    /// Bu hesaplar yalnızca dağıtım yapılandırmasından (seed) oluşturulur.
+    /// </summary>
+    private static void EnsureAssignableByTenantAdmin(UserRole role)
+    {
+        if ((int)role >= 10)
+        {
+            throw new ForbiddenException(
+                "Platform rolleri kiracı yöneticisi tarafından atanamaz. " +
+                "Bu hesaplar yalnızca platform yapılandırmasıyla oluşturulur.");
+        }
+    }
+
     public async Task<UserDto> CreateUserAsync(Guid tenantId, CreateUserRequest request, CancellationToken cancellationToken = default)
     {
+        EnsureAssignableByTenantAdmin(request.Role);
+
         var existing = await users.GetByEmailAsync(request.Email, cancellationToken);
         if (existing is not null)
         {
@@ -117,7 +135,12 @@ public sealed class AuthenticationService(
 
     public async Task<UserDto> ChangeRoleAsync(Guid userId, UserRole role, CancellationToken cancellationToken = default)
     {
+        EnsureAssignableByTenantAdmin(role);
+
         var user = await LoadUserInTenantAsync(userId, cancellationToken);
+
+        // Mevcut platform hesabının rolü de kiracı yöneticisi tarafından düşürülemez.
+        EnsureAssignableByTenantAdmin(user.Role);
 
         user.ChangeRole(role);
         await unitOfWork.SaveChangesAsync(cancellationToken);

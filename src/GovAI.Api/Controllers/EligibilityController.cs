@@ -66,7 +66,7 @@ public sealed class EligibilityController(EligibilityService service) : Controll
     /// Uzun sürebilir; büyük katalogda worker üzerinden tetiklenmesi önerilir.
     /// </summary>
     [HttpPost("companies/{companyId:guid}/rescore")]
-    [Authorize(Policy = Policies.Operate)]
+    [Authorize(Policy = Policies.Rescore)]
     [Audited("Eligibility.Rescored", "Company", RouteKey = "companyId")]
     public async Task<ActionResult<RescoreResult>> Rescore(
         Guid companyId,

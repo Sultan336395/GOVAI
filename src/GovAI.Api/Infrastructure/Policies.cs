@@ -19,11 +19,36 @@ public static class Policies
     public const string Read = "Read";
 
     /// <summary>
-    /// Ortak çağrı/kaynak kataloğuna <b>yazma</b>. Katalog kiracıya özel değildir:
-    /// bir kiracının yaptığı değişikliği tüm kiracılar görür. Bu yüzden sıradan
-    /// operasyon kullanıcısına açık olamaz (Faz 0B).
-    ///
-    /// Okuma tarafı <see cref="Read"/> ile herkese açık kalır.
+    /// Ortak katalog <b>tanımı</b>: kaynak ekleme/güncelleme ve fırsat kaydı.
+    /// Yalnızca platform işletimi. Kiracı SuperAdmin'i buraya dahil <b>değildir</b> —
+    /// katalog tüm kiracılarca paylaşıldığı için bir müşterinin yöneticisi diğerlerinin
+    /// verisini değiştiremez (Faz 1).
     /// </summary>
-    public const string CatalogWrite = "CatalogWrite";
+    public const string PlatformCatalog = "PlatformCatalog";
+
+    /// <summary>
+    /// Fırsat kuralı düzeltme ve danışman onayı. Katalog tanımını değiştirmez;
+    /// yalnızca içerik kalitesine dokunur.
+    /// </summary>
+    public const string PlatformReview = "PlatformReview";
+
+    /// <summary>
+    /// Worker'ın veri toplama yolu: crawl tetikleme, ham doküman bırakma, tarama
+    /// sonucu bildirme ve ayrıştırılmış fırsatı kaydetme.
+    /// Kullanıcı, rol, kiracı veya şirket yönetemez; şirket raporlarını okuyamaz.
+    /// </summary>
+    public const string SystemIngest = "SystemIngest";
+
+    /// <summary>
+    /// Kiracıya ait şirket verisi (rapor, skor, simülasyon). Platform rolleri
+    /// bilinçli olarak <b>dışarıdadır</b>: veri toplama kimliği müşteri verisini görmez.
+    /// </summary>
+    public const string CompanyData = "CompanyData";
+
+    /// <summary>
+    /// Yeniden skorlama tetikleme. Hem kiracı operasyon kullanıcısının ("Yeniden skorla"
+    /// düğmesi) hem de gece toplu turunu çalıştıran worker'ın ihtiyacı olduğu için iki
+    /// tarafı da kapsayan tek politika. Skor <b>okuma</b> yetkisi vermez.
+    /// </summary>
+    public const string Rescore = "Rescore";
 }

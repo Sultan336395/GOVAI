@@ -10,7 +10,7 @@ namespace GovAI.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/reports")]
-[Authorize(Policy = Policies.Read)]
+[Authorize(Policy = Policies.CompanyData)]
 public sealed class ReportsController(ReportingService service) : ControllerBase
 {
     /// <summary>Yönetici dashboard verisi: KPI'lar, kategori kırılımı, boyut ortalamaları, öncelikli fırsatlar.</summary>

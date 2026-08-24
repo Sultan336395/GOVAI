@@ -14,7 +14,7 @@ namespace GovAI.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/scoring")]
-[Authorize(Policy = Policies.Read)]
+[Authorize(Policy = Policies.CompanyData)]
 [Produces("application/json")]
 public sealed class ScoringController(
     EligibilityService eligibility,

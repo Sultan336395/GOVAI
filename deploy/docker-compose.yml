@@ -93,6 +93,8 @@ services:
       Seed__Enabled: ${SEED_ENABLED:-false}
       Seed__AdminEmail: ${SEED_ADMIN_EMAIL:-admin@govai.local}
       Seed__AdminPassword: ${SEED_ADMIN_PASSWORD:-}
+      Seed__WorkerEmail: ${WORKER_EMAIL:-}
+      Seed__WorkerPassword: ${WORKER_PASSWORD:-}
       Jwt__SigningKey: ${JWT_SIGNING_KEY:?JWT_SIGNING_KEY en az 32 karakter olmalı}
       Jwt__Issuer: govai
       Jwt__Audience: govai-api
@@ -135,8 +137,10 @@ services:
         condition: service_started
     environment: &worker-env
       GOVAI_API_BASE_URL: http://api:8080
-      GOVAI_API_EMAIL: ${SEED_ADMIN_EMAIL:-admin@govai.local}
-      GOVAI_API_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
+      # Worker artık yönetici hesabıyla değil, sınırlı SystemIngest kimliğiyle bağlanır.
+      # Parola yalnızca .env dosyasından gelir; kodda ve depoda tutulmaz.
+      GOVAI_API_EMAIL: ${WORKER_EMAIL:-}
+      GOVAI_API_PASSWORD: ${WORKER_PASSWORD:-}
       GOVAI_RABBITMQ_HOST: rabbitmq
       GOVAI_RABBITMQ_USER: ${RABBITMQ_USER:-govai}
       GOVAI_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}

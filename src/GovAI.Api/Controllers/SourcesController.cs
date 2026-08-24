@@ -26,7 +26,7 @@ public sealed class SourcesController(SourceService service) : ControllerBase
         Ok(await service.GetAsync(id, cancellationToken));
 
     [HttpPost]
-    [Authorize(Policy = Policies.SuperAdmin)]
+    [Authorize(Policy = Policies.PlatformCatalog)]
     [Audited("Source.Created", "Source")]
     public async Task<ActionResult<SourceDto>> Create(
         [FromBody] UpsertSourceRequest request,
@@ -37,7 +37,7 @@ public sealed class SourcesController(SourceService service) : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
-    [Authorize(Policy = Policies.SuperAdmin)]
+    [Authorize(Policy = Policies.PlatformCatalog)]
     [Audited("Source.Updated", "Source")]
     public async Task<ActionResult<SourceDto>> Update(
         Guid id,
@@ -46,7 +46,7 @@ public sealed class SourcesController(SourceService service) : ControllerBase
         Ok(await service.UpdateAsync(id, request, cancellationToken));
 
     [HttpPost("{id:guid}/enabled")]
-    [Authorize(Policy = Policies.SuperAdmin)]
+    [Authorize(Policy = Policies.PlatformCatalog)]
     [Audited("Source.EnabledChanged", "Source")]
     public async Task<ActionResult<SourceDto>> SetEnabled(
         Guid id,
@@ -56,7 +56,7 @@ public sealed class SourcesController(SourceService service) : ControllerBase
 
     /// <summary>Kaynağı takvim beklemeden hemen taramaya alır.</summary>
     [HttpPost("{id:guid}/crawl")]
-    [Authorize(Policy = Policies.CatalogWrite)]
+    [Authorize(Policy = Policies.SystemIngest)]
     [Audited("Source.CrawlTriggered", "Source")]
     public async Task<IActionResult> TriggerCrawl(Guid id, CancellationToken cancellationToken)
     {
@@ -69,7 +69,7 @@ public sealed class SourcesController(SourceService service) : ControllerBase
     /// İçerik değişmediyse hiçbir iş kuyruğa alınmaz.
     /// </summary>
     [HttpPost("documents")]
-    [Authorize(Policy = Policies.CatalogWrite)]
+    [Authorize(Policy = Policies.SystemIngest)]
     public async Task<ActionResult<IngestDocumentResult>> IngestDocument(
         [FromBody] IngestDocumentRequest request,
         CancellationToken cancellationToken) =>
@@ -77,7 +77,7 @@ public sealed class SourcesController(SourceService service) : ControllerBase
 
     /// <summary>Worker'ın tarama sonucunu bildirmesi; üst üste hata alan kaynak otomatik devre dışı kalır.</summary>
     [HttpPost("{id:guid}/runs")]
-    [Authorize(Policy = Policies.CatalogWrite)]
+    [Authorize(Policy = Policies.SystemIngest)]
     public async Task<IActionResult> RecordRun(
         Guid id,
         [FromBody] RecordCrawlRunRequest request,

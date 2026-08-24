@@ -50,7 +50,7 @@ public sealed class NotificationsController(NotificationService service, ICurren
     /// Zamanlanmış worker tarafından çağrılır.
     /// </summary>
     [HttpPost("dispatch")]
-    [Authorize(Policy = Policies.SuperAdmin)]
+    [Authorize(Policy = Policies.SystemIngest)]
     [Audited("Notification.Dispatched", "Notification")]
     public async Task<ActionResult<DispatchResponse>> Dispatch(
         [FromQuery] int batchSize = 100,
