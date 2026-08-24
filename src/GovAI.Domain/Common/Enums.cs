@@ -135,12 +135,85 @@ public enum NotificationChannel
     Webhook = 3
 }
 
-/// <summary>Rol bazlı yetkilendirme seviyeleri (Teknik doküman 5.4).</summary>
+/// <summary>
+/// Kiracı (workspace) düzeyindeki roller ve platform işletim rolleri.
+///
+/// 1–5 arası değerler <b>kiracıya</b> aittir: bir müşterinin kendi çalışma alanındaki
+/// yetkileridir ve ortak katalogda hiçbir yazma hakkı vermezler.
+/// 10 ve üzeri değerler <b>platform işletimine</b> aittir; kiracı yöneticileri
+/// tarafından atanamazlar (bkz. AuthenticationService.CreateUserAsync).
+///
+/// Şirket bazlı yetkiler bu enum'da değil, <see cref="CompanyRole"/> içindedir:
+/// bir kullanıcının yetkisi şirketten şirkete değişebilir.
+/// </summary>
 public enum UserRole
 {
-    SuperAdmin = 1,        // Süper yönetici
+    SuperAdmin = 1,        // Kiracı yöneticisi — kendi çalışma alanının tamamı
     CompanyManager = 2,    // Firma yöneticisi
     OperationUser = 3,     // Operasyon kullanıcısı
     Consultant = 4,        // Danışman
-    ReadOnly = 5           // Salt okuyucu
+    ReadOnly = 5,          // Salt okuyucu
+
+    /// <summary>Platform: kaynakları ve global fırsat kataloğunu yönetir.</summary>
+    PlatformCatalogManager = 10,
+
+    /// <summary>Platform: fırsat kuralını düzeltir ve danışman onayı verir.</summary>
+    PlatformReviewer = 11,
+
+    /// <summary>Platform: yalnızca worker'ın ingest / crawl / run uçları.</summary>
+    SystemIngest = 12
+}
+
+/// <summary>
+/// Kullanıcının <b>belirli bir şirketteki</b> yetkisi. Aynı kullanıcı bir şirkette
+/// sahip, başka şirkette yalnızca görüntüleyici olabilir.
+/// </summary>
+public enum CompanyRole
+{
+    /// <summary>Şirketi ve üyeliklerini yönetir. Her şirkette en az bir aktif sahip bulunmalıdır.</summary>
+    CompanyOwner = 1,
+
+    /// <summary>Profil ve operasyon yönetimi. Sahip rolü atayamaz.</summary>
+    CompanyManager = 2,
+
+    /// <summary>Analiz, fırsat ve rapor işlemleri. Üyelik yönetemez.</summary>
+    CompanyExpert = 3,
+
+    /// <summary>Yalnızca görüntüleme.</summary>
+    CompanyViewer = 4
+}
+
+/// <summary>Şirketin gruptaki veya ana şirkete göre konumu.</summary>
+public enum CompanyRelationshipType
+{
+    /// <summary>Bağımsız; ana şirkete bağlı değil.</summary>
+    Independent = 0,
+
+    /// <summary>Grubun ana şirketi.</summary>
+    HeadCompany = 1,
+
+    /// <summary>Bağlı ortaklık (kontrol sahibi ana şirket).</summary>
+    Subsidiary = 2,
+
+    /// <summary>İştirak (azınlık payı).</summary>
+    Affiliate = 3,
+
+    /// <summary>
+    /// Şube. Ayrı tüzel kişilik olmayan operasyonel şubeler için
+    /// <c>CompanyLocation</c> kullanılmalıdır; bu değer yalnızca ayrı vergi
+    /// numarası taşıyan tüzel şube kayıtları içindir.
+    /// </summary>
+    Branch = 4,
+
+    /// <summary>Aynı grupta yer alan, doğrudan ana-bağlı ilişkisi olmayan şirket.</summary>
+    GroupCompany = 5
+}
+
+/// <summary>Başka bir kiracıda kayıtlı vergi numarası için açılan bağlantı/doğrulama talebi.</summary>
+public enum VerificationRequestStatus
+{
+    Pending = 1,
+    Approved = 2,
+    Rejected = 3,
+    Cancelled = 4
 }

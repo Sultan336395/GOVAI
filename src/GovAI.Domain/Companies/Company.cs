@@ -67,6 +67,42 @@ public class Company : AggregateRoot, IAuditable, ISoftDeletable, ITenantScoped
     /// <summary>Profilin kaçıncı sürümü olduğu; her anlamlı değişiklikte artar ve skor yeniden hesaplanır.</summary>
     public int ProfileVersion { get; private set; } = 1;
 
+    // ───────────── Faz 1: grup ve hiyerarşi ─────────────
+
+    /// <summary>Bağlı olduğu şirket grubu. Grup üyeliği ile ana/bağlı ilişkisi ayrı kavramlardır.</summary>
+    public Guid? GroupId { get; private set; }
+
+    /// <summary>Hukuki üst şirket. Aynı kiracıda olmak zorundadır; döngü kurulamaz.</summary>
+    public Guid? ParentCompanyId { get; private set; }
+
+    public CompanyRelationshipType RelationshipType { get; private set; } = CompanyRelationshipType.Independent;
+
+    /// <summary>Grubun ana şirketi mi.</summary>
+    public bool IsHeadCompany { get; private set; }
+
+    /// <summary>Pasif şirket listelerde gizlenir; kayıt izlenebilirlik için silinmez.</summary>
+    public bool IsActive { get; private set; } = true;
+
+    /// <summary>Profil doluluğu (0–100). Kullanıcıya "neyi tamamlamalıyım" sinyali verir.</summary>
+    public int ProfileCompletionPercentage { get; private set; }
+
+    // ───────────── Faz 1: sicil ve iletişim bilgileri ─────────────
+
+    public CompanyRegistry Registry { get; private set; } = CompanyRegistry.Empty;
+
+    public CompanyContact Contact { get; private set; } = CompanyContact.Empty;
+
+    /// <summary>Ana sektör (serbest metin; NACE'den bağımsız iş dili).</summary>
+    public string? MainSector { get; private set; }
+
+    /// <summary>
+    /// Alt sektörler ve hedef ülkeler basit metin listeleridir; yabancı anahtar taşımaz
+    /// ve tek başlarına sorgulanmaz. Ayrı tablo yerine jsonb tutulur.
+    /// </summary>
+    public string? SubSectorsJson { get; private set; }
+
+    public string? TargetCountriesJson { get; private set; }
+
     public DateTimeOffset CreatedAt { get; set; }
     public string? CreatedBy { get; set; }
     public DateTimeOffset? UpdatedAt { get; set; }
@@ -85,6 +121,64 @@ public class Company : AggregateRoot, IAuditable, ISoftDeletable, ITenantScoped
 
     public string? PrimaryNaceCode => _naceCodes.FirstOrDefault(n => n.IsPrimary)?.Code
                                       ?? _naceCodes.FirstOrDefault()?.Code;
+
+    /// <summary>
+    /// Sicil bilgileri (kısa ad, vergi dairesi, MERSİS, ticaret sicil).
+    /// Bu alanlar kural motoruna girmez; bu yüzden <c>ProfileVersion</c> artırılmaz
+    /// ve gereksiz yeniden skorlama tetiklenmez.
+    /// </summary>
+    public void UpdateRegistry(CompanyRegistry registry) => Registry = registry;
+
+    /// <summary>İletişim ve adres bilgileri.</summary>
+    public void UpdateContact(CompanyContact contact) => Contact = contact;
+
+    public void UpdateSectors(string? mainSector, string? subSectorsJson, string? targetCountriesJson)
+    {
+        MainSector = string.IsNullOrWhiteSpace(mainSector) ? null : mainSector.Trim();
+        SubSectorsJson = subSectorsJson;
+        TargetCountriesJson = targetCountriesJson;
+    }
+
+    /// <summary>
+    /// Grup ve ana şirket bağını kurar. Kiracı eşitliği ve döngü kontrolü servis
+    /// katmanındadır: burada yalnızca tek kayıtla doğrulanabilen kural uygulanır.
+    /// </summary>
+    public void SetGroupAndParent(
+        Guid? groupId,
+        Guid? parentCompanyId,
+        CompanyRelationshipType relationshipType,
+        bool isHeadCompany)
+    {
+        DomainException.ThrowIf(parentCompanyId == Id, "Bir şirket kendisinin ana şirketi olamaz.");
+        DomainException.ThrowIf(
+            isHeadCompany && parentCompanyId is not null,
+            "Ana şirketin kendisi başka bir şirkete bağlı olamaz.");
+        DomainException.ThrowIf(
+            relationshipType != CompanyRelationshipType.Independent
+            && relationshipType != CompanyRelationshipType.HeadCompany
+            && parentCompanyId is null,
+            "Bu ilişki türü için ana şirket seçilmelidir.");
+
+        GroupId = groupId;
+        ParentCompanyId = parentCompanyId;
+        RelationshipType = relationshipType;
+        IsHeadCompany = isHeadCompany;
+    }
+
+    public void LeaveGroup()
+    {
+        GroupId = null;
+        ParentCompanyId = null;
+        RelationshipType = CompanyRelationshipType.Independent;
+        IsHeadCompany = false;
+    }
+
+    public void SetProfileCompletion(int percentage) =>
+        ProfileCompletionPercentage = Math.Clamp(percentage, 0, 100);
+
+    public void Deactivate() => IsActive = false;
+
+    public void Activate() => IsActive = true;
 
     public void UpdateIdentity(string legalName, LegalType legalType, DateOnly? foundedOn)
     {
