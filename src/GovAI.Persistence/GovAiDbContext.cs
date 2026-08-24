@@ -40,6 +40,10 @@ public class GovAiDbContext(
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<AppUser> Users => Set<AppUser>();
     public DbSet<Company> Companies => Set<Company>();
+    public DbSet<CompanyGroup> CompanyGroups => Set<CompanyGroup>();
+    public DbSet<UserCompany> UserCompanies => Set<UserCompany>();
+    public DbSet<CompanyInvitation> CompanyInvitations => Set<CompanyInvitation>();
+    public DbSet<CompanyVerificationRequest> CompanyVerificationRequests => Set<CompanyVerificationRequest>();
     public DbSet<Source> Sources => Set<Source>();
     public DbSet<SourceDocument> SourceDocuments => Set<SourceDocument>();
     public DbSet<Opportunity> Opportunities => Set<Opportunity>();
@@ -77,6 +81,18 @@ public class GovAiDbContext(
 
         modelBuilder.Entity<AppUser>()
             .HasQueryFilter(u => !u.IsDeleted && u.TenantId == _tenantId);
+
+        modelBuilder.Entity<CompanyGroup>()
+            .HasQueryFilter(g => !g.IsDeleted && g.TenantId == _tenantId);
+
+        modelBuilder.Entity<UserCompany>()
+            .HasQueryFilter(uc => !uc.IsDeleted && uc.TenantId == _tenantId);
+
+        modelBuilder.Entity<CompanyInvitation>()
+            .HasQueryFilter(i => i.TenantId == _tenantId);
+
+        modelBuilder.Entity<CompanyVerificationRequest>()
+            .HasQueryFilter(r => r.TenantId == _tenantId);
 
         modelBuilder.Entity<EligibilityAssessment>()
             .HasQueryFilter(a => a.TenantId == _tenantId);

@@ -1,4 +1,5 @@
 using GovAI.Domain.Companies;
+using GovAI.Domain.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -19,6 +20,45 @@ public sealed class CompanyConfiguration : IEntityTypeConfiguration<Company>
         builder.Property(c => c.TaxNumber).HasMaxLength(20).IsRequired();
         builder.Property(c => c.LegalType).HasConversion<int>();
         builder.Property(c => c.ProfileVersion).IsConcurrencyToken();
+
+        // ── Faz 1: grup ve hiyerarşi ──
+        builder.Property(c => c.RelationshipType).HasConversion<int>();
+        builder.Property(c => c.MainSector).HasMaxLength(200);
+        builder.Property(c => c.SubSectorsJson).HasColumnType("jsonb");
+        builder.Property(c => c.TargetCountriesJson).HasColumnType("jsonb");
+
+        builder.HasIndex(c => c.GroupId);
+        builder.HasIndex(c => c.ParentCompanyId);
+
+        builder.HasOne<CompanyGroup>()
+            .WithMany()
+            .HasForeignKey(c => c.GroupId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        // Ana şirket kendi tablosuna bağlanır. Silme davranışı Restrict: bir ana şirketin
+        // silinmesi bağlı şirketleri sessizce köksüz bırakmamalıdır.
+        builder.HasOne<Company>()
+            .WithMany()
+            .HasForeignKey(c => c.ParentCompanyId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.OwnsOne(c => c.Registry, registry =>
+        {
+            registry.Property(r => r.ShortName).HasColumnName("short_name").HasMaxLength(200);
+            registry.Property(r => r.TaxOffice).HasColumnName("tax_office").HasMaxLength(200);
+            registry.Property(r => r.MersisNumber).HasColumnName("mersis_number").HasMaxLength(20);
+            registry.Property(r => r.TradeRegistryNumber).HasColumnName("trade_registry_number").HasMaxLength(50);
+        });
+
+        builder.OwnsOne(c => c.Contact, contact =>
+        {
+            contact.Property(x => x.Website).HasColumnName("website").HasMaxLength(300);
+            contact.Property(x => x.Phone).HasColumnName("phone").HasMaxLength(50);
+            contact.Property(x => x.CorporateEmail).HasColumnName("corporate_email").HasMaxLength(320);
+            contact.Property(x => x.Country).HasColumnName("country").HasMaxLength(100);
+            contact.Property(x => x.City).HasColumnName("city").HasMaxLength(150);
+            contact.Property(x => x.Address).HasColumnName("address").HasMaxLength(1000);
+        });
 
         // Aynı kiracıda aynı vergi numarası iki kez kayıtlı olamaz.
         builder.HasIndex(c => new { c.TenantId, c.TaxNumber }).IsUnique();
