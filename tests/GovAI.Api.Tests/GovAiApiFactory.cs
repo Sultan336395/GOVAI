@@ -241,9 +241,21 @@ public sealed class GovAiApiFactory : WebApplicationFactory<Program>
         var operatorUser = new AppUser(tenant.Id, fixture.OperatorEmail, $"{fixture.Name} Operatörü", UserRole.OperationUser);
         operatorUser.SetPasswordHash(hasher.Hash(Password));
 
+        // Şirket rolü bazlı testler için dört ayrı hesap.
+        var expertUser = new AppUser(tenant.Id, fixture.ExpertEmail, $"{fixture.Name} Uzmanı", UserRole.OperationUser);
+        expertUser.SetPasswordHash(hasher.Hash(Password));
+
+        var viewerUser = new AppUser(tenant.Id, fixture.ViewerEmail, $"{fixture.Name} Görüntüleyici", UserRole.ReadOnly);
+        viewerUser.SetPasswordHash(hasher.Hash(Password));
+
         var company = new Company(tenant.Id, $"{fixture.Name} Sanayi A.Ş.", fixture.TaxNumber, LegalType.JointStockCompany);
         company.UpdateWorkforce(new Workforce(40, 15, 10, 5, 1));
         company.UpdateFinancials(new Financials(50_000_000m, 30_000_000m, 12_000_000m, 5_000_000m, "TRY", 2026));
+
+        // Aynı kiracıda ikinci tüzel şirket: şirketler arası geçiş testleri için.
+        var secondCompany = new Company(
+            tenant.Id, $"{fixture.Name} Lojistik A.Ş.", fixture.SecondTaxNumber, LegalType.LimitedCompany);
+        secondCompany.UpdateWorkforce(new Workforce(12, 4, 3, 1, 0));
 
         var outcome = EligibilityEngine.Evaluate(company, opportunity, DateTimeOffset.UtcNow);
         var assessment = new EligibilityAssessment(tenant.Id, outcome, company.ProfileVersion, "{}");
@@ -267,7 +279,19 @@ public sealed class GovAiApiFactory : WebApplicationFactory<Program>
         context.Tenants.Add(tenant);
         context.Users.Add(admin);
         context.Users.Add(operatorUser);
+        context.Users.Add(expertUser);
+        context.Users.Add(viewerUser);
         context.Companies.Add(company);
+        context.Companies.Add(secondCompany);
+
+        // Faz 1: şirket erişimi artık üyelikten doğrulanır. Yönetici iki şirkete de
+        // sahip olarak bağlanır; diğerleri yalnızca birinci şirkete ve farklı rollerle.
+        context.UserCompanies.AddRange(
+            new UserCompany(tenant.Id, admin.Id, company.Id, CompanyRole.CompanyOwner, isDefault: true),
+            new UserCompany(tenant.Id, admin.Id, secondCompany.Id, CompanyRole.CompanyOwner),
+            new UserCompany(tenant.Id, operatorUser.Id, company.Id, CompanyRole.CompanyManager, isDefault: true),
+            new UserCompany(tenant.Id, expertUser.Id, company.Id, CompanyRole.CompanyExpert, isDefault: true),
+            new UserCompany(tenant.Id, viewerUser.Id, company.Id, CompanyRole.CompanyViewer, isDefault: true));
         context.Assessments.Add(assessment);
         context.ScenarioSimulations.Add(simulation);
         context.Notifications.Add(notification);
@@ -275,8 +299,11 @@ public sealed class GovAiApiFactory : WebApplicationFactory<Program>
         fixture.TenantId = tenant.Id;
         fixture.UserId = admin.Id;
         fixture.OperatorUserId = operatorUser.Id;
+        fixture.ExpertUserId = expertUser.Id;
+        fixture.ViewerUserId = viewerUser.Id;
         fixture.SourceId = source.Id;
         fixture.CompanyId = company.Id;
+        fixture.SecondCompanyId = secondCompany.Id;
         fixture.AssessmentId = assessment.Id;
         fixture.SimulationId = simulation.Id;
         fixture.NotificationId = notification.Id;
@@ -315,14 +342,26 @@ public sealed class TenantFixture(string name, string slug, string email, string
     public string Email { get; } = email;
     public string TaxNumber { get; } = taxNumber;
 
-    /// <summary>Aynı kiracıdaki SuperAdmin olmayan (OperationUser) hesap.</summary>
+    /// <summary>Şirkette CompanyManager rolündeki hesap.</summary>
     public string OperatorEmail { get; } = $"operator-{email}";
+
+    /// <summary>Şirkette CompanyExpert rolündeki hesap.</summary>
+    public string ExpertEmail { get; } = $"uzman-{email}";
+
+    /// <summary>Şirkette CompanyViewer rolündeki hesap.</summary>
+    public string ViewerEmail { get; } = $"okuyucu-{email}";
+
+    /// <summary>Aynı kiracıdaki ikinci tüzel şirketin vergi numarası.</summary>
+    public string SecondTaxNumber { get; } = taxNumber[..^1] + "9";
 
     public Guid TenantId { get; set; }
     public Guid UserId { get; set; }
     public Guid OperatorUserId { get; set; }
+    public Guid ExpertUserId { get; set; }
+    public Guid ViewerUserId { get; set; }
     public Guid SourceId { get; set; }
     public Guid CompanyId { get; set; }
+    public Guid SecondCompanyId { get; set; }
     public Guid AssessmentId { get; set; }
     public Guid SimulationId { get; set; }
     public Guid NotificationId { get; set; }

@@ -35,6 +35,13 @@ public static class DependencyInjection
         services.AddScoped<ITenantRepository, TenantRepository>();
         services.AddScoped<IAuditLogRepository, AuditLogRepository>();
 
+        // Faz 1: çoklu şirket
+        services.AddScoped<IUserCompanyRepository, UserCompanyRepository>();
+        services.AddScoped<ICompanyGroupRepository, CompanyGroupRepository>();
+        services.AddScoped<ICompanyInvitationRepository, CompanyInvitationRepository>();
+        services.AddScoped<ICompanyVerificationRequestRepository, CompanyVerificationRequestRepository>();
+        services.AddScoped<ICrossTenantCompanyLookup, CrossTenantCompanyLookup>();
+
         return services;
     }
 }

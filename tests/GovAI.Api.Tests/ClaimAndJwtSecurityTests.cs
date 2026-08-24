@@ -29,11 +29,12 @@ public sealed class ClaimAndJwtSecurityTests : IAsyncLifetime
 
     // ─────────────────────────── K ───────────────────────────
 
-    [Fact(DisplayName = "K. Kapsam claim'i olmayan jeton hiçbir firmaya erişemez")]
-    public async Task Kapsam_claimi_olmayan_jeton_firmaya_erisemez()
+    [Fact(DisplayName = "K. Üyeliği olmayan kullanıcı geçerli jetonla da firmaya erişemez")]
+    public async Task Uyeligi_olmayan_kullanici_firmaya_erisemez()
     {
-        // Eski biçimli jeton: imzası geçerli, kiracısı doğru, ama company_scope taşımıyor.
-        // Düzeltmeden önce bu jeton kiracının tüm firmalarına erişebiliyordu.
+        // Faz 1'de yetkinin kaynağı JWT claim'i değil, veritabanındaki üyeliktir.
+        // Bu jeton geçerli imzalı ve doğru kiracıya ait; kapsam claim'i de taşımıyor.
+        // Ama sahibi olan platform hesabının hiçbir şirkette üyeliği yok.
         var token = CreateTokenWithoutCompanyScope(_factory.TenantA);
 
         using var client = _factory.CreateClient();
@@ -44,7 +45,7 @@ public sealed class ClaimAndJwtSecurityTests : IAsyncLifetime
         var me = await client.GetAsync("/api/auth/me");
         Assert.Equal(HttpStatusCode.OK, me.StatusCode);
 
-        // ...ama hiçbir firma verisine ulaşamaz.
+        // ...ama üyeliği bulunmadığı için hiçbir firma verisine ulaşamaz.
         var ownCompany = await client.GetAsync($"/api/company-profile/{_factory.TenantA.CompanyId}");
         var ownDashboard = await client.GetAsync($"/api/reports/companies/{_factory.TenantA.CompanyId}/dashboard");
 
@@ -75,7 +76,8 @@ public sealed class ClaimAndJwtSecurityTests : IAsyncLifetime
     {
         var claims = new List<Claim>
         {
-            new(JwtRegisteredClaimNames.Sub, fixture.UserId.ToString()),
+            // Üyeliği bulunmayan bir kullanıcı: platform inceleyici hesabı şirket üyeliği almaz.
+            new(JwtRegisteredClaimNames.Sub, Guid.CreateVersion7().ToString()),
             new(JwtRegisteredClaimNames.Email, fixture.Email),
             new(JwtRegisteredClaimNames.Jti, Guid.CreateVersion7().ToString()),
             new(GovAiClaims.TenantId, fixture.TenantId.ToString()),

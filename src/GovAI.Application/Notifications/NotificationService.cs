@@ -39,7 +39,7 @@ public sealed class NotificationService(
         // erişebildiği doğrulanır. Firma verilmediyse kiracı sınırı tek başına yeterlidir.
         if (scoped.CompanyId is not null)
         {
-            await access.EnsureAccessAsync(scoped.CompanyId.Value, cancellationToken);
+            await access.EnsureAccessAsync(scoped.CompanyId.Value, CompanyPermission.Read, cancellationToken);
         }
 
         var page = await notifications.ListAsync(scoped, cancellationToken);
@@ -66,7 +66,7 @@ public sealed class NotificationService(
 
         if (notification.CompanyId is not null)
         {
-            await access.EnsureAccessAsync(notification.CompanyId.Value, cancellationToken);
+            await access.EnsureAccessAsync(notification.CompanyId.Value, CompanyPermission.Read, cancellationToken);
         }
 
         notification.MarkRead(clock.UtcNow);

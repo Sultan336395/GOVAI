@@ -325,7 +325,7 @@ public sealed class EligibilityService(
     /// <c>CanAccessCompany</c> çağrılıyor, kiracı hiç karşılaştırılmıyordu (Faz 0 / D1).
     /// </summary>
     private Task<Company> LoadCompanyAsync(Guid companyId, CancellationToken cancellationToken) =>
-        access.LoadAccessibleAsync(companyId, cancellationToken);
+        access.LoadAccessibleAsync(companyId, CompanyPermission.Read, cancellationToken);
 
     private async Task EnsureCompanyAccessAsync(Guid companyId, CancellationToken cancellationToken)
     {

@@ -3,6 +3,7 @@ using GovAI.Application.Abstractions.Services;
 using GovAI.Domain.Assessments;
 using GovAI.Domain.Common;
 using GovAI.Domain.Companies;
+using GovAI.Domain.Identity;
 using GovAI.Domain.Opportunities;
 
 namespace GovAI.Application.Tests;
@@ -34,6 +35,40 @@ internal sealed class FakeCurrentUser : ICurrentUser
     public HashSet<Guid>? AllowedCompanies { get; init; }
 
     public bool CanAccessCompany(Guid companyId) => AllowedCompanies is null || AllowedCompanies.Contains(companyId);
+}
+
+/// <summary>
+/// Bellek içi üyelik deposu. Faz 1'de şirket erişimi UserCompany üzerinden
+/// doğrulandığı için servis testlerinin de üyelik kurması gerekir.
+/// </summary>
+internal sealed class FakeUserCompanyRepository : IUserCompanyRepository
+{
+    private readonly List<UserCompany> _memberships = [];
+
+    public void Seed(Guid tenantId, Guid userId, Guid companyId, CompanyRole role = CompanyRole.CompanyOwner) =>
+        _memberships.Add(new UserCompany(tenantId, userId, companyId, role, isDefault: _memberships.Count == 0));
+
+    public Task<UserCompany?> GetAsync(Guid userId, Guid companyId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(_memberships.FirstOrDefault(m => m.UserId == userId && m.CompanyId == companyId));
+
+    public Task<UserCompany?> GetByIdAsync(Guid membershipId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(_memberships.FirstOrDefault(m => m.Id == membershipId));
+
+    public Task<IReadOnlyList<UserCompany>> ListForUserAsync(Guid userId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<UserCompany>>(_memberships.Where(m => m.UserId == userId).ToList());
+
+    public Task<IReadOnlyList<UserCompany>> ListForCompanyAsync(Guid companyId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<UserCompany>>(_memberships.Where(m => m.CompanyId == companyId).ToList());
+
+    public Task<int> CountActiveOwnersAsync(Guid companyId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(_memberships.Count(m =>
+            m.CompanyId == companyId && m.IsActive && m.CompanyRole == CompanyRole.CompanyOwner));
+
+    public Task AddAsync(UserCompany membership, CancellationToken cancellationToken = default)
+    {
+        _memberships.Add(membership);
+        return Task.CompletedTask;
+    }
 }
 
 internal sealed class FakeUnitOfWork : IUnitOfWork

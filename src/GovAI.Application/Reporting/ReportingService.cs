@@ -55,7 +55,7 @@ public sealed class ReportingService(
     public async Task<DashboardDto> GetDashboardAsync(Guid companyId, CancellationToken cancellationToken = default)
     {
         // Kiracı + yetki doğrulaması; şirket nesnesi ancak bu kapıdan geçtikten sonra elde edilir.
-        var company = await access.LoadAccessibleAsync(companyId, cancellationToken);
+        var company = await access.LoadAccessibleAsync(companyId, CompanyPermission.Read, cancellationToken);
 
         var all = await assessments.ListLatestForCompanyAsync(companyId, cancellationToken);
         var now = clock.UtcNow;

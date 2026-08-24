@@ -99,11 +99,15 @@ public class ScenarioSimulationServiceTests
 
         var scenarios = new FakeScenarioRepository();
 
+        // Faz 1: şirket erişimi üyelikten doğrulanır; test kullanıcısına sahip rolü verilir.
+        var memberships = new FakeUserCompanyRepository();
+        memberships.Seed(currentUser.TenantId!.Value, currentUser.UserId!.Value, company.Id);
+
         var service = new ScenarioSimulationService(
             opportunities,
             scenarios,
             new FakeUnitOfWork(),
-            new CompanyAccessGuard(companies, currentUser),
+            new CompanyAccessGuard(companies, memberships, currentUser),
             new FixedClock(Now),
             NullLogger<ScenarioSimulationService>.Instance);
 

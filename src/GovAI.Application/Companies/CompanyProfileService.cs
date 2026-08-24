@@ -13,6 +13,7 @@ namespace GovAI.Application.Companies;
 /// </summary>
 public sealed class CompanyProfileService(
     ICompanyRepository companies,
+    IUserCompanyRepository memberships,
     ITenantRepository tenants,
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
@@ -25,10 +26,18 @@ public sealed class CompanyProfileService(
     public async Task<IReadOnlyList<CompanySummaryDto>> ListAsync(CancellationToken cancellationToken = default)
     {
         var tenantId = RequireTenant();
+        var userId = currentUser.UserId ?? throw new ForbiddenException("İstek bir kullanıcıya bağlı değil.");
+
+        // Liste artık JWT kapsamından değil, veritabanındaki aktif üyeliklerden türetilir.
+        var accessible = (await memberships.ListForUserAsync(userId, cancellationToken))
+            .Where(uc => uc.GrantsAccess)
+            .Select(uc => uc.CompanyId)
+            .ToHashSet();
+
         var items = await companies.ListAsync(tenantId, cancellationToken);
 
         return items
-            .Where(c => currentUser.CanAccessCompany(c.Id))
+            .Where(c => accessible.Contains(c.Id))
             .Select(ToSummary)
             .ToList();
     }
@@ -192,7 +201,7 @@ public sealed class CompanyProfileService(
 
     // Bu servisin özgün kontrolü, tüm servislerin ortak kullandığı CompanyAccessGuard'a taşındı.
     private Task<Company> LoadAccessibleAsync(Guid companyId, CancellationToken cancellationToken) =>
-        access.LoadAccessibleAsync(companyId, cancellationToken);
+        access.LoadAccessibleAsync(companyId, CompanyPermission.ManageProfile, cancellationToken);
 
     private async Task EnsureCompanyQuotaAsync(Guid tenantId, CancellationToken cancellationToken)
     {

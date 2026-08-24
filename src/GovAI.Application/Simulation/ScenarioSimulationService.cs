@@ -31,7 +31,8 @@ public sealed class ScenarioSimulationService(
         bool persist = true,
         CancellationToken cancellationToken = default)
     {
-        var company = await access.LoadAccessibleAsync(companyId, cancellationToken);
+        // Senaryo çalıştırmak analiz işlemidir; yalnızca görüntüleyici yapamaz.
+        var company = await access.LoadAccessibleAsync(companyId, CompanyPermission.Operate, cancellationToken);
 
         var now = clock.UtcNow;
         var openOpportunities = await opportunities.ListForEvaluationAsync(now, request.Categories, cancellationToken);
@@ -111,7 +112,7 @@ public sealed class ScenarioSimulationService(
 
     public async Task<IReadOnlyList<ScenarioSummaryDto>> ListAsync(Guid companyId, CancellationToken cancellationToken = default)
     {
-        await access.EnsureAccessAsync(companyId, cancellationToken);
+        await access.EnsureAccessAsync(companyId, CompanyPermission.Read, cancellationToken);
 
         var items = await simulations.ListForCompanyAsync(companyId, cancellationToken);
 
