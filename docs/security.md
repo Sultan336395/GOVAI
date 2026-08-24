@@ -109,13 +109,43 @@ Jetonlar kapsamı **her zaman açıkça** taşır:
 Eskiden claim'in yokluğu "sınırsız erişim" sayılıyordu; kimliksiz istekler de tüm
 firmalara erişebiliyordu. İkisi de kaldırıldı.
 
+### Faz 1: erişimin kaynağı jeton değil, üyeliktir
+
+Jetondaki liste artık **yalnızca istemci kolaylığıdır.** Yetki kararı her istekte
+`user_companies` tablosundan okunur (`CompanyAccessGuard`).
+
+Sebebi bir güvenlik gereğidir: bir kullanıcının şirket erişimi kaldırıldığında elindeki
+jeton hâlâ geçerli kalır. Karar veritabanından verilmezse o jeton erişmeye devam ederdi.
+Koruyan test: `Faz1-O. Üyelik kaldırılınca eski jeton erişim sağlayamaz`.
+
+Aktif şirket de istemcide seçilmez: `POST /api/auth/active-company` üyeliği doğrular ve
+aktif şirketi **kendi yazdığı** yeni bir jeton döner.
+
+| Şirket rolü | Görüntüler | Analiz çalıştırır | Profili değiştirir | Kullanıcı yönetir |
+|---|---|---|---|---|
+| CompanyOwner | ✔ | ✔ | ✔ | ✔ |
+| CompanyManager | ✔ | ✔ | ✔ | — |
+| CompanyExpert | ✔ | ✔ | — | — |
+| CompanyViewer | ✔ | — | — | — |
+
+Matris tek yerde tanımlıdır: `CompanyAccessGuard.Satisfies`. Panel aynı matrisi
+`companyPermissions` içinde tekrarlar; bu yalnızca kullanıcıyı boş yere uğraştırmamak
+içindir, karar her zaman sunucudadır.
+
+Erişim reddinde `NotFoundException` atılır, `ForbiddenException` değil: "yasak" cevabı o
+kimliğin var olduğunu doğrular ve kimlik sayımına izin verirdi. Tek istisna, üyeliği olan
+ama **rolü yetmeyen** kullanıcıdır; orada şirketin varlığı zaten bilindiği için 403 döner.
+
 ---
 
 ## 4. Sorgu filtresini atlayan tek yol
 
-Kod tabanında `IgnoreQueryFilters()` **bir kez** kullanılır:
+Kod tabanında `IgnoreQueryFilters()` **iki yerde** kullanılır. İkisi de burada
+gerekçelendirilmiştir; üçüncüsü eklenemez.
 
-`UserRepository.GetByEmailAsync` — `src/GovAI.Persistence/Repositories/AssessmentRepositories.cs`
+### 4.1 `UserRepository.GetByEmailAsync`
+
+`src/GovAI.Persistence/Repositories/AssessmentRepositories.cs`
 
 Zorunludur, çünkü:
 
@@ -130,6 +160,24 @@ Korumalar:
 - Filtre tümüyle kalktığı için **yumuşak silme koşulu elle geri konur** — aksi hâlde
   silinmiş bir hesap yeniden giriş yapabilirdi.
 
+### 4.2 `CrossTenantCompanyLookup` (Faz 1)
+
+`src/GovAI.Persistence/Repositories/MultiCompanyRepositories.cs`
+
+Zorunludur, çünkü panelden eklenen bir vergi numarasının **başka bir çalışma alanında**
+kayıtlı olup olmadığı bilinmeden mükerrer tüzel kişilik engellenemez.
+
+Korumalar:
+
+- Yalnızca `bool` döner. Karşı tarafın adı, kimliği, kiracısı veya herhangi bir alanı
+  çağırana **hiç ulaşmaz**.
+- Sonuç kullanıcıya da açılmaz: yanıt yalnızca "doğrulama veya bağlantı talebi gereklidir"
+  der ve bir talep kaydı açar. Şirket oluşturulmaz.
+- Açılan talep kaydı karşı tarafa **hiçbir yabancı anahtar tutmaz.**
+- Koruyan test: `Faz1-E. Başka çalışma alanındaki vergi numarası bilgi sızdırmaz` —
+  yanıt gövdesinde karşı tarafın adının, şirket kimliğinin ve kiracı kimliğinin
+  geçmediğini ayrı ayrı doğrular.
+
 Yeni bir `IgnoreQueryFilters()` eklenmesi gerekiyorsa, gerekçesi bu belgeye yazılmalı ve
 izolasyonu doğrulayan bir test eklenmelidir.
 
@@ -141,6 +189,15 @@ Arka plan işleri anonim kullanıcı gibi davranmaz.
 
 - **Python worker'ları** gerçek bir hesapla `/api/auth/login` üzerinden giriş yapar ve
   normal kullanıcılar gibi jeton taşır. Ayrıcalıkları yoktur; kiracı sınırına tabidirler.
+  Faz 1'den beri bu hesabın rolü `SystemIngest`'tir: yalnızca veri toplama uçlarını
+  kullanabilir; kullanıcı, rol, kiracı veya şirket yönetemez ve şirket raporlarını
+  okuyamaz (`Policies.CompanyData` platform rollerini dışarıda bırakır).
+  Kimlik bilgileri koda ve depoya yazılmaz; yalnızca `.env` üzerinden gelir.
+
+  Tek muafiyeti gece toplu skorlama işidir: bu şirketlerde insan üyeliği yoktur ve
+  olmamalıdır, bu yüzden `CompanyAccessGuard` bu aktör için üyelik aramaz. Muafiyet
+  kiracı sınırını **aşmaz** ve uç seviyesinde okuma yolları zaten kapalıdır.
+  Koruyan test: `T3. SystemIngest şirket raporlarını okuyamaz`.
 - **Açılış seed'i** (`DatabaseSeeder`) HTTP bağlamı olmadan çalışır. Yalnızca kiracıya
   bağlı olmayan tablolara okuma yapar (`tenants`); diğer işlemleri yazmadır ve yazma
   sorgu filtresinden etkilenmez. Bu nedenle **filtre atlamasına ihtiyaç duymaz.**
@@ -158,6 +215,19 @@ filtreleri; yalnızca veritabanı sağlayıcısı bellek içi sağlayıcıyla de
 |---|---|
 | `TenantIsolationTests.cs` | Kiracılar arası okuma/yazma denemeleri (senaryo A–J, L, M) |
 | `ClaimAndJwtSecurityTests.cs` | Kapsam claim'i eksik jeton (K), JWT anahtar kuralları (N, O) |
+| `PlatformRoleTests.cs` | Platform rolleri: katalog yazma, danışman onayı, worker sınırları (R–T4) |
+| `MultiCompanyTests.cs` | Çoklu şirket: üyelik, rol matrisi, aktif şirket, grup, davet (Faz1-A–Q) |
+
+Testler bellek içi sağlayıcıyla **ve** gerçek PostgreSQL 17 ile ayrı ayrı koşturulur:
+
+```bash
+dotnet test                                              # bellek içi
+GOVAI_TEST_POSTGRES="Host=...;Database=postgres;..." dotnet test   # gerçek PostgreSQL
+```
+
+İkisi de gereklidir. Kısmi tekil indeks, yabancı anahtar sırası ve `jsonb` davranışı
+bellek içi sağlayıcıda hiç sınanmaz; Faz 1'de üç veri hatası yalnızca gerçek
+PostgreSQL koşusunda ortaya çıktı.
 
 Bu testler düzeltme öncesi koda karşı çalıştırıldığında **16 tanesi başarısız olur**;
 düzeltmeden sonra tamamı geçer.

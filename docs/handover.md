@@ -76,6 +76,39 @@ diğer tüm 2xx yanıtlarda JSON gövde bekliyordu. `POST /api/sources/{id}/craw
 ve boş gövde döndüğü için "Şimdi tara" düğmesi `Unexpected end of JSON input` hatası veriyordu.
 İstemci, gövdesiz yanıtları durum koduna bakmadan tolere edecek biçimde düzeltildi.
 
+### 2.2 Faz 1 — çoklu şirket ve şirket grubu (25.08.2026)
+
+Dal: `feature/multi-company-foundation` (main'e birleştirilmedi, GitHub'a gönderilmedi).
+
+| Kontrol | Sonuç |
+|---|---|
+| `dotnet build -c Release` | Başarılı, **0 uyarı** |
+| `dotnet test` (bellek içi) | **111/111** (29 domain + 5 application + 77 API) |
+| `dotnet test` (gerçek PostgreSQL 17) | **111/111** |
+| `migrations has-pending-model-changes` | Bekleyen değişiklik yok |
+| Migration: veri üzerinde uygula → geri al → tekrar uygula | Veri korundu, üyelikler geri dolduruldu, geri alma temiz |
+| `npm run lint` / `typecheck` / `build` (web) | Temiz |
+| `check_contract_parity.py` | Senkron |
+| İzole önizleme ortamı (`govai-faz1`) | Sekiz servis ayakta; mevcut `govai` ortamına dokunulmadı |
+| Panelden şirket ekleme, mükerrer engelleme, şirket değiştirme | Tarayıcıda fiilen denendi ve geçti |
+
+**Testler iki sağlayıcıda da koşulmalıdır.** Faz 1'de üç veri hatası yalnızca gerçek
+PostgreSQL koşusunda ortaya çıktı: kısmi tekil indeks çakışması, yabancı anahtar sırası
+ve yükseltmede sütun varsayılanı. Bellek içi sağlayıcı bunların hiçbirini göremez.
+
+```bash
+GOVAI_TEST_POSTGRES="Host=localhost;Port=15438;Database=postgres;Username=govai;Password=..." dotnet test
+```
+
+**İzole önizleme ortamı** çalışan kuruluma dokunmadan ayağa kaldırılır:
+
+```bash
+cd deploy && docker compose -p govai-faz1 --env-file .env.preview up -d --build
+```
+
+`.env.preview` ayrı portlar kullanır (web 5181, api 8081, postgres 15437, redis 6381,
+rabbitmq 5674/15674). Proje adı farklı olduğu için volume'ler de ayrışır.
+
 ---
 
 ## 3. İlk 30 dakikada yapılması gereken
