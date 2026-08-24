@@ -1,10 +1,13 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth, useCompanies } from '@/app/contexts'
+import { companyRoleLabels } from '@/lib/companyLabels'
 
 const navItems = [
   { to: '/', label: 'Panel', end: true },
   { to: '/matches', label: 'Fırsat eşleşmeleri' },
   { to: '/opportunities', label: 'Çağrı kataloğu' },
+  { to: '/companies', label: 'Şirketlerim' },
+  { to: '/companies/groups', label: 'Şirket grupları' },
   { to: '/company', label: 'Firma profili' },
   { to: '/simulation', label: 'Senaryo simülasyonu' },
   { to: '/notifications', label: 'Bildirimler' },
@@ -13,7 +16,7 @@ const navItems = [
 
 export default function AppLayout() {
   const { user, logout } = useAuth()
-  const { companies, selectedCompanyId, selectCompany } = useCompanies()
+  const { companies, selectedCompanyId, selectCompany, isSwitching, activeRole } = useCompanies()
 
   return (
     <div className="app-shell">
@@ -25,18 +28,26 @@ export default function AppLayout() {
 
         {companies.length > 0 ? (
           <div className="field" style={{ marginBottom: 0 }}>
-            <label htmlFor="company-select">Aktif firma</label>
+            <label htmlFor="company-select">Aktif şirket</label>
             <select
               id="company-select"
               value={selectedCompanyId ?? ''}
-              onChange={(e) => selectCompany(e.target.value)}
+              disabled={isSwitching}
+              onChange={(e) => void selectCompany(e.target.value)}
             >
               {companies.map((company) => (
                 <option key={company.id} value={company.id}>
-                  {company.legalName}
+                  {company.shortName ?? company.legalName}
                 </option>
               ))}
             </select>
+            <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+              {isSwitching
+                ? 'Şirket değiştiriliyor…'
+                : activeRole
+                  ? companyRoleLabels[activeRole]
+                  : null}
+            </div>
           </div>
         ) : null}
 

@@ -71,6 +71,10 @@ export type UserRole =
   | 'OperationUser'
   | 'Consultant'
   | 'ReadOnly'
+  // Platform işletim rolleri (Faz 1). Kiracı yöneticisi bunları atayamaz.
+  | 'PlatformCatalogManager'
+  | 'PlatformReviewer'
+  | 'SystemIngest'
 
 export interface PagedResult<T> {
   items: T[]
@@ -353,4 +357,169 @@ export interface SourceDto {
   lastRunMessage: string | null
   consecutiveFailureCount: number
   configurationJson: string | null
+}
+
+// ══════════════════════════ Faz 1 — çoklu şirket ══════════════════════════
+// C# karşılığı: GovAI.Application/Companies/MultiCompanyDtos.cs
+// Bu blok elle senkronize edilir (bkz. CLAUDE.md §3).
+
+export type CompanyRole = 'CompanyOwner' | 'CompanyManager' | 'CompanyExpert' | 'CompanyViewer'
+
+export type CompanyRelationshipType =
+  | 'Independent'
+  | 'HeadCompany'
+  | 'Subsidiary'
+  | 'Affiliate'
+  | 'Branch'
+  | 'GroupCompany'
+
+export type CreateCompanyOutcome = 'Created' | 'AlreadyInWorkspace' | 'VerificationRequired'
+
+export type VerificationRequestStatus = 'Pending' | 'Approved' | 'Rejected' | 'Cancelled'
+
+/** Şirket ekleme ve düzenleme formunun gövdesi. */
+export interface CreateCompanyRequest {
+  legalName: string
+  taxNumber: string
+  country: string
+  mainSector: string
+  primaryNaceCode: string
+
+  shortName?: string | null
+  taxOffice?: string | null
+  mersisNumber?: string | null
+  tradeRegistryNumber?: string | null
+
+  legalType?: LegalType
+  foundedOn?: string | null
+
+  secondaryNaceCodes?: string[]
+  subSectors?: string[]
+  targetCountries?: string[]
+
+  employeeCount?: number
+  rAndDEmployeeCount?: number
+  womenEmployeeCount?: number
+
+  annualRevenue?: number
+  balanceSize?: number
+
+  isInTechnopark?: boolean
+  exportFlag?: boolean
+
+  website?: string | null
+  phone?: string | null
+  corporateEmail?: string | null
+  city?: string | null
+  address?: string | null
+
+  groupId?: string | null
+  parentCompanyId?: string | null
+  relationshipType?: CompanyRelationshipType
+  isHeadCompany?: boolean
+}
+
+export interface CreateCompanyResult {
+  outcome: CreateCompanyOutcome
+  message: string
+  companyId?: string | null
+  canNavigateToExisting: boolean
+  verificationRequestId?: string | null
+}
+
+export interface MyCompany {
+  id: string
+  legalName: string
+  shortName: string | null
+  taxNumber: string
+  legalType: LegalType
+  size: EnterpriseSize
+  primaryNaceCode: string | null
+  mainSector: string | null
+  city: string | null
+  employeeCount: number
+  annualRevenue: number
+  profileCompletionPercentage: number
+  isActive: boolean
+  groupId: string | null
+  groupName: string | null
+  parentCompanyId: string | null
+  parentCompanyName: string | null
+  relationshipType: CompanyRelationshipType
+  isHeadCompany: boolean
+  companyRole: CompanyRole
+  isDefault: boolean
+}
+
+export interface CompanyGroup {
+  id: string
+  name: string
+  description: string | null
+  isActive: boolean
+  companyCount: number
+}
+
+export interface UpdateCompanyHierarchyRequest {
+  groupId?: string | null
+  parentCompanyId?: string | null
+  relationshipType: CompanyRelationshipType
+  isHeadCompany: boolean
+}
+
+export interface CompanyMember {
+  membershipId: string
+  userId: string
+  email: string
+  fullName: string
+  companyRole: CompanyRole
+  isActive: boolean
+  isDefault: boolean
+  createdAt: string
+}
+
+export interface CompanyInvitation {
+  id: string
+  email: string
+  companyRole: CompanyRole
+  expiresAt: string
+  acceptedAt: string | null
+  revokedAt: string | null
+  isRedeemable: boolean
+}
+
+/** Davet jetonunun açık metni yalnızca oluşturma yanıtında, bir kez döner. */
+export interface CompanyInvitationResult {
+  invitationId: string
+  email: string
+  companyRole: CompanyRole
+  expiresAt: string
+  token: string
+}
+
+export interface ActiveCompanyResult {
+  companyId: string
+  companyName: string
+  companyRole: CompanyRole
+  accessToken: string
+  expiresAt: string
+}
+
+export interface VerificationRequest {
+  id: string
+  taxNumber: string
+  requestedLegalName: string
+  status: VerificationRequestStatus
+  requestedAt: string
+  resolvedAt: string | null
+  resolutionNote: string | null
+}
+
+export interface TenantUser {
+  id: string
+  tenantId: string
+  email: string
+  fullName: string
+  role: UserRole
+  isActive: boolean
+  lastLoginAt: string | null
 }

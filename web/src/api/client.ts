@@ -1,6 +1,14 @@
 import type {
+  ActiveCompanyResult,
   CompanyDetail,
+  CompanyGroup,
+  CompanyInvitation,
+  CompanyInvitationResult,
+  CompanyMember,
+  CompanyRole,
   CompanySummary,
+  CreateCompanyRequest,
+  CreateCompanyResult,
   Dashboard,
   EligibilityDetail,
   LoginResponse,
@@ -8,9 +16,13 @@ import type {
   OpportunityMatch,
   OpportunitySummary,
   PagedResult,
+  MyCompany,
   ScenarioRequest,
   ScenarioResult,
   SourceDto,
+  TenantUser,
+  UpdateCompanyHierarchyRequest,
+  VerificationRequest,
 } from './types'
 
 const TOKEN_STORAGE_KEY = 'govai.token'
@@ -23,6 +35,8 @@ export class ApiError extends Error {
     readonly status: number,
     message: string,
     readonly problem?: unknown,
+    /** Alan adı → hata mesajları. Formların ilgili alanın altına yazması için. */
+    readonly fieldErrors: Record<string, string[]> = {},
   ) {
     super(message)
     this.name = 'ApiError'
@@ -54,12 +68,23 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   if (!response.ok) {
     const problem = await response.json().catch(() => undefined)
+    const shape = problem as
+      | { detail?: string; title?: string; errors?: Record<string, string[]> }
+      | undefined
+
+    const fieldErrors = shape?.errors ?? {}
+
+    // Doğrulama hatalarında anlamlı metin "errors" içindedir; başlık ("Girdi doğrulaması
+    // başarısız") tek başına kullanıcıya ne yapması gerektiğini söylemez.
+    const firstFieldMessage = Object.values(fieldErrors).flat()[0]
+
     const detail =
-      (problem as { detail?: string; title?: string } | undefined)?.detail ??
-      (problem as { title?: string } | undefined)?.title ??
+      shape?.detail ??
+      firstFieldMessage ??
+      shape?.title ??
       `İstek başarısız (${response.status})`
 
-    throw new ApiError(response.status, detail, problem)
+    throw new ApiError(response.status, detail, problem, fieldErrors)
   }
 
   // 202 (Accepted) ve 204 gibi gövdesiz yanıtlar da başarılıdır; boş gövdede json() patlar.
@@ -158,6 +183,95 @@ export const api = {
 
   markNotificationRead: (id: string) =>
     request<Notification>(`/api/notifications/${id}/read`, { method: 'POST' }),
+
+  // ---- çoklu şirket (Faz 1) ----
+
+  /** Kullanıcının üyeliği olan şirketler. Kiracının tümü değil — yalnızca erişebildikleri. */
+  listMyCompanies: () => request<MyCompany[]>('/api/companies'),
+
+  createCompany: (body: CreateCompanyRequest) =>
+    request<CreateCompanyResult>('/api/companies', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateCompany: (companyId: string, body: CreateCompanyRequest) =>
+    request<MyCompany>(`/api/companies/${companyId}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  updateCompanyHierarchy: (companyId: string, body: UpdateCompanyHierarchyRequest) =>
+    request<MyCompany>(`/api/companies/${companyId}/hierarchy`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  listCompanyGroups: () => request<CompanyGroup[]>('/api/companies/groups'),
+
+  createCompanyGroup: (body: { name: string; description?: string | null }) =>
+    request<CompanyGroup>('/api/companies/groups', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateCompanyGroup: (groupId: string, body: { name: string; description?: string | null }) =>
+    request<CompanyGroup>(`/api/companies/groups/${groupId}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  listVerificationRequests: () =>
+    request<VerificationRequest[]>('/api/companies/verification-requests'),
+
+  // ---- şirket kullanıcıları ----
+  listCompanyMembers: (companyId: string) =>
+    request<CompanyMember[]>(`/api/companies/${companyId}/members`),
+
+  addCompanyMember: (companyId: string, body: { userId: string; companyRole: CompanyRole }) =>
+    request<CompanyMember>(`/api/companies/${companyId}/members`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  changeCompanyMemberRole: (companyId: string, membershipId: string, companyRole: CompanyRole) =>
+    request<CompanyMember>(`/api/companies/${companyId}/members/${membershipId}/role`, {
+      method: 'PUT',
+      body: JSON.stringify({ companyRole }),
+    }),
+
+  removeCompanyMember: (companyId: string, membershipId: string) =>
+    request<void>(`/api/companies/${companyId}/members/${membershipId}`, { method: 'DELETE' }),
+
+  setDefaultCompany: (companyId: string) =>
+    request<void>(`/api/companies/${companyId}/members/default`, { method: 'POST' }),
+
+  listCompanyInvitations: (companyId: string) =>
+    request<CompanyInvitation[]>(`/api/companies/${companyId}/members/invitations`),
+
+  createCompanyInvitation: (
+    companyId: string,
+    body: { email: string; companyRole: CompanyRole; validForDays?: number },
+  ) =>
+    request<CompanyInvitationResult>(`/api/companies/${companyId}/members/invitations`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  revokeCompanyInvitation: (companyId: string, invitationId: string) =>
+    request<void>(`/api/companies/${companyId}/members/invitations/${invitationId}`, {
+      method: 'DELETE',
+    }),
+
+  /** Aktif şirketi sunucuda değiştirir ve yeni jetonu döner. */
+  setActiveCompany: (companyId: string) =>
+    request<ActiveCompanyResult>('/api/auth/active-company', {
+      method: 'POST',
+      body: JSON.stringify({ companyId }),
+    }),
+
+  /** Yalnızca kiracı yöneticisi çağırabilir; üye eklerken kullanıcı seçimi için. */
+  listTenantUsers: () => request<TenantUser[]>('/api/admin/users'),
 
   // ---- kaynaklar ----
   listSources: () => request<SourceDto[]>('/api/sources'),

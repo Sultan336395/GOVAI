@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react'
-import type { CompanySummary, LoginResponse } from '@/api/types'
+import type { CompanyRole, LoginResponse, MyCompany } from '@/api/types'
 
 /**
  * Context nesneleri ve hook'ları burada, provider bileşenlerinden ayrı tutulur.
@@ -27,9 +27,16 @@ export function useAuth(): AuthContextValue {
 }
 
 export interface CompanyContextValue {
-  companies: CompanySummary[]
+  /** Kullanıcının üyeliği olan şirketler. Kiracının tamamı değildir. */
+  companies: MyCompany[]
   selectedCompanyId: string | null
-  selectCompany: (id: string) => void
+  /** Aktif şirketi sunucuda değiştirir; yetki sunucuda doğrulanır ve jeton yenilenir. */
+  selectCompany: (id: string) => Promise<void>
+  /** Şirket değişimi sürerken çift tıklamayı ve yarı yüklü ekranı engellemek için. */
+  isSwitching: boolean
+  /** Aktif şirketteki rol; ekranların düğme göstermeden önce sorduğu değer. */
+  activeRole: CompanyRole | null
+  refresh: () => Promise<unknown>
   isLoading: boolean
   error: unknown
 }
@@ -42,4 +49,16 @@ export function useCompanies(): CompanyContextValue {
     throw new Error('useCompanies, CompanyProvider içinde kullanılmalıdır.')
   }
   return context
+}
+
+/**
+ * Rol–yetki matrisi. C# karşılığı: CompanyAccessGuard.Satisfies.
+ * Okuma ayrıca sorulmaz: üyeliği olan her rol görüntüleyebilir.
+ */
+export const companyPermissions = {
+  operate: (role: CompanyRole | null) =>
+    role === 'CompanyOwner' || role === 'CompanyManager' || role === 'CompanyExpert',
+  manageProfile: (role: CompanyRole | null) =>
+    role === 'CompanyOwner' || role === 'CompanyManager',
+  manageMembers: (role: CompanyRole | null) => role === 'CompanyOwner',
 }

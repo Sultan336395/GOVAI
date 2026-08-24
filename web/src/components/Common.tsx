@@ -48,3 +48,49 @@ export function ScoreCell({ score }: { score: number }) {
     </div>
   )
 }
+
+/** Başarılı işlem bildirimi. Kullanıcı ne olduğunu görmeden ekran değişmemeli. */
+export function SuccessBox({ children }: { children: ReactNode }) {
+  return (
+    <div
+      className="card"
+      role="status"
+      style={{ borderLeft: '4px solid var(--success, #1a7f37)', marginBottom: 16 }}
+    >
+      {children}
+    </div>
+  )
+}
+
+/** Bilgilendirme kutusu: hata değil ama kullanıcının bilmesi gereken durumlar. */
+export function InfoBox({ children }: { children: ReactNode }) {
+  return (
+    <div
+      className="card"
+      role="status"
+      style={{ borderLeft: '4px solid var(--warning, #9a6700)', marginBottom: 16 }}
+    >
+      {children}
+    </div>
+  )
+}
+
+/**
+ * Yetkisiz kullanıcıya gösterilen mesaj. Kaydın var olup olmadığını ele vermez;
+ * yalnızca kullanıcının kendi rolünün yetmediğini söyler.
+ */
+export function NotAuthorized({ message }: { message?: string }) {
+  return (
+    <div className="state">
+      {message ?? 'Bu ekranı görüntülemek için şirketteki rolünüz yeterli değil.'}
+    </div>
+  )
+}
+
+/** Form alanının altına yazılan hata metni. */
+export function FieldError({ message }: { message?: string }) {
+  if (!message) return null
+  return (
+    <div style={{ color: 'var(--danger, #b42318)', fontSize: 12, marginTop: 4 }}>{message}</div>
+  )
+}
