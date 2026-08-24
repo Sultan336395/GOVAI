@@ -8,7 +8,17 @@ namespace GovAI.Domain.Companies;
 /// </summary>
 public sealed record Workforce
 {
-    public static readonly Workforce Empty = new(0, 0, 0, 0, 0);
+    /// <summary>
+    /// Boş değer. Her çağrıda <b>yeni bir örnek</b> döner.
+    ///
+    /// Bilinçli olarak <c>static readonly</c> alan DEĞİLDİR: EF Core sahipli (owned)
+    /// tipleri örnek kimliğine göre izler. Tek bir paylaşılan örnek iki farklı şirkete
+    /// atandığında EF sahipliği karıştırır ve satırlardan birinin sütunlarını NULL yazar.
+    /// Bu, finansal bilgisi girilmemiş ikinci şirket eklenirken
+    /// "null value in column annual_revenue violates not-null constraint" hatası olarak
+    /// ortaya çıkmıştı. Bellek içi sağlayıcı bu hatayı gizler; gerçek PostgreSQL yakalar.
+    /// </summary>
+    public static Workforce Empty => new(0, 0, 0, 0, 0);
 
     public Workforce(
         int employeeCount,
