@@ -232,6 +232,8 @@ static async Task ApplyStartupTasksAsync(WebApplication app)
     if (!string.IsNullOrWhiteSpace(workerEmail) && !string.IsNullOrWhiteSpace(workerPassword))
     {
         await seeder.SeedWorkerIdentityAsync(workerEmail, workerPassword);
+        // Faz 2: resmî kaynak kataloğu. Yalnızca eksikleri ekler; var olanlara dokunmaz.
+        await seeder.SeedOfficialSourceCatalogAsync();
     }
     else
     {

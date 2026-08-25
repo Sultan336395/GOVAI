@@ -18,7 +18,26 @@ public sealed record SourceDto(
     CrawlStatus LastRunStatus,
     string? LastRunMessage,
     int ConsecutiveFailureCount,
-    string? ConfigurationJson);
+    string? ConfigurationJson,
+    // ── Faz 2 künyesi ──
+    // Worker tarama planını buradan okur; kod içinde kaynağa özgü ayar yoktur.
+    SourceCategory Category,
+    SourceHealth Health,
+    bool ConfigurationVerified,
+    DateTimeOffset? ConfigurationVerifiedAt,
+    DateTimeOffset? LastSuccessfulRunAt,
+    bool IsCrawlable,
+    string? Authority,
+    string? Jurisdiction,
+    string? OfficialDomain,
+    string? Language,
+    string? StartUrl,
+    string? ListSelector,
+    string? ContentSelector,
+    string? UrlPattern,
+    int MaxPages,
+    string? AllowedDomains,
+    string? DocumentTypes);
 
 public sealed record UpsertSourceRequest(string Name, SourceType Type, string BaseUrl, string CronExpression, string? ConfigurationJson);
 
@@ -60,6 +79,35 @@ public sealed record IngestDocumentResult(
     QuarantineReason Quarantine = QuarantineReason.None);
 
 public sealed record RecordCrawlRunRequest(CrawlStatus Status, string? Message, int DocumentCount);
+
+/// <summary>
+/// Worker'ın canlı doğrulama sonucu (Faz 2).
+///
+/// Bir kaynak ancak seçicisinin gerçekten bağlantı çıkardığı kanıtlandığında taranabilir
+/// hâle gelir. Erişilemeyen ya da seçicisi tutmayan kaynak <b>başarılı gösterilmez</b>;
+/// nedeniyle birlikte pasif kalır.
+/// </summary>
+public sealed record RecordVerificationRequest
+{
+    public required bool Reachable { get; init; }
+
+    /// <summary>Seçicinin çıkardığı bağlantı sayısı. Sıfırsa yapılandırma çalışmıyordur.</summary>
+    public int DiscoveredLinkCount { get; init; }
+
+    public int? HttpStatusCode { get; init; }
+    public string? FinalUrl { get; init; }
+    public string? Charset { get; init; }
+
+    /// <summary>Başarısızlık nedeni; panelde olduğu gibi gösterilir.</summary>
+    public string? FailureReason { get; init; }
+}
+
+public sealed record RecordVerificationResult(
+    Guid SourceId,
+    bool ConfigurationVerified,
+    SourceHealth Health,
+    bool IsEnabled,
+    string Message);
 
 /// <summary>Parser worker'ın ürettiği tek bir kanıt parçası.</summary>
 public sealed record EvidenceChunkRequest
@@ -416,6 +464,71 @@ public sealed class SourceService(
     /// <summary>Bir kanıt parçasının anlamlı sayılması için gereken en az uzunluk.</summary>
     private const int MinimumChunkLength = 30;
 
+    /// <summary>
+    /// Canlı doğrulama sonucunu kaydeder ve kaynağı taranabilir yapar ya da pasif bırakır.
+    ///
+    /// Doğrulama <b>üç koşulun üçünü de</b> ister: adrese erişilebilmeli, seçici en az bir
+    /// bağlantı çıkarmalı ve tarama planı zaten taranabilir olmalı. Biri eksikse kaynak
+    /// pasif kalır — yarım yapılandırmayla tarama, siteyi olduğu gibi toplamak demektir.
+    /// </summary>
+    public async Task<RecordVerificationResult> RecordVerificationAsync(
+        Guid sourceId,
+        RecordVerificationRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var source = await sources.GetAsync(sourceId, cancellationToken)
+            ?? throw new NotFoundException("Kaynak", sourceId);
+
+        var now = clock.UtcNow;
+
+        if (!request.Reachable)
+        {
+            var reason = request.FailureReason ?? "Kaynak adresine erişilemedi.";
+            source.FailVerification(reason);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+
+            logger.LogInformation(
+                "Kaynak doğrulanamadı. SourceId={SourceId} Neden={Reason}", sourceId, reason);
+
+            return new RecordVerificationResult(
+                sourceId, false, source.Health, source.IsEnabled, reason);
+        }
+
+        if (request.DiscoveredLinkCount <= 0)
+        {
+            const string reason =
+                "Adrese erişildi ama liste seçicisi hiç bağlantı çıkarmadı; yapılandırma çalışmıyor.";
+
+            source.FailVerification(reason);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+
+            return new RecordVerificationResult(
+                sourceId, false, source.Health, source.IsEnabled, reason);
+        }
+
+        if (!source.CrawlPlan.IsCrawlable)
+        {
+            const string reason = "Liste seçicisi veya URL kalıbı tanımlı değil.";
+            source.FailVerification(reason);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+
+            return new RecordVerificationResult(
+                sourceId, false, source.Health, source.IsEnabled, reason);
+        }
+
+        source.MarkVerified(now);
+        source.Enable();
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        var message = $"Doğrulandı: {request.DiscoveredLinkCount} bağlantı bulundu.";
+
+        logger.LogInformation(
+            "Kaynak doğrulandı. SourceId={SourceId} Bağlantı={LinkCount}",
+            sourceId, request.DiscoveredLinkCount);
+
+        return new RecordVerificationResult(sourceId, true, source.Health, source.IsEnabled, message);
+    }
+
     public async Task RecordRunAsync(Guid sourceId, RecordCrawlRunRequest request, CancellationToken cancellationToken = default)
     {
         var source = await sources.GetAsync(sourceId, cancellationToken)
@@ -459,5 +572,22 @@ public sealed class SourceService(
         source.LastRunStatus,
         source.LastRunMessage,
         source.ConsecutiveFailureCount,
-        source.ConfigurationJson);
+        source.ConfigurationJson,
+        source.Category,
+        source.Health,
+        source.ConfigurationVerified,
+        source.ConfigurationVerifiedAt,
+        source.LastSuccessfulRunAt,
+        source.IsCrawlable,
+        source.Profile.Authority,
+        source.Profile.Jurisdiction,
+        source.Profile.OfficialDomain,
+        source.Profile.Language,
+        source.CrawlPlan.StartUrl,
+        source.CrawlPlan.ListSelector,
+        source.CrawlPlan.ContentSelector,
+        source.CrawlPlan.UrlPattern,
+        source.CrawlPlan.MaxPages,
+        source.CrawlPlan.AllowedDomains,
+        source.CrawlPlan.DocumentTypes);
 }

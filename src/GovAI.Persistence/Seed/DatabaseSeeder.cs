@@ -27,6 +27,43 @@ public sealed class DatabaseSeeder(
     /// Bilinen sınır: hesap seed edilen kiracıya bağlıdır. Çok kiracılı üretimde her
     /// kiracı için ayrı ingest kimliği veya kiracıdan bağımsız servis kimliği gerekir.
     /// </summary>
+    /// <summary>
+    /// Resmî kaynak kataloğunu yükler (Faz 2).
+    ///
+    /// Fikir birliği: kaynaklar <b>veritabanında</b> yaşar. Bu metot yalnızca eksik
+    /// olanları ekler; var olanların yapılandırmasına dokunmaz — platform yöneticisinin
+    /// panelden yaptığı düzeltmeler her açılışta geri alınmamalıdır.
+    ///
+    /// Hepsi doğrulanmamış ve kapalı olarak eklenir; taranabilmesi için seçicisinin
+    /// canlı olarak çalıştığının kanıtlanması gerekir.
+    /// </summary>
+    public async Task<int> SeedOfficialSourceCatalogAsync(CancellationToken cancellationToken = default)
+    {
+        var mevcutAdlar = await context.Sources
+            .Select(s => s.Name)
+            .ToListAsync(cancellationToken);
+
+        var eklenecek = OfficialSourceCatalog.All
+            .Where(d => !mevcutAdlar.Contains(d.Name))
+            .Select(OfficialSourceCatalog.ToSource)
+            .ToList();
+
+        if (eklenecek.Count == 0)
+        {
+            logger.LogInformation("Resmî kaynak kataloğu güncel; yeni kaynak eklenmedi.");
+            return 0;
+        }
+
+        await context.Sources.AddRangeAsync(eklenecek, cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
+
+        logger.LogInformation(
+            "Resmî kaynak kataloğuna {Count} kaynak eklendi (doğrulanmamış, kapalı).",
+            eklenecek.Count);
+
+        return eklenecek.Count;
+    }
+
     public async Task SeedWorkerIdentityAsync(
         string workerEmail,
         string workerPassword,

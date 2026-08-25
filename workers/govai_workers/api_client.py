@@ -145,6 +145,10 @@ class GovAiClient:
             },
         )
 
+    def record_verification(self, source_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        """Canlı doğrulama sonucunu bildirir; kaynağı aktif eden tek yol budur."""
+        return self._request("POST", f"/api/sources/{source_id}/verification", json=payload)
+
     def record_run(
         self,
         source_id: str,

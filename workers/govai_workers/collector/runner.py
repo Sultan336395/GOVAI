@@ -13,6 +13,7 @@ from typing import Any
 from govai_workers.api_client import GovAiClient
 from govai_workers.collector.crawler import SourceCrawler
 from govai_workers.collector.fetcher import PoliteFetcher
+from govai_workers.collector.verifier import verify_source
 from govai_workers.logging_setup import configure_logging, get_logger
 from govai_workers.messaging import RoutingKeys, consume
 
@@ -61,15 +62,56 @@ def crawl_all(client: GovAiClient) -> int:
     return len(sources)
 
 
+def verify_all(client: GovAiClient, source_id: str | None = None) -> int:
+    """Kaynakları canlı doğrular ve sonuçları API'ye bildirir.
+
+    Doğrulanamayan kaynak pasif kalır; başarılı gösterilmez.
+    """
+    sources = client.list_sources(only_enabled=False)
+
+    if source_id:
+        sources = [s for s in sources if s["id"] == source_id]
+        if not sources:
+            log.error("source_not_found", source_id=source_id)
+            return 1
+
+    dogrulanan = 0
+
+    for source in sources:
+        result = verify_source(source)
+
+        try:
+            client.record_verification(source["id"], result.to_payload())
+        except Exception:  # noqa: BLE001 - bildirim hatası doğrulamayı durdurmamalı
+            log.exception("verification_report_failed", source=source.get("name"))
+
+        if result.reachable and result.discovered_link_count > 0:
+            dogrulanan += 1
+
+        print(result.summary())
+
+    pasif = len(sources) - dogrulanan
+    print(f"\nToplam {len(sources)} kaynak; {dogrulanan} doğrulandı, {pasif} pasif.")
+    return 0
+
+
 def main() -> int:
     configure_logging()
 
     parser = argparse.ArgumentParser(description="GOVAI kaynak tarama worker'ı")
     parser.add_argument("--once", action="store_true", help="Tüm kaynakları bir kez tara ve çık")
     parser.add_argument("--source-id", help="Yalnızca belirtilen kaynağı tara")
+    parser.add_argument(
+        "--verify",
+        action="store_true",
+        help="Kaynakları canlı doğrula (belge kaydetmez); doğrulanan kaynak taranabilir olur",
+    )
     args = parser.parse_args()
 
     with GovAiClient() as client:
+        if args.verify:
+            return verify_all(client, args.source_id)
+
         if args.source_id:
             all_sources = client.list_sources(only_enabled=False)
             sources = [s for s in all_sources if s["id"] == args.source_id]

@@ -87,6 +87,18 @@ public sealed class SourcesController(SourceService service) : ControllerBase
         CancellationToken cancellationToken) =>
         Ok(await service.RecordParseResultAsync(documentId, request, cancellationToken));
 
+    /// <summary>
+    /// Worker'ın canlı doğrulama sonucunu bildirmesi. Kaynak ancak burada
+    /// doğrulanırsa taranabilir hâle gelir.
+    /// </summary>
+    [HttpPost("{id:guid}/verification")]
+    [Authorize(Policy = Policies.SystemIngest)]
+    public async Task<ActionResult<RecordVerificationResult>> RecordVerification(
+        Guid id,
+        [FromBody] RecordVerificationRequest request,
+        CancellationToken cancellationToken) =>
+        Ok(await service.RecordVerificationAsync(id, request, cancellationToken));
+
     /// <summary>Worker'ın tarama sonucunu bildirmesi; üst üste hata alan kaynak otomatik devre dışı kalır.</summary>
     [HttpPost("{id:guid}/runs")]
     [Authorize(Policy = Policies.SystemIngest)]
