@@ -10,6 +10,7 @@ from __future__ import annotations
 import io
 import re
 import unicodedata
+from dataclasses import dataclass
 
 from bs4 import BeautifulSoup
 
@@ -27,30 +28,63 @@ _WHITESPACE = re.compile(r"[ \t ]+")
 _BLANK_LINES = re.compile(r"\n{3,}")
 
 
-def extract_text(content: bytes, media_type: str) -> str:
-    """Ham baytları düz metne çevirir."""
-    if "pdf" in media_type.lower():
-        return _extract_pdf(content)
+@dataclass(frozen=True, slots=True)
+class ExtractedDocument:
+    """Ayrıştırma çıktısı ve kanıt için gereken künye."""
 
-    return _extract_html(content)
+    text: str
+    page_count: int | None = None
+    needs_ocr: bool = False
+    error: str | None = None
+
+    @property
+    def succeeded(self) -> bool:
+        return bool(self.text.strip()) and not self.needs_ocr and self.error is None
+
+
+def extract_text(content: bytes, media_type: str) -> str:
+    """Ham baytları düz metne çevirir (geriye uyumlu sade arayüz)."""
+    return extract_document(content, media_type).text
+
+
+def extract_document(content: bytes, media_type: str) -> ExtractedDocument:
+    """Metni künyesiyle birlikte çıkarır.
+
+    PDF sayfaları form-feed ile ayrılır; böylece kanıt parçalarında sayfa numarası
+    korunabilir. Metin katmanı olmayan taranmış PDF için **uydurma metin üretilmez**,
+    ``needs_ocr`` işaretlenir.
+    """
+    if "pdf" in media_type.lower():
+        return _extract_pdf_document(content)
+
+    text = _extract_html(content)
+    return ExtractedDocument(text=text, error=None if text.strip() else "HTML metni boş.")
 
 
 def _extract_pdf(content: bytes) -> str:
+    return _extract_pdf_document(content).text
+
+
+def _extract_pdf_document(content: bytes) -> ExtractedDocument:
     try:
         from pypdf import PdfReader
 
         reader = PdfReader(io.BytesIO(content))
         pages = [page.extract_text() or "" for page in reader.pages]
-        text = "\n\n".join(pages)
+        # Her sayfa AYRI normalize edilir, sonra form-feed ile birleştirilir.
+        # Birleşik metni normalize etmek form-feed'i satır kırpmasında yok ederdi ve
+        # kanıt parçaları sayfa numarasını kaybederdi.
+        text = "\f".join(normalize(page) for page in pages)
 
         if not text.strip():
-            # Metin katmanı olmayan taranmış PDF; OCR gerekir (yol haritasında Ay 4).
+            # Metin katmanı olmayan taranmış PDF. Uydurma metin ÜRETİLMEZ.
             log.warning("pdf_has_no_text_layer", pages=len(reader.pages))
+            return ExtractedDocument(text="", page_count=len(reader.pages), needs_ocr=True)
 
-        return normalize(text)
-    except Exception:
+        return ExtractedDocument(text=text, page_count=len(reader.pages))
+    except Exception as exc:  # noqa: BLE001 - ayrıştırma hatası belgeyi silmemeli
         log.exception("pdf_extract_failed")
-        return ""
+        return ExtractedDocument(text="", error=f"PDF ayrıştırılamadı: {exc}"[:500])
 
 
 def _extract_html(content: bytes) -> str:

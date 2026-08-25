@@ -14,7 +14,8 @@ from govai_workers.api_client import GovAiClient
 from govai_workers.collector.fetcher import PoliteFetcher
 from govai_workers.logging_setup import configure_logging, get_logger
 from govai_workers.messaging import RoutingKeys, consume
-from govai_workers.parser.extractors import extract_text
+from govai_workers.parser.chunker import build_chunks
+from govai_workers.parser.extractors import extract_document
 from govai_workers.parser.rule_extractor import extract_rules, rules_to_payload
 
 log = get_logger(__name__)
@@ -60,15 +61,57 @@ def process_document(client: GovAiClient, document: dict[str, Any]) -> None:
             fetched = fetcher.fetch(url)
             if fetched is None:
                 log.warning("parse_skipped_unreachable", url=url)
+                client.record_parse_result(
+                    document_id, status="Failed", error="Kaynak adresine erişilemedi."
+                )
                 return
-            text = extract_text(fetched.content, fetched.media_type)
+            extracted = extract_document(fetched.content, fetched.media_type)
             media_type = fetched.media_type
     else:
-        text = extract_text(raw.encode("utf-8"), media_type)
+        extracted = extract_document(raw.encode("utf-8"), media_type)
+
+    # Taranmış PDF: uydurma metin ÜRETİLMEZ, belge insana bırakılır.
+    if extracted.needs_ocr:
+        log.warning("parse_needs_ocr", document_id=document_id, url=url)
+        client.record_parse_result(
+            document_id,
+            status="NeedsOcr",
+            page_count=extracted.page_count,
+            error="Taranmış PDF; metin katmanı yok.",
+        )
+        return
+
+    text = extracted.text
 
     if not text.strip():
+        # Belge SİLİNMEZ; karantinaya alınır ve yeniden ayrıştırılabilir.
         log.warning("parse_produced_empty_text", document_id=document_id)
+        client.record_parse_result(
+            document_id,
+            status="Failed",
+            error=extracted.error or "Ayrıştırma boş metin üretti.",
+        )
         return
+
+    # Kanıt parçaları GERÇEK ayrıştırma hattı tarafından üretilir; testte elle yazılmaz.
+    chunks = build_chunks(text)
+
+    parse_result = client.record_parse_result(
+        document_id,
+        status="Parsed",
+        normalized_text=text,
+        title=document.get("title"),
+        language=document.get("language") or "tr",
+        page_count=extracted.page_count,
+        chunks=[chunk.to_payload() for chunk in chunks],
+    )
+
+    log.info(
+        "evidence_recorded",
+        document_id=document_id,
+        version_id=parse_result.get("documentVersionId"),
+        chunk_count=parse_result.get("chunkCount"),
+    )
 
     title = document.get("title") or text.splitlines()[0][:300]
     extraction = extract_rules(title, text)
@@ -127,10 +170,14 @@ def main() -> int:
                 log.error("url_unreachable", url=args.url)
                 return 1
 
-            text = extract_text(fetched.content, fetched.media_type)
+            extracted = extract_document(fetched.content, fetched.media_type)
+            text = extracted.text
             extraction = extract_rules(args.url, text)
+            chunks = build_chunks(text)
 
             print(f"Metin uzunluğu: {len(text)} karakter")
+            print(f"Kanıt parçası: {len(chunks)}")
+            print(f"OCR gerekli mi: {extracted.needs_ocr}")
             print(f"Kural sayısı: {len(extraction.rules)} (güven: {extraction.confidence})")
             print(f"Son başvuru tahmini: {extraction.deadline}")
             for rule in extraction.rules:

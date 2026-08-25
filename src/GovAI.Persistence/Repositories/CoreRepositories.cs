@@ -174,7 +174,15 @@ public sealed class SourceDocumentRepository(GovAiDbContext context) : ISourceDo
         context.SourceDocuments.FirstOrDefaultAsync(d => d.Id == documentId, cancellationToken);
 
     public Task<SourceDocument?> GetByUrlAsync(Guid sourceId, string url, CancellationToken cancellationToken = default) =>
-        context.SourceDocuments.FirstOrDefaultAsync(d => d.SourceId == sourceId && d.Url == url, cancellationToken);
+        context.SourceDocuments
+            .Include(d => d.Versions)
+            .FirstOrDefaultAsync(d => d.SourceId == sourceId && d.Url == url, cancellationToken);
+
+    public Task<SourceDocument?> GetWithVersionsAsync(Guid documentId, CancellationToken cancellationToken = default) =>
+        context.SourceDocuments
+            .Include(d => d.Versions)
+            .ThenInclude(v => v.Chunks)
+            .FirstOrDefaultAsync(d => d.Id == documentId, cancellationToken);
 
     public async Task<IReadOnlyList<SourceDocument>> ListPendingAsync(int take, CancellationToken cancellationToken = default) =>
         await context.SourceDocuments

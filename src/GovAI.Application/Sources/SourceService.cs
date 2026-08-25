@@ -61,6 +61,49 @@ public sealed record IngestDocumentResult(
 
 public sealed record RecordCrawlRunRequest(CrawlStatus Status, string? Message, int DocumentCount);
 
+/// <summary>Parser worker'ın ürettiği tek bir kanıt parçası.</summary>
+public sealed record EvidenceChunkRequest
+{
+    public required int SequenceNumber { get; init; }
+    public required string Text { get; init; }
+    public required int StartOffset { get; init; }
+    public required int EndOffset { get; init; }
+    public int? PageNumber { get; init; }
+    public string? SectionTitle { get; init; }
+    public int? ParagraphNumber { get; init; }
+}
+
+/// <summary>
+/// Parser worker'ın ayrıştırma sonucu.
+///
+/// Kanıt parçaları <b>yalnızca</b> burada, ayrıştırıcının ürettiği normalize metinden
+/// yazılır. Yapay zekânın ürettiği hiçbir metin bu yolla kaydedilmez.
+/// </summary>
+public sealed record RecordParseResultRequest
+{
+    /// <summary>Hedef sürüm; verilmezse belgenin en son sürümü kullanılır.</summary>
+    public Guid? DocumentVersionId { get; init; }
+
+    public required DocumentParseStatus Status { get; init; }
+
+    public string? NormalizedText { get; init; }
+    public string? Title { get; init; }
+    public string? Language { get; init; }
+    public int? PageCount { get; init; }
+    public DateTimeOffset? PublishedAt { get; init; }
+
+    /// <summary>Başarısızlık nedeni; belge silinmez, karantinaya alınır.</summary>
+    public string? Error { get; init; }
+
+    public IReadOnlyList<EvidenceChunkRequest> Chunks { get; init; } = [];
+}
+
+public sealed record RecordParseResultResult(
+    Guid DocumentVersionId,
+    DocumentParseStatus Status,
+    int ChunkCount,
+    QuarantineReason Quarantine);
+
 /// <summary>
 /// Veri Toplama ve Kaynak İzleme Modülü'nün (Modül 1) use-case servisi.
 /// Kaynak tanımlarını yönetir ve worker'lardan gelen ham dokümanları sisteme alır.
@@ -286,6 +329,92 @@ public sealed class SourceService(
     ];
 
     private const int MinimumContentLength = 200;
+
+    /// <summary>
+    /// Parser sonucunu belge sürümüne yazar ve kanıt parçalarını üretir.
+    ///
+    /// Üç durum ayrı ele alınır:
+    /// <list type="bullet">
+    ///   <item><b>Parsed</b> — metin ve kanıt parçaları yazılır.</item>
+    ///   <item><b>NeedsOcr</b> — taranmış PDF. Uydurma metin üretilmez; belge insana
+    ///         bırakılır ve karantinaya alınır.</item>
+    ///   <item><b>Failed</b> — ayrıştırıcı çuvalladı. Belge <b>silinmez</b>, karantinaya
+    ///         alınır ve yeniden ayrıştırılabilir.</item>
+    /// </list>
+    /// </summary>
+    public async Task<RecordParseResultResult> RecordParseResultAsync(
+        Guid documentId,
+        RecordParseResultRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var document = await documents.GetWithVersionsAsync(documentId, cancellationToken)
+            ?? throw new NotFoundException("Doküman", documentId);
+
+        var version = request.DocumentVersionId is { } versionId
+            ? document.Versions.FirstOrDefault(v => v.Id == versionId)
+              ?? throw new NotFoundException("Belge sürümü", versionId)
+            : document.Versions.OrderByDescending(v => v.VersionNumber).FirstOrDefault()
+              ?? throw new NotFoundException("Belge sürümü", documentId);
+
+        if (request.Status == DocumentParseStatus.Parsed && !string.IsNullOrWhiteSpace(request.NormalizedText))
+        {
+            version.RecordParse(
+                request.NormalizedText,
+                request.Title,
+                request.Language,
+                request.PageCount,
+                request.PublishedAt);
+
+            // Boş ve anlamsız parçalar kanıt sayılmaz; sessizce elenir.
+            var chunks = request.Chunks
+                .Where(c => !string.IsNullOrWhiteSpace(c.Text) && c.Text.Trim().Length >= MinimumChunkLength)
+                .OrderBy(c => c.SequenceNumber)
+                .Select(c => new DocumentEvidenceChunk(
+                    version.Id,
+                    c.SequenceNumber,
+                    c.Text.Trim(),
+                    c.StartOffset,
+                    c.EndOffset,
+                    c.PageNumber,
+                    c.SectionTitle,
+                    c.ParagraphNumber))
+                .ToList();
+
+            version.ReplaceChunks(chunks);
+            document.MarkParsed(request.NormalizedText);
+
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+
+            logger.LogInformation(
+                "Belge ayrıştırıldı. DocumentId={DocumentId} Version={Version} Parça={ChunkCount}",
+                document.Id, version.VersionNumber, chunks.Count);
+
+            return new RecordParseResultResult(
+                version.Id, DocumentParseStatus.Parsed, chunks.Count, document.QuarantineReason);
+        }
+
+        var requiresOcr = request.Status == DocumentParseStatus.NeedsOcr;
+        var reason = requiresOcr ? "Taranmış PDF; metin katmanı yok." : (request.Error ?? "Ayrıştırma başarısız.");
+
+        version.RecordParseFailure(reason, requiresOcr);
+
+        // Belge SİLİNMEZ: karantinaya alınır, platform yöneticisi yeniden ayrıştırabilir.
+        document.Quarantine(
+            requiresOcr ? QuarantineReason.NeedsManualReview : QuarantineReason.ParserFailed,
+            reason);
+
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        logger.LogInformation(
+            "Belge ayrıştırılamadı, karantinaya alındı. DocumentId={DocumentId} Neden={Reason}",
+            document.Id, reason);
+
+        return new RecordParseResultResult(
+            version.Id, version.ParseStatus, 0, document.QuarantineReason);
+    }
+
+    /// <summary>Bir kanıt parçasının anlamlı sayılması için gereken en az uzunluk.</summary>
+    private const int MinimumChunkLength = 30;
 
     public async Task RecordRunAsync(Guid sourceId, RecordCrawlRunRequest request, CancellationToken cancellationToken = default)
     {

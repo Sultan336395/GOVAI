@@ -115,6 +115,36 @@ class GovAiClient:
             },
         )
 
+    def record_parse_result(
+        self,
+        document_id: str,
+        status: str,
+        normalized_text: str | None = None,
+        title: str | None = None,
+        language: str | None = None,
+        page_count: int | None = None,
+        error: str | None = None,
+        chunks: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        """Ayrıştırma sonucunu ve kanıt parçalarını belge sürümüne yazar.
+
+        Kanıt parçaları yalnızca bu yoldan kaydedilir; yapay zekâ üretimi metin
+        bu uca gönderilmez.
+        """
+        return self._request(
+            "POST",
+            f"/api/sources/documents/{document_id}/parse-result",
+            json={
+                "status": status,
+                "normalizedText": normalized_text,
+                "title": title,
+                "language": language,
+                "pageCount": page_count,
+                "error": error,
+                "chunks": chunks or [],
+            },
+        )
+
     def record_run(
         self,
         source_id: str,

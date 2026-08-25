@@ -72,6 +72,9 @@ public interface ISourceDocumentRepository
 
     Task<SourceDocument?> GetByUrlAsync(Guid sourceId, string url, CancellationToken cancellationToken = default);
 
+    /// <summary>Belgeyi sürüm zinciriyle birlikte yükler (kanıt yazımı için).</summary>
+    Task<SourceDocument?> GetWithVersionsAsync(Guid documentId, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<SourceDocument>> ListPendingAsync(int take, CancellationToken cancellationToken = default);
 
     Task AddAsync(SourceDocument document, CancellationToken cancellationToken = default);

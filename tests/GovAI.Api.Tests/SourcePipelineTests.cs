@@ -165,47 +165,129 @@ public sealed class SourcePipelineTests(GovAiApiFactory factory)
         Assert.Contains("Şirketlerin", version.RawContent, StringComparison.Ordinal);
     }
 
-    [Fact(DisplayName = "Faz2-D. Kanıt parçası belge sürümüne geri bağlanır")]
-    public async Task Kanit_parcasi_belge_surumune_baglanir()
+    [Fact(DisplayName = "Faz2-D. Ayrıştırma sonucu kanıt parçalarını üretir ve sürüme bağlar")]
+    public async Task Ayristirma_kanit_parcalarini_uretir()
     {
         var sourceId = await CreateSourceAsync("Parça Testi");
         var sonuc = await IngestAsync(
             sourceId, "https://kurum.gov.tr/ilan/parca-1", "Tebliğ", GercekIcerik);
 
+        var documentId = sonuc.GetProperty("documentId").GetGuid();
         var versionId = sonuc.GetProperty("documentVersionId").GetGuid();
 
-        // Ayrıştırıcının üreteceği kanıt parçası; konumuyla birlikte saklanır.
-        await QueryAsync(async db =>
-        {
-            var version = await db.SourceDocumentVersions.SingleAsync(v => v.Id == versionId);
-            version.RecordParse(GercekIcerik, "Ar-Ge Tebliği", "tr", 1, null);
-            version.ReplaceChunks([
-                new DocumentEvidenceChunk(
-                    versionId, 0, "Yürürlük tarihi yayımı izleyen ayın ilk günüdür.",
-                    startOffset: 260, endOffset: 310,
-                    pageNumber: 1, sectionTitle: "Yürürlük", paragraphNumber: 4)
-            ]);
+        // Parçalar elle yazılmaz: parser worker'ın kullandığı uç çağrılır.
+        var parse = await _ingest.PostAsJsonAsync(
+            $"/api/sources/documents/{documentId}/parse-result",
+            new
+            {
+                status = "Parsed",
+                normalizedText = GercekIcerik,
+                title = "Ar-Ge Tebliği",
+                language = "tr",
+                pageCount = 1,
+                chunks = new[]
+                {
+                    new
+                    {
+                        sequenceNumber = 0,
+                        text = "Bu tebliğ, 5746 sayılı Kanun kapsamında yapılan harcamaların belgelendirilmesine ilişkindir.",
+                        startOffset = 60,
+                        endOffset = 152,
+                        pageNumber = (int?)1,
+                        sectionTitle = (string?)"Kapsam",
+                        paragraphNumber = (int?)1
+                    },
+                    // Anlamsız parça: kaydedilmemeli.
+                    new
+                    {
+                        sequenceNumber = 1,
+                        text = "  ",
+                        startOffset = 0,
+                        endOffset = 2,
+                        pageNumber = (int?)null,
+                        sectionTitle = (string?)null,
+                        paragraphNumber = (int?)null
+                    }
+                }
+            });
 
-            await db.SaveChangesAsync();
-            return true;
-        });
+        parse.EnsureSuccessStatusCode();
+        var parseResult = await parse.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal("Parsed", parseResult.GetProperty("status").GetString());
+        Assert.Equal(1, parseResult.GetProperty("chunkCount").GetInt32());
 
         var chunk = await QueryAsync(db => db.DocumentEvidenceChunks
             .SingleAsync(c => c.DocumentVersionId == versionId));
 
-        // Parçadan belgeye ve kaynağa kadar zincir kurulabiliyor.
-        Assert.Equal(versionId, chunk.DocumentVersionId);
-        Assert.Equal("Yürürlük", chunk.SectionTitle);
+        // Parçadan sürüme, sürümden belgeye, belgeden kaynağa zincir kuruluyor.
+        Assert.Equal("Kapsam", chunk.SectionTitle);
         Assert.Equal(1, chunk.PageNumber);
         Assert.Equal(64, chunk.TextHash.Length);
 
         var zincir = await QueryAsync(db => db.SourceDocumentVersions
             .Where(v => v.Id == chunk.DocumentVersionId)
-            .Select(v => new { v.SourceDocumentId, v.CanonicalUrl })
+            .Select(v => new { v.SourceDocumentId, v.CanonicalUrl, v.ParseStatus, v.NormalizedTextHash })
             .SingleAsync());
 
-        Assert.Equal(sonuc.GetProperty("documentId").GetGuid(), zincir.SourceDocumentId);
+        Assert.Equal(documentId, zincir.SourceDocumentId);
         Assert.Equal("https://kurum.gov.tr/ilan/parca-1", zincir.CanonicalUrl);
+        Assert.Equal(DocumentParseStatus.Parsed, zincir.ParseStatus);
+        Assert.Equal(64, zincir.NormalizedTextHash!.Length);
+    }
+
+    [Fact(DisplayName = "Faz2-D2. Taranmış PDF NeedsOcr olur ve uydurma metin üretilmez")]
+    public async Task Taranmis_pdf_needs_ocr_olur()
+    {
+        var sourceId = await CreateSourceAsync("OCR Testi");
+        var sonuc = await IngestAsync(
+            sourceId, "https://kurum.gov.tr/ilan/ocr-1", "Taranmış Tebliğ", GercekIcerik);
+
+        var documentId = sonuc.GetProperty("documentId").GetGuid();
+
+        var parse = await _ingest.PostAsJsonAsync(
+            $"/api/sources/documents/{documentId}/parse-result",
+            new { status = "NeedsOcr", pageCount = 3, error = "Taranmış PDF; metin katmanı yok." });
+
+        parse.EnsureSuccessStatusCode();
+        var parseResult = await parse.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal("NeedsOcr", parseResult.GetProperty("status").GetString());
+        Assert.Equal(0, parseResult.GetProperty("chunkCount").GetInt32());
+
+        var version = await QueryAsync(db => db.SourceDocumentVersions
+            .SingleAsync(v => v.SourceDocumentId == documentId));
+
+        Assert.True(version.RequiresOcr);
+        Assert.Null(version.NormalizedText);
+
+        // Belge silinmez; incelemeye alınır.
+        var document = await QueryAsync(db => db.SourceDocuments.SingleAsync(d => d.Id == documentId));
+        Assert.True(document.IsQuarantined);
+    }
+
+    [Fact(DisplayName = "Faz2-D3. Ayrıştırma hatası belgeyi silmez, karantinaya alır")]
+    public async Task Ayristirma_hatasi_belgeyi_silmez()
+    {
+        var sourceId = await CreateSourceAsync("Ayrıştırma Hatası Testi");
+        var sonuc = await IngestAsync(
+            sourceId, "https://kurum.gov.tr/ilan/hata-1", "Bozuk Belge", GercekIcerik);
+
+        var documentId = sonuc.GetProperty("documentId").GetGuid();
+
+        var parse = await _ingest.PostAsJsonAsync(
+            $"/api/sources/documents/{documentId}/parse-result",
+            new { status = "Failed", error = "Ayrıştırma boş metin üretti." });
+
+        parse.EnsureSuccessStatusCode();
+
+        var document = await QueryAsync(db => db.SourceDocuments.SingleAsync(d => d.Id == documentId));
+
+        Assert.Equal(QuarantineReason.ParserFailed, document.QuarantineReason);
+
+        // Kayıt DURUYOR — silinmedi.
+        var varMi = await QueryAsync(db => db.SourceDocuments.AnyAsync(d => d.Id == documentId));
+        Assert.True(varMi);
     }
 
     // ═══════════════ Karantina ═══════════════

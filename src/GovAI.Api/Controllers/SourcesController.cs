@@ -75,6 +75,18 @@ public sealed class SourcesController(SourceService service) : ControllerBase
         CancellationToken cancellationToken) =>
         Ok(await service.IngestDocumentAsync(request, cancellationToken));
 
+    /// <summary>
+    /// Parser worker'ın ayrıştırma sonucunu ve kanıt parçalarını bildirmesi.
+    /// Kanıt parçaları yalnızca bu yoldan yazılır.
+    /// </summary>
+    [HttpPost("documents/{documentId:guid}/parse-result")]
+    [Authorize(Policy = Policies.SystemIngest)]
+    public async Task<ActionResult<RecordParseResultResult>> RecordParseResult(
+        Guid documentId,
+        [FromBody] RecordParseResultRequest request,
+        CancellationToken cancellationToken) =>
+        Ok(await service.RecordParseResultAsync(documentId, request, cancellationToken));
+
     /// <summary>Worker'ın tarama sonucunu bildirmesi; üst üste hata alan kaynak otomatik devre dışı kalır.</summary>
     [HttpPost("{id:guid}/runs")]
     [Authorize(Policy = Policies.SystemIngest)]
