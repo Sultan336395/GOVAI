@@ -140,8 +140,8 @@ ama **rolü yetmeyen** kullanıcıdır; orada şirketin varlığı zaten bilindi
 
 ## 4. Sorgu filtresini atlayan tek yol
 
-Kod tabanında `IgnoreQueryFilters()` **iki yerde** kullanılır. İkisi de burada
-gerekçelendirilmiştir; üçüncüsü eklenemez.
+Kod tabanında `IgnoreQueryFilters()` **üç yerde** kullanılır. Üçü de burada
+gerekçelendirilmiştir; dördüncüsü eklenemez.
 
 ### 4.1 `UserRepository.GetByEmailAsync`
 
@@ -177,6 +177,23 @@ Korumalar:
 - Koruyan test: `Faz1-E. Başka çalışma alanındaki vergi numarası bilgi sızdırmaz` —
   yanıt gövdesinde karşı tarafın adının, şirket kimliğinin ve kiracı kimliğinin
   geçmediğini ayrı ayrı doğrular.
+
+### 4.3 `UserCompanyRepository.ListForUserAtLoginAsync`
+
+`src/GovAI.Persistence/Repositories/MultiCompanyRepositories.cs`
+
+Zorunludur, çünkü giriş anında istek henüz bir kiracıya bağlı değildir
+(`ICurrentUser.TenantId` boştur) ve `user_companies` üzerindeki kiracı filtresi tüm
+üyelikleri eler. Bu yüzden kullanıcının varsayılan şirketi bulunamaz; jeton "tüm kiracı"
+kapsamıyla çıkar ve aktif şirket claim'i hiç üretilemezdi.
+
+Korumalar:
+
+- Kiracı, **kullanıcı bulunduktan sonra** bilinir ve sorguya **parametre olarak** verilir.
+- Filtre sınırsız kaldırılmaz: `TenantId` ve yumuşak silme koşulu elle geri konur, bu
+  yüzden kapsam filtre devredeyken olduğundan geniş değildir.
+- Yalnızca `AuthenticationService.LoginAsync` çağırır.
+- Koruyan testler: `Aktif-A`, `Aktif-B`, `Aktif-C`.
 
 Yeni bir `IgnoreQueryFilters()` eklenmesi gerekiyorsa, gerekçesi bu belgeye yazılmalı ve
 izolasyonu doğrulayan bir test eklenmelidir.
@@ -217,6 +234,7 @@ filtreleri; yalnızca veritabanı sağlayıcısı bellek içi sağlayıcıyla de
 | `ClaimAndJwtSecurityTests.cs` | Kapsam claim'i eksik jeton (K), JWT anahtar kuralları (N, O) |
 | `PlatformRoleTests.cs` | Platform rolleri: katalog yazma, danışman onayı, worker sınırları (R–T4) |
 | `MultiCompanyTests.cs` | Çoklu şirket: üyelik, rol matrisi, aktif şirket, grup, davet (Faz1-A–Q) |
+| `CompanyAuthorizationTests.cs` | Şirket kaydetme yetkisi, üye listesi yetkisi, varsayılan aktif şirket (Yetki-A–M, Aktif-A–E) |
 
 Testler bellek içi sağlayıcıyla **ve** gerçek PostgreSQL 17 ile ayrı ayrı koşturulur:
 

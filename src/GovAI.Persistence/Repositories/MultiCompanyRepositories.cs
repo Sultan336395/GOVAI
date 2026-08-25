@@ -22,6 +22,24 @@ public sealed class UserCompanyRepository(GovAiDbContext context) : IUserCompany
             .ThenBy(uc => uc.CreatedAt)
             .ToListAsync(cancellationToken);
 
+    /// <summary>
+    /// Giriş akışına özel, <b>yetkilendirilmiş</b> filtre atlaması (belgelenmiş istisna #3,
+    /// bkz. docs/security.md). Kiracı ve yumuşak silme koşulları elle geri konur; bu yüzden
+    /// filtre atlanmış olsa da kapsam daralmaz.
+    /// </summary>
+    public async Task<IReadOnlyList<UserCompany>> ListForUserAtLoginAsync(
+        Guid tenantId,
+        Guid userId,
+        CancellationToken cancellationToken = default) =>
+        await context.UserCompanies
+            .IgnoreQueryFilters()
+            .Where(uc => uc.UserId == userId
+                         && uc.TenantId == tenantId
+                         && !uc.IsDeleted)
+            .OrderByDescending(uc => uc.IsDefault)
+            .ThenBy(uc => uc.CreatedAt)
+            .ToListAsync(cancellationToken);
+
     public async Task<IReadOnlyList<UserCompany>> ListForCompanyAsync(Guid companyId, CancellationToken cancellationToken = default) =>
         await context.UserCompanies
             .Where(uc => uc.CompanyId == companyId)

@@ -18,6 +18,22 @@ public interface IUserCompanyRepository
     /// <summary>Kullanıcının erişebildiği tüm şirket üyelikleri.</summary>
     Task<IReadOnlyList<UserCompany>> ListForUserAsync(Guid userId, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// <b>Yalnızca giriş akışı için.</b> Kullanıcının üyelikleri, kiracı sorgu filtresi
+    /// devrede olmadan okunur.
+    ///
+    /// Gerekçesi: giriş anında istek henüz bir kiracıya bağlı değildir
+    /// (<c>ICurrentUser.TenantId</c> boştur), bu yüzden global filtre tüm üyelikleri eler
+    /// ve kullanıcının varsayılan şirketi bulunamaz. Kiracı, ancak kullanıcı bulunduktan
+    /// sonra bilinir ve buraya <b>parametre olarak</b> verilir.
+    ///
+    /// Filtre sınırsız kaldırılmaz: kiracı ve yumuşak silme koşulları elle yeniden uygulanır.
+    /// </summary>
+    Task<IReadOnlyList<UserCompany>> ListForUserAtLoginAsync(
+        Guid tenantId,
+        Guid userId,
+        CancellationToken cancellationToken = default);
+
     /// <summary>Bir şirketteki tüm üyelikler (yönetim ekranı).</summary>
     Task<IReadOnlyList<UserCompany>> ListForCompanyAsync(Guid companyId, CancellationToken cancellationToken = default);
 

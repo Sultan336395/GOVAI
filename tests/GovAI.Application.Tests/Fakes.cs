@@ -59,6 +59,13 @@ internal sealed class FakeUserCompanyRepository : IUserCompanyRepository
     public Task<IReadOnlyList<UserCompany>> ListForUserAsync(Guid userId, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<UserCompany>>(_memberships.Where(m => m.UserId == userId).ToList());
 
+    public Task<IReadOnlyList<UserCompany>> ListForUserAtLoginAsync(
+        Guid tenantId,
+        Guid userId,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<UserCompany>>(
+            _memberships.Where(m => m.UserId == userId && m.TenantId == tenantId && !m.IsDeleted).ToList());
+
     public Task<IReadOnlyList<UserCompany>> ListForCompanyAsync(Guid companyId, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<UserCompany>>(_memberships.Where(m => m.CompanyId == companyId).ToList());
 

@@ -6,6 +6,9 @@ import type { AuthContextValue, SessionUser } from '@/app/contexts'
 
 const USER_STORAGE_KEY = 'govai.user'
 
+/** CompanyProvider ile aynı anahtar: aktif şirket girişte sunucudan yazılır. */
+const SELECTED_COMPANY_KEY = 'govai.selectedCompany'
+
 function readStoredUser(): SessionUser | null {
   const raw = localStorage.getItem(USER_STORAGE_KEY)
   if (!raw) return null
@@ -15,6 +18,7 @@ function readStoredUser(): SessionUser | null {
   } catch {
     // Bozuk oturum verisi sessizce temizlenir; kullanıcı yeniden giriş yapar.
     localStorage.removeItem(USER_STORAGE_KEY)
+    localStorage.removeItem(SELECTED_COMPANY_KEY)
     return null
   }
 }
@@ -28,12 +32,21 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     const response = await api.login(email, password)
     tokenStore.set(response.accessToken)
     localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(response.user))
+
+    // Aktif şirketi sunucu belirler; istemci kendi başına seçmez. Önceki oturumdan
+    // kalan seçim başka bir hesaba ait olabilir, bu yüzden her girişte üzerine yazılır.
+    if (response.activeCompanyId) {
+      localStorage.setItem(SELECTED_COMPANY_KEY, response.activeCompanyId)
+    } else {
+      localStorage.removeItem(SELECTED_COMPANY_KEY)
+    }
     setUser(response.user)
   }, [])
 
   const logout = useCallback(() => {
     tokenStore.clear()
     localStorage.removeItem(USER_STORAGE_KEY)
+    localStorage.removeItem(SELECTED_COMPANY_KEY)
     setUser(null)
   }, [])
 

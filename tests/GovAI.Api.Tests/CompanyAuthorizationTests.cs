@@ -256,6 +256,128 @@ public sealed class CompanyAuthorizationTests(GovAiApiFactory factory)
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
+    // ═══════════════════ Varsayılan aktif şirket ═══════════════════
+
+    /// <summary>Giriş yanıtından hem jetonu hem sunucunun seçtiği aktif şirketi okur.</summary>
+    private async Task<(string Token, Guid? ActiveCompanyId, JsonElement Claims)> LoginAsync(string email)
+    {
+        using var anonymous = _factory.CreateClient();
+
+        var response = await anonymous.PostAsJsonAsync(
+            "/api/auth/login", new { email, password = GovAiApiFactory.Password });
+
+        response.EnsureSuccessStatusCode();
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var token = body.GetProperty("accessToken").GetString()!;
+
+        Guid? active = body.TryGetProperty("activeCompanyId", out var raw)
+                       && raw.ValueKind is not JsonValueKind.Null
+            ? raw.GetGuid()
+            : null;
+
+        return (token, active, ReadClaims(token));
+    }
+
+    private static JsonElement ReadClaims(string jwt)
+    {
+        var payload = jwt.Split('.')[1];
+        payload = payload.Replace('-', '+').Replace('_', '/');
+        payload = payload.PadRight(payload.Length + (4 - payload.Length % 4) % 4, '=');
+
+        return JsonSerializer.Deserialize<JsonElement>(Convert.FromBase64String(payload));
+    }
+
+    [Fact(DisplayName = "Aktif-A. Giriş varsayılan aktif şirketi jetona ekler")]
+    public async Task Giris_varsayilan_aktif_sirketi_jetona_ekler()
+    {
+        // B kiracısı bilerek seçilir: bu sınıftaki diğer testler A kiracısının
+        // varsayılanını değiştirdiği için sıraya bağlı bir beklenti kurulmaz.
+        var (_, active, claims) = await LoginAsync(_factory.TenantB.Email);
+
+        // Fixture'da yöneticinin varsayılan şirketi birinci şirkettir.
+        Assert.Equal(_factory.TenantB.CompanyId, active);
+        Assert.Equal(_factory.TenantB.CompanyId, claims.GetProperty("active_company").GetGuid());
+
+        // Kapsam da üyelikten kurulur; "tüm kiracı" varsayımına düşülmez.
+        Assert.Equal("list", claims.GetProperty("company_scope").GetString());
+    }
+
+    [Fact(DisplayName = "Aktif-B. Üyeliği olmayan kullanıcıya aktif şirket verilmez")]
+    public async Task Uyeligi_olmayan_kullaniciya_aktif_sirket_verilmez()
+    {
+        // Boş kiracının okuyucusunun hiç üyeliği yok.
+        var (_, active, claims) = await LoginAsync(_factory.TenantEmptyDenied.ViewerEmail);
+
+        Assert.Null(active);
+        Assert.False(claims.TryGetProperty("active_company", out _));
+    }
+
+    [Fact(DisplayName = "Aktif-C. Varsayılan üyeliği olmayan kullanıcıya biri kalıcı olarak varsayılan yapılır")]
+    public async Task Varsayilan_yoksa_ilk_uyelik_varsayilan_yapilir()
+    {
+        var companyId = _factory.TenantA.SecondCompanyId;
+
+        // Sahip, ikinci şirketteki kendi üyeliğini varsayılan olmaktan çıkarır:
+        // birinci şirketi varsayılan yaparak.
+        var setDefault = await _owner.PostAsync($"/api/companies/{companyId}/members/default", null);
+        setDefault.EnsureSuccessStatusCode();
+
+        var (_, active, claims) = await LoginAsync(_factory.TenantA.OwnerEmail);
+
+        Assert.Equal(companyId, active);
+        Assert.Equal(companyId, claims.GetProperty("active_company").GetGuid());
+    }
+
+    [Fact(DisplayName = "Aktif-D. Şirket değiştirme yeni aktif şirketi jetona yazar")]
+    public async Task Sirket_degistirme_yeni_aktif_sirketi_jetona_yazar()
+    {
+        var hedef = _factory.TenantA.SecondCompanyId;
+
+        var response = await _tenantAdmin.PostAsJsonAsync(
+            "/api/auth/active-company", new { companyId = hedef });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(hedef, result.GetProperty("companyId").GetGuid());
+
+        var claims = ReadClaims(result.GetProperty("accessToken").GetString()!);
+        Assert.Equal(hedef, claims.GetProperty("active_company").GetGuid());
+    }
+
+    [Fact(DisplayName = "Aktif-E. Üyeliği kaldırılan kullanıcının eski jetonu erişemez")]
+    public async Task Uyeligi_kaldirilan_kullanicinin_eski_jetonu_erisemez()
+    {
+        var companyId = _factory.TenantA.CompanyId;
+
+        // Uzman, üyeliği dururken şirket profilini okuyabiliyor.
+        var (expertToken, _, _) = await LoginAsync(_factory.TenantA.ExpertEmail);
+
+        using var expertClient = _factory.CreateClient();
+        expertClient.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", expertToken);
+
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await expertClient.GetAsync($"/api/company-profile/{companyId}")).StatusCode);
+
+        // Sahip üyeliği kaldırır.
+        var members = await _tenantAdmin.GetFromJsonAsync<List<JsonElement>>(
+            $"/api/companies/{companyId}/members") ?? [];
+
+        var membershipId = members
+            .Single(m => m.GetProperty("userId").GetGuid() == _factory.TenantA.ExpertUserId)
+            .GetProperty("membershipId").GetGuid();
+
+        var remove = await _tenantAdmin.DeleteAsync($"/api/companies/{companyId}/members/{membershipId}");
+        remove.EnsureSuccessStatusCode();
+
+        // Aynı jeton hâlâ imza olarak geçerli ama artık erişim vermez.
+        var after = await expertClient.GetAsync($"/api/company-profile/{companyId}");
+        Assert.Equal(HttpStatusCode.NotFound, after.StatusCode);
+    }
+
     [Fact(DisplayName = "Yetki-M. Başka çalışma alanının üyeleri listelenemez")]
     public async Task Baska_kiracinin_uyeleri_listelenemez()
     {

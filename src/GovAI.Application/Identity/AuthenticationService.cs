@@ -14,7 +14,12 @@ public sealed record LoginResponse(
     string AccessToken,
     DateTimeOffset ExpiresAt,
     string RefreshToken,
-    UserDto User);
+    UserDto User,
+    /// <summary>
+    /// Sunucunun belirlediği aktif şirket. Üyeliği olmayan kullanıcıda <c>null</c>'dır.
+    /// İstemci şirket seçimini buradan alır; kendi başına belirlemez.
+    /// </summary>
+    Guid? ActiveCompanyId);
 
 public sealed record UserDto(
     Guid Id,
@@ -77,7 +82,12 @@ public sealed class AuthenticationService(
 
         // Şirket erişimi Faz 1'den beri üyelikten okunur. Jetondaki liste yalnızca
         // istemci kolaylığıdır; yetki kararı her istekte veritabanından verilir.
-        var accessibleCompanies = (await memberships.ListForUserAsync(user.Id, cancellationToken))
+        //
+        // Kiracı ancak burada bilinir; giriş öncesinde global filtre tüm üyelikleri eler.
+        // Bu yüzden kiracıyı parametre olarak alan, kapsamı daraltılmış giriş sorgusu
+        // kullanılır (bkz. IUserCompanyRepository.ListForUserAtLoginAsync).
+        var accessibleCompanies = (await memberships.ListForUserAtLoginAsync(
+                user.TenantId, user.Id, cancellationToken))
             .Where(m => m.GrantsAccess)
             .ToList();
 
@@ -85,16 +95,30 @@ public sealed class AuthenticationService(
             ? accessibleCompanies.Select(m => m.CompanyId).ToList()
             : ParseScopedCompanies(user);
 
-        // Girişte kullanıcının varsayılan şirketi aktif olur; yoksa ilk üyeliği.
-        var activeCompanyId = accessibleCompanies.FirstOrDefault(m => m.IsDefault)?.CompanyId
-                              ?? accessibleCompanies.FirstOrDefault()?.CompanyId;
+        // Aktif şirket sunucuda belirlenir: varsayılan üyelik varsa o, yoksa ilk erişilebilir
+        // üyelik seçilir ve kalıcı olarak varsayılan yapılır — kullanıcı bir dahaki girişinde
+        // aynı şirketle açılsın diye. Hiç üyelik yoksa claim üretilmez.
+        var defaultMembership = accessibleCompanies.FirstOrDefault(m => m.IsDefault);
+
+        if (defaultMembership is null && accessibleCompanies.Count > 0)
+        {
+            defaultMembership = accessibleCompanies[0];
+            defaultMembership.MarkDefault();
+
+            // Hiçbir üyelik varsayılan değilken işaretlenir; tek varsayılan kısmi tekil
+            // indeksiyle çakışma olmaz.
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+
+        var activeCompanyId = defaultMembership?.CompanyId;
 
         var (token, expiresAt) = tokenService.CreateAccessToken(
             user.Id, user.TenantId, user.Email, user.Role, scopedCompanyIds, activeCompanyId);
 
         logger.LogInformation("Giriş başarılı. UserId={UserId} TenantId={TenantId}", user.Id, user.TenantId);
 
-        return new LoginResponse(token, expiresAt, tokenService.CreateRefreshToken(), ToDto(user));
+        return new LoginResponse(
+            token, expiresAt, tokenService.CreateRefreshToken(), ToDto(user), activeCompanyId);
     }
 
     /// <summary>

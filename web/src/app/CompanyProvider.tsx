@@ -25,8 +25,10 @@ export default function CompanyProvider({ children }: { children: ReactNode }) {
     enabled: Boolean(tokenStore.get()),
   })
 
-  // Seçili firma listede yoksa varsayılana, o da yoksa ilk firmaya düşülür.
-  // Üyelik kaldırıldığında ekranın boş bir kimlikte takılı kalmaması için gereklidir.
+  // Aktif şirketi sunucu belirler (girişte jetona ve yanıta yazılır); buradaki
+  // localStorage yalnızca sayfa yenilemeleri arasında o değeri taşır.
+  // Seçili firma listede yoksa sunucunun varsayılanına, o da yoksa ilk firmaya düşülür:
+  // üyelik kaldırıldığında ekran boş bir kimlikte takılı kalmamalıdır.
   useEffect(() => {
     if (companies.length === 0) return
 

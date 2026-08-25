@@ -88,6 +88,8 @@ export interface LoginResponse {
   accessToken: string
   expiresAt: string
   refreshToken: string
+  /** Sunucunun üyelikten belirlediği aktif şirket. Üyeliği yoksa null. */
+  activeCompanyId: string | null
   user: {
     id: string
     tenantId: string
