@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import type { CompanyRole } from '@/api/types'
 import { companyPermissions, useAuth, useCompanies } from '@/app/contexts'
 import { buildNavigation } from '@/app/navigation'
 import NavIcon from '@/components/NavIcons'
@@ -21,10 +22,13 @@ export default function AppLayout() {
   )
 
   // Aktif şirket çözülene kadar menünün yerinde durması için: varsayılan, yoksa ilk
-  // sahibi olunan şirket.
+  // sahip/yönetici olunan şirket.
+  const isOwnerOrManager = (role: CompanyRole) =>
+    role === 'CompanyOwner' || role === 'CompanyManager'
+
   const fallbackOwnedCompanyId =
-    (companies.find((c) => c.isDefault && c.companyRole === 'CompanyOwner') ??
-      companies.find((c) => c.companyRole === 'CompanyOwner'))?.id ?? null
+    (companies.find((c) => c.isDefault && isOwnerOrManager(c.companyRole)) ??
+      companies.find((c) => isOwnerOrManager(c.companyRole)))?.id ?? null
 
   const groups = useMemo(
     () =>
@@ -38,8 +42,10 @@ export default function AppLayout() {
     [user?.role, activeRole, selectedCompanyId, canManageAnyCompany, fallbackOwnedCompanyId],
   )
 
-  // Şirket ekleme bir yönetim işidir; görüntüleyiciye kısayol gösterilmez.
-  const canAddCompany = activeRole !== 'CompanyViewer'
+  // Şirket ekleme bir yönetim işidir: sahip ve yönetici yapar, uzman ve görüntüleyici
+  // yapmaz. Aynı kural Şirketlerim sayfasındaki düğmede ve /companies/new ekranında da
+  // uygulanır (companyPermissions.manageProfile).
+  const canAddCompany = companyPermissions.manageProfile(activeRole)
 
   return (
     <div className="app-shell" data-nav={isNavOpen ? 'open' : 'closed'}>

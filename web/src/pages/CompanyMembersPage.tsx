@@ -45,7 +45,13 @@ export default function CompanyMembersPage() {
   const companyId = routeCompanyId ?? selectedCompanyId ?? undefined
 
   const company = companies.find((candidate) => candidate.id === companyId)
+
+  // İki kademe. Sunucu da böyle davranır: üyelik listesi Read ister, her değiştirme
+  // işlemi ManageMembers ister ve onu yalnızca CompanyOwner karşılar. Yöneticiye
+  // düğme göstermek 403 ile biterdi; bu yüzden ekran salt okunur açılır.
   const canManage = companyPermissions.manageMembers(company?.companyRole ?? null)
+  const canView =
+    company?.companyRole === 'CompanyOwner' || company?.companyRole === 'CompanyManager'
 
   const {
     data: members = [],
@@ -146,7 +152,7 @@ export default function CompanyMembersPage() {
     return <EmptyState>Bu şirket listenizde yok veya erişiminiz kaldırılmış.</EmptyState>
   }
 
-  if (!canManage) {
+  if (!canView) {
     return (
       <>
         <div className="page-header">
@@ -154,7 +160,7 @@ export default function CompanyMembersPage() {
             <h1>{company.legalName} — kullanıcılar</h1>
           </div>
         </div>
-        <NotAuthorized message="Şirket kullanıcılarını yönetmek yalnızca şirket sahibinin yetkisindedir." />
+        <NotAuthorized message="Şirket kullanıcılarını görüntülemek için şirket sahibi veya şirket yöneticisi olmanız gerekir." />
       </>
     )
   }
@@ -179,6 +185,13 @@ export default function CompanyMembersPage() {
           <button type="button">Şirket profili</button>
         </Link>
       </div>
+
+      {!canManage ? (
+        <InfoBox>
+          Salt okunur görünüm: Şirket kullanıcıları ve yetkileri yalnızca şirket sahibi
+          tarafından yönetilebilir.
+        </InfoBox>
+      ) : null}
 
       {notice ? <SuccessBox>{notice}</SuccessBox> : null}
       {actionError ? <ErrorBox error={actionError} /> : null}
@@ -209,8 +222,9 @@ export default function CompanyMembersPage() {
                 <th>Kullanıcı</th>
                 <th>Rol</th>
                 <th>Durum</th>
+                <th>Varsayılan şirketi</th>
                 <th>Eklendiği tarih</th>
-                <th />
+                {canManage ? <th /> : null}
               </tr>
             </thead>
             <tbody>
@@ -226,42 +240,49 @@ export default function CompanyMembersPage() {
                       </div>
                     </td>
                     <td>
-                      <select
-                        value={member.companyRole}
-                        disabled={changeRole.isPending || isLastOwner}
-                        onChange={(e) =>
-                          changeRole.mutate({
-                            membershipId: member.membershipId,
-                            role: e.target.value as CompanyRole,
-                          })
-                        }
-                      >
-                        {companyRoleOrder.map((role) => (
-                          <option key={role} value={role}>
-                            {companyRoleLabels[role]}
-                          </option>
-                        ))}
-                      </select>
+                      {canManage ? (
+                        <select
+                          value={member.companyRole}
+                          disabled={changeRole.isPending || isLastOwner}
+                          onChange={(e) =>
+                            changeRole.mutate({
+                              membershipId: member.membershipId,
+                              role: e.target.value as CompanyRole,
+                            })
+                          }
+                        >
+                          {companyRoleOrder.map((role) => (
+                            <option key={role} value={role}>
+                              {companyRoleLabels[role]}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <strong>{companyRoleLabels[member.companyRole]}</strong>
+                      )}
                       <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
                         {companyRoleHints[member.companyRole]}
                       </div>
                     </td>
                     <td>{member.isActive ? 'Etkin' : 'Pasif'}</td>
+                    <td>{member.isDefault ? 'Evet' : '—'}</td>
                     <td>{formatDate(member.createdAt)}</td>
-                    <td>
-                      <button
-                        type="button"
-                        disabled={removeMember.isPending || isLastOwner}
-                        onClick={() => removeMember.mutate(member.membershipId)}
-                      >
-                        Kaldır
-                      </button>
-                      {isLastOwner ? (
-                        <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-                          Şirketin son sahibi kaldırılamaz.
-                        </div>
-                      ) : null}
-                    </td>
+                    {canManage ? (
+                      <td>
+                        <button
+                          type="button"
+                          disabled={removeMember.isPending || isLastOwner}
+                          onClick={() => removeMember.mutate(member.membershipId)}
+                        >
+                          Kaldır
+                        </button>
+                        {isLastOwner ? (
+                          <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                            Şirketin son sahibi kaldırılamaz.
+                          </div>
+                        ) : null}
+                      </td>
+                    ) : null}
                   </tr>
                 )
               })}
@@ -321,6 +342,7 @@ export default function CompanyMembersPage() {
         </div>
       ) : null}
 
+      {canManage ? (
       <div className="card" style={{ marginBottom: 16 }}>
         <h2 style={{ marginTop: 0 }}>E-posta ile davet et</h2>
         <p className="muted" style={{ marginTop: 0 }}>
@@ -377,6 +399,7 @@ export default function CompanyMembersPage() {
           </button>
         </div>
       </div>
+      ) : null}
 
       {invitations.length > 0 ? (
         <div className="card">

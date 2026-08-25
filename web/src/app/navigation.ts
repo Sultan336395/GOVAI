@@ -35,8 +35,8 @@ export interface NavContext {
   /** Kullanıcı, şirketlerinden herhangi birinde sahip veya yönetici mi? */
   canManageAnyCompany: boolean
   /**
-   * Kullanıcının CompanyOwner olduğu varsayılan şirket. Yalnızca aktif şirket henüz
-   * çözülmediğinde (liste yükleniyor ya da kayıtlı seçim eskimiş) kullanılır.
+   * Kullanıcının sahip ya da yönetici olduğu varsayılan şirket. Yalnızca aktif şirket
+   * henüz çözülmediğinde (liste yükleniyor ya da kayıtlı seçim eskimiş) kullanılır.
    */
   fallbackOwnedCompanyId: string | null
 }
@@ -110,14 +110,15 @@ export function buildNavigation({
     })
   }
 
-  // Üyelik ve rol yönetimi yalnızca CompanyOwner'a açıktır: sunucudaki karşılığı
-  // CompanyPermission.ManageMembers'tır ve orada da yalnızca sahibi karşılar.
-  // CompanyManager'a göstermek, açıldığında "yetkiniz yok" diyen bir menü üretirdi.
+  // Ekran iki kademelidir: CompanyOwner yönetir, CompanyManager yalnızca görür.
+  // Sunucudaki karşılığı da böyledir — üyelik listesi Read, her değiştirme işlemi
+  // ManageMembers ister ve onu yalnızca sahibi karşılar.
+  // CompanyExpert ve CompanyViewer menüyü hiç görmez.
   //
   // Aktif şirket henüz çözülmediyse (liste yükleniyor ya da kayıtlı seçim başka bir
-  // hesaba ait) menü kaybolmasın diye sahibi olunan varsayılan şirkete düşülür.
+  // hesaba ait) menü kaybolmasın diye yedek şirkete düşülür.
   const membersCompanyId =
-    activeRole === 'CompanyOwner'
+    activeRole === 'CompanyOwner' || activeRole === 'CompanyManager'
       ? activeCompanyId
       : activeRole === null
         ? fallbackOwnedCompanyId

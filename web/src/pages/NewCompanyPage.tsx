@@ -3,8 +3,8 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/api/client'
 import type { CreateCompanyResult } from '@/api/types'
-import { useCompanies } from '@/app/contexts'
-import { InfoBox, SuccessBox } from '@/components/Common'
+import { companyPermissions, useCompanies } from '@/app/contexts'
+import { InfoBox, NotAuthorized, SuccessBox } from '@/components/Common'
 import CompanyForm from '@/components/CompanyForm'
 import { emptyCompanyForm } from '@/lib/companyForm'
 import type { CompanyFormValues } from '@/lib/companyForm'
@@ -19,7 +19,7 @@ import type { CompanyFormValues } from '@/lib/companyForm'
  */
 export default function NewCompanyPage() {
   const navigate = useNavigate()
-  const { companies, refresh, selectCompany } = useCompanies()
+  const { companies, refresh, selectCompany, activeRole } = useCompanies()
 
   const [values, setValues] = useState<CompanyFormValues>(emptyCompanyForm)
   const [result, setResult] = useState<CreateCompanyResult | null>(null)
@@ -29,6 +29,9 @@ export default function NewCompanyPage() {
     queryFn: api.listCompanyGroups,
   })
 
+  // Ekran doğrudan adresle açılsa da yetkisiz kullanıcıya form gösterilmez.
+  const canAddCompany = companyPermissions.manageProfile(activeRole)
+
   async function handleSubmit() {
     const created = await api.createCompany(values)
     setResult(created)
@@ -36,6 +39,19 @@ export default function NewCompanyPage() {
     if (created.outcome === 'Created') {
       await refresh()
     }
+  }
+
+  if (!canAddCompany) {
+    return (
+      <>
+        <div className="page-header">
+          <div>
+            <h1>Yeni şirket ekle</h1>
+          </div>
+        </div>
+        <NotAuthorized message="Şirket eklemek için şirket sahibi veya şirket yöneticisi olmanız gerekir." />
+      </>
+    )
   }
 
   if (result && result.outcome === 'Created' && result.companyId) {

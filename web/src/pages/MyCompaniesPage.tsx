@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/api/client'
-import { useCompanies } from '@/app/contexts'
+import { companyPermissions, useCompanies } from '@/app/contexts'
 import { EmptyState, ErrorBox, InfoBox, Loading } from '@/components/Common'
 import {
   companyRoleLabels,
@@ -16,8 +16,13 @@ import { formatCurrency } from '@/lib/format'
  * Erişim kaynağı sunucudaki üyelik kaydıdır; bu ekran onun görünen yüzüdür.
  */
 export default function MyCompaniesPage() {
-  const { companies, selectedCompanyId, selectCompany, isSwitching, isLoading, error } =
+  const { companies, selectedCompanyId, selectCompany, isSwitching, activeRole, isLoading, error } =
     useCompanies()
+
+  // Şirket ekleme bir profil yönetimi işidir: sahip ve yönetici yapar.
+  // Düğmeyi gizlemek bir güvenlik önlemi değildir; /companies/new ekranı da aynı
+  // kuralı kendi içinde uygular.
+  const canAddCompany = companyPermissions.manageProfile(activeRole)
 
   const { data: verificationRequests = [] } = useQuery({
     queryKey: ['verification-requests'],
@@ -39,9 +44,11 @@ export default function MyCompaniesPage() {
             eşleşmeler ve raporlar o şirkete göre yeniden yüklenir.
           </p>
         </div>
-        <Link to="/companies/new">
-          <button type="button">Yeni şirket ekle</button>
-        </Link>
+        {canAddCompany ? (
+          <Link to="/companies/new">
+            <button type="button">Yeni şirket ekle</button>
+          </Link>
+        ) : null}
       </div>
 
       {pending.length > 0 ? (
@@ -63,7 +70,9 @@ export default function MyCompaniesPage() {
 
       {companies.length === 0 ? (
         <EmptyState>
-          Henüz erişebildiğiniz bir şirket yok. "Yeni şirket ekle" ile başlayabilirsiniz.
+          {canAddCompany
+            ? 'Henüz erişebildiğiniz bir şirket yok. "Yeni şirket ekle" ile başlayabilirsiniz.'
+            : 'Henüz erişebildiğiniz bir şirket yok. Şirket sahibinden sizi eklemesini isteyin.'}
         </EmptyState>
       ) : (
         <div className="table-wrap">
