@@ -39,29 +39,77 @@ public sealed class DatabaseSeeder(
     /// </summary>
     public async Task<int> SeedOfficialSourceCatalogAsync(CancellationToken cancellationToken = default)
     {
-        var mevcutAdlar = await context.Sources
-            .Select(s => s.Name)
-            .ToListAsync(cancellationToken);
+        var mevcutlar = await context.Sources.ToListAsync(cancellationToken);
 
-        var eklenecek = OfficialSourceCatalog.All
-            .Where(d => !mevcutAdlar.Contains(d.Name))
-            .Select(OfficialSourceCatalog.ToSource)
-            .ToList();
+        var eklenen = 0;
+        var yukseltilen = 0;
 
-        if (eklenecek.Count == 0)
+        foreach (var tanim in OfficialSourceCatalog.All)
         {
-            logger.LogInformation("Resmî kaynak kataloğu güncel; yeni kaynak eklenmedi.");
+            // Önce ada, sonra resmî alan adına bakılır: Faz 0 seed'inden gelen kayıtlar
+            // farklı adlarla ("KOSGEB Destek Çağrıları") aynı kurumu gösteriyor olabilir.
+            var mevcut =
+                mevcutlar.FirstOrDefault(s => s.Name == tanim.Name)
+                ?? mevcutlar.FirstOrDefault(s => SameHost(s.BaseUrl, tanim.BaseUrl));
+
+            if (mevcut is null)
+            {
+                context.Sources.Add(OfficialSourceCatalog.ToSource(tanim));
+                eklenen++;
+                continue;
+            }
+
+            // Doğrulanmış kaynağa DOKUNULMAZ: platform yöneticisinin panelden yaptığı
+            // düzeltmeler her açılışta geri alınmamalıdır.
+            if (mevcut.ConfigurationVerified)
+            {
+                continue;
+            }
+
+            // Künyesi olmayan eski kayıt katalog tanımıyla yükseltilir; doğrulanmamış
+            // olduğu için kaybedilecek bir operatör emeği yoktur.
+            mevcut.Describe(
+                tanim.Category,
+                new Domain.Sources.SourceProfile(
+                    tanim.Authority, tanim.Jurisdiction, tanim.OfficialDomain, tanim.Language));
+
+            mevcut.PlanCrawl(new Domain.Sources.SourceCrawlPlan(
+                tanim.StartUrl, tanim.ListSelector, tanim.ContentSelector, tanim.UrlPattern,
+                tanim.MaxPages, tanim.OfficialDomain, tanim.DocumentTypes));
+
+            // Doğrulanana kadar taranmaz.
+            mevcut.Disable();
+            yukseltilen++;
+        }
+
+        if (eklenen == 0 && yukseltilen == 0)
+        {
+            logger.LogInformation("Resmî kaynak kataloğu güncel.");
             return 0;
         }
 
-        await context.Sources.AddRangeAsync(eklenecek, cancellationToken);
         await context.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation(
-            "Resmî kaynak kataloğuna {Count} kaynak eklendi (doğrulanmamış, kapalı).",
-            eklenecek.Count);
+            "Resmî kaynak kataloğu: {Eklenen} eklendi, {Yukseltilen} yükseltildi (doğrulanmamış, kapalı).",
+            eklenen, yukseltilen);
 
-        return eklenecek.Count;
+        return eklenen + yukseltilen;
+    }
+
+    /// <summary>İki adresin aynı kuruma ait olup olmadığı (alan adı karşılaştırması).</summary>
+    private static bool SameHost(string left, string right)
+    {
+        if (!Uri.TryCreate(left, UriKind.Absolute, out var a) ||
+            !Uri.TryCreate(right, UriKind.Absolute, out var b))
+        {
+            return false;
+        }
+
+        static string Root(string host) =>
+            host.StartsWith("www.", StringComparison.OrdinalIgnoreCase) ? host[4..] : host;
+
+        return string.Equals(Root(a.Host), Root(b.Host), StringComparison.OrdinalIgnoreCase);
     }
 
     public async Task SeedWorkerIdentityAsync(

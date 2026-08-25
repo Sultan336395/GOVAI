@@ -132,7 +132,9 @@ public static class OfficialSourceCatalog
         new("EU Funding & Tenders Portal", SourceType.EuOrInternational, SourceCategory.EuProgramme,
             "European Commission", "EU", "ec.europa.eu",
             "https://ec.europa.eu", "0 10 * * *",
-            StartUrl: "/info/funding-tenders/opportunities/portal/screen/opportunities/topic-search",
+            // Portalın kendisi Angular ile çizilir ve statik HTML'de bağlantı yoktur.
+            // Kurum, tarayıcılar için sunucuda üretilen bu listeyi ayrıca yayımlar.
+            StartUrl: "/info/funding-tenders/opportunities/data/topic-list.html",
             ListSelector: "a[href*='/topic-details/']",
             ContentSelector: "main, .eui-page-content",
             UrlPattern: "topic-details|call", MaxPages: 10, Language: "en",
