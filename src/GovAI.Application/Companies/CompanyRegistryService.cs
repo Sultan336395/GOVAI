@@ -100,6 +100,11 @@ public sealed class CompanyRegistryService(
         var tenantId = access.RequireTenant();
         var userId = RequireUser();
 
+        // Yetki EN BAŞTA doğrulanır: reddedilen istek hiçbir kayıt bırakmamalıdır.
+        // Aşağıdaki çapraz çalışma alanı yolu doğrulama talebi YAZAR; kontrol sonraya
+        // kalsaydı yetkisiz bir kullanıcı da o kaydı oluşturabilirdi.
+        await EnsureCanCreateCompanyAsync(tenantId, userId, cancellationToken);
+
         var taxNumber = NormalizeTaxNumber(request.TaxNumber, request.Country);
         ValidateRequiredFields(request);
 
@@ -540,6 +545,56 @@ public sealed class CompanyRegistryService(
             company.IsHeadCompany,
             membership.CompanyRole,
             membership.IsDefault);
+
+    /// <summary>
+    /// Kiracıya yeni şirket kaydetme yetkisi.
+    ///
+    /// Bu, aktif şirketteki sıradan yönetim yetkisinden <b>ayrı bir kiracı işlemidir</b>:
+    /// bir şirketin yöneticisi olmak, kiracıya yeni tüzel kişilik eklemeye yetmez.
+    ///
+    /// İzin verilenler:
+    /// <list type="bullet">
+    ///   <item>Kiracı yöneticisi (<see cref="UserRole.SuperAdmin"/>) — her zaman.</item>
+    ///   <item>Aynı kiracıda en az bir <b>etkin</b> CompanyOwner üyeliği olan kullanıcı.</item>
+    /// </list>
+    ///
+    /// Karar <b>veritabanındaki üyelikten</b> verilir; jetondaki eski şirket claim'ine
+    /// bakılmaz. Üyelik sorgusu kiracı filtresine tabidir, bu yüzden kullanıcının başka
+    /// kiracıdaki sahipliği hesaba katılmaz; okunabilirlik için ayrıca elle de denetlenir.
+    ///
+    /// Kiracıda hiç şirket yoksa ilk şirketi yalnızca kiracı yöneticisi açabilir:
+    /// aksi hâlde kural kendi kendini besleyemezdi, çünkü sahiplik ancak var olan bir
+    /// şirket üzerinden doğar.
+    /// </summary>
+    private async Task EnsureCanCreateCompanyAsync(
+        Guid tenantId,
+        Guid userId,
+        CancellationToken cancellationToken)
+    {
+        if (currentUser.Role == UserRole.SuperAdmin)
+        {
+            return;
+        }
+
+        var tenantCompanyCount = await companies.CountAsync(tenantId, cancellationToken);
+        if (tenantCompanyCount == 0)
+        {
+            throw new ForbiddenException(
+                "Çalışma alanındaki ilk şirketi yalnızca çalışma alanı yöneticisi ekleyebilir.");
+        }
+
+        var ownsAnyCompany = (await memberships.ListForUserAsync(userId, cancellationToken))
+            .Any(m => m.TenantId == tenantId
+                      && m.GrantsAccess
+                      && m.CompanyRole == CompanyRole.CompanyOwner);
+
+        if (!ownsAnyCompany)
+        {
+            throw new ForbiddenException(
+                "Yeni şirket eklemek için çalışma alanı yöneticisi olmanız ya da " +
+                "en az bir şirkette şirket sahibi olmanız gerekir.");
+        }
+    }
 
     private async Task EnsureCompanyQuotaAsync(Guid tenantId, CancellationToken cancellationToken)
     {

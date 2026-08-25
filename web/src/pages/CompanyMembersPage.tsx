@@ -60,7 +60,9 @@ export default function CompanyMembersPage() {
   } = useQuery({
     queryKey: ['company-members', companyId],
     queryFn: () => api.listCompanyMembers(companyId!),
-    enabled: Boolean(companyId) && Boolean(company),
+    // Uzman ve görüntüleyici sunucudan da okuyamaz; boşuna 403 istememek için
+    // sorgu hiç açılmaz.
+    enabled: Boolean(companyId) && Boolean(company) && canView,
   })
 
   const { data: invitations = [] } = useQuery({

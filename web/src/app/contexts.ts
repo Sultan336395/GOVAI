@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react'
-import type { CompanyRole, LoginResponse, MyCompany } from '@/api/types'
+import type { CompanyRole, LoginResponse, MyCompany, UserRole } from '@/api/types'
 
 /**
  * Context nesneleri ve hook'ları burada, provider bileşenlerinden ayrı tutulur.
@@ -49,6 +49,27 @@ export function useCompanies(): CompanyContextValue {
     throw new Error('useCompanies, CompanyProvider içinde kullanılmalıdır.')
   }
   return context
+}
+
+/**
+ * Yeni şirket kaydetme yetkisi. C# karşılığı:
+ * <c>CompanyRegistryService.EnsureCanCreateCompanyAsync</c>.
+ *
+ * Aktif şirketteki role değil, kiracıdaki duruma bakılır: kiracı yöneticisi her zaman,
+ * sıradan kullanıcı ise en az bir şirkette sahip olduğunda ekleyebilir. Bir şirketin
+ * yöneticisi olmak yetmez.
+ *
+ * Bu kontrol yalnızca kullanıcıyı boş yere uğraştırmamak içindir; karar sunucudadır.
+ */
+export function canCreateCompany(
+  userRole: UserRole | null,
+  companies: Pick<MyCompany, 'companyRole'>[],
+): boolean {
+  if (userRole === 'SuperAdmin') {
+    return true
+  }
+
+  return companies.some((company) => company.companyRole === 'CompanyOwner')
 }
 
 /**

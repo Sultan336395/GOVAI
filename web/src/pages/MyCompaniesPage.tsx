@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/api/client'
-import { companyPermissions, useCompanies } from '@/app/contexts'
+import { canCreateCompany, useAuth, useCompanies } from '@/app/contexts'
 import { EmptyState, ErrorBox, InfoBox, Loading } from '@/components/Common'
 import {
   companyRoleLabels,
@@ -16,13 +16,13 @@ import { formatCurrency } from '@/lib/format'
  * Erişim kaynağı sunucudaki üyelik kaydıdır; bu ekran onun görünen yüzüdür.
  */
 export default function MyCompaniesPage() {
-  const { companies, selectedCompanyId, selectCompany, isSwitching, activeRole, isLoading, error } =
+  const { companies, selectedCompanyId, selectCompany, isSwitching, isLoading, error } =
     useCompanies()
+  const { user } = useAuth()
 
-  // Şirket ekleme bir profil yönetimi işidir: sahip ve yönetici yapar.
-  // Düğmeyi gizlemek bir güvenlik önlemi değildir; /companies/new ekranı da aynı
-  // kuralı kendi içinde uygular.
-  const canAddCompany = companyPermissions.manageProfile(activeRole)
+  // Şirket ekleme kiracı işlemidir. Düğmeyi gizlemek bir güvenlik önlemi değildir;
+  // /companies/new ekranı ve sunucu aynı kuralı ayrıca uygular.
+  const canAddCompany = canCreateCompany(user?.role ?? null, companies)
 
   const { data: verificationRequests = [] } = useQuery({
     queryKey: ['verification-requests'],

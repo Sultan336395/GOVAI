@@ -335,7 +335,12 @@ public sealed class MultiCompanyTests : IAsyncLifetime
     [Fact(DisplayName = "Faz1-K2. Yetkisiz kullanıcı kendini yükseltemez")]
     public async Task Yetkisiz_kullanici_kendini_yukseltemez()
     {
-        var members = await _viewer.GetFromJsonAsync<List<JsonElement>>(
+        // Görüntüleyici üye listesini artık okuyamaz; kendi üyelik kimliğini bilse bile
+        // rolünü yükseltemediği sınanır, bu yüzden kimlik sahip hesabından alınır.
+        var listeDenemesi = await _viewer.GetAsync($"/api/companies/{_factory.TenantA.CompanyId}/members");
+        Assert.Equal(HttpStatusCode.Forbidden, listeDenemesi.StatusCode);
+
+        var members = await _owner.GetFromJsonAsync<List<JsonElement>>(
             $"/api/companies/{_factory.TenantA.CompanyId}/members") ?? [];
 
         var own = members.Single(m => m.GetProperty("userId").GetGuid() == _factory.TenantA.ViewerUserId);

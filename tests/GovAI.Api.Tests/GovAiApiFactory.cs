@@ -58,6 +58,19 @@ public sealed class GovAiApiFactory : WebApplicationFactory<Program>
     public TenantFixture TenantA { get; } = new("Kiracı A", "kiraci-a", "a@govai.test", "1111111111");
     public TenantFixture TenantB { get; } = new("Kiracı B", "kiraci-b", "b@govai.test", "2222222222");
 
+    /// <summary>
+    /// Hiç şirketi olmayan kiracı. "İlk şirketi yalnızca kiracı yöneticisi açabilir"
+    /// kuralı yalnızca burada sınanabilir.
+    /// </summary>
+    public TenantFixture TenantEmpty { get; } = new("Kiracı C", "kiraci-c", "c@govai.test", "3333333333");
+
+    /// <summary>
+    /// İkinci boş kiracı. "İlk şirketi yönetici açabilir" testi <see cref="TenantEmpty"/>
+    /// içine şirket eklediği için, "sıradan kullanıcı açamaz" testi ayrı ve gerçekten boş
+    /// kalan bir kiracıya ihtiyaç duyar; aksi hâlde iki test birbirinin sırasına bağlanırdı.
+    /// </summary>
+    public TenantFixture TenantEmptyDenied { get; } = new("Kiracı D", "kiraci-d", "d@govai.test", "4444444444");
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         // Development: HTTPS yönlendirmesi devreye girmez ve test istekleri düz HTTP kalır.
@@ -178,10 +191,27 @@ public sealed class GovAiApiFactory : WebApplicationFactory<Program>
         base.Dispose(disposing);
     }
 
-    /// <summary>İki kiracıyı ve her birinin tam veri setini yükler.</summary>
+    private bool _seeded;
+
+    /// <summary>
+    /// İki kiracıyı ve her birinin tam veri setini yükler.
+    ///
+    /// Test sınıflarının her testte çağırması normaldir; bu yüzden <b>bir kez</b> çalışır.
+    /// Aksi hâlde her çağrı aynı e-postalarla ikinci bir kiracı kümesi eklerdi: bellek içi
+    /// sağlayıcı tekil dizini uygulamadığı için mükerrer kullanıcılar oluşur, giriş bir
+    /// kümenin kullanıcısını döndürürken fixture kimlikleri diğerini gösterir ve testler
+    /// yalnızca birlikte koştuklarında "kayıt bulunamadı" ile düşerdi.
+    /// </summary>
     public async Task SeedAsync()
     {
         EnsureSchema();
+
+        if (_seeded)
+        {
+            return;
+        }
+
+        _seeded = true;
 
         using var scope = Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<GovAiDbContext>();
@@ -203,6 +233,8 @@ public sealed class GovAiApiFactory : WebApplicationFactory<Program>
 
         SeedTenant(context, hasher, TenantA, opportunity, source);
         SeedTenant(context, hasher, TenantB, opportunity, source);
+        SeedEmptyTenant(context, hasher, TenantEmpty);
+        SeedEmptyTenant(context, hasher, TenantEmptyDenied);
 
         // Platform işletim hesapları. Kiracıya bağlıdırlar (AppUser kiracı ister) ama
         // rolleri kiracı rolü değildir; ortak kataloğa ve worker uçlarına erişirler.
@@ -214,6 +246,29 @@ public sealed class GovAiApiFactory : WebApplicationFactory<Program>
             "Veri Toplama Servisi", UserRole.SystemIngest);
 
         await context.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Şirketi olmayan kiracı: bir yönetici ve bir salt okuyucu, hiç şirket ve hiç üyelik yok.
+    /// </summary>
+    private static void SeedEmptyTenant(GovAiDbContext context, IPasswordHasher hasher, TenantFixture fixture)
+    {
+        var tenant = new Tenant(fixture.Name, fixture.Slug);
+        tenant.SetPlan("Professional", maxCompanies: 25);
+
+        var admin = new AppUser(tenant.Id, fixture.Email, $"{fixture.Name} Yöneticisi", UserRole.SuperAdmin);
+        admin.SetPasswordHash(hasher.Hash(Password));
+
+        var reader = new AppUser(tenant.Id, fixture.ViewerEmail, $"{fixture.Name} Görüntüleyici", UserRole.ReadOnly);
+        reader.SetPasswordHash(hasher.Hash(Password));
+
+        context.Tenants.Add(tenant);
+        context.Users.Add(admin);
+        context.Users.Add(reader);
+
+        fixture.TenantId = tenant.Id;
+        fixture.UserId = admin.Id;
+        fixture.ViewerUserId = reader.Id;
     }
 
     /// <summary>Platform işletim hesabı; şirket üyeliği almaz.</summary>
@@ -247,6 +302,11 @@ public sealed class GovAiApiFactory : WebApplicationFactory<Program>
         // Ortak katalog yazma yetkisinin bu kullanıcıya kapalı olduğu sınanır.
         var operatorUser = new AppUser(tenant.Id, fixture.OperatorEmail, $"{fixture.Name} Operatörü", UserRole.OperationUser);
         operatorUser.SetPasswordHash(hasher.Hash(Password));
+
+        // SuperAdmin olmayan şirket sahibi: "şirket ekleme yetkisi üyelikten gelir"
+        // kuralının kiracı yöneticiliğinden bağımsız çalıştığı bu hesapla sınanır.
+        var ownerUser = new AppUser(tenant.Id, fixture.OwnerEmail, $"{fixture.Name} Şirket Sahibi", UserRole.OperationUser);
+        ownerUser.SetPasswordHash(hasher.Hash(Password));
 
         // Şirket rolü bazlı testler için dört ayrı hesap.
         var expertUser = new AppUser(tenant.Id, fixture.ExpertEmail, $"{fixture.Name} Uzmanı", UserRole.OperationUser);
@@ -286,6 +346,7 @@ public sealed class GovAiApiFactory : WebApplicationFactory<Program>
         context.Tenants.Add(tenant);
         context.Users.Add(admin);
         context.Users.Add(operatorUser);
+        context.Users.Add(ownerUser);
         context.Users.Add(expertUser);
         context.Users.Add(viewerUser);
         context.Companies.Add(company);
@@ -297,6 +358,9 @@ public sealed class GovAiApiFactory : WebApplicationFactory<Program>
             new UserCompany(tenant.Id, admin.Id, company.Id, CompanyRole.CompanyOwner, isDefault: true),
             new UserCompany(tenant.Id, admin.Id, secondCompany.Id, CompanyRole.CompanyOwner),
             new UserCompany(tenant.Id, operatorUser.Id, company.Id, CompanyRole.CompanyManager, isDefault: true),
+            // İKİNCİ şirkete bağlanır: birinci şirkette tek sahip (admin) kalmalı ki
+            // "son sahip kaldırılamaz" kuralı orada sınanabilsin.
+            new UserCompany(tenant.Id, ownerUser.Id, secondCompany.Id, CompanyRole.CompanyOwner, isDefault: true),
             new UserCompany(tenant.Id, expertUser.Id, company.Id, CompanyRole.CompanyExpert, isDefault: true),
             new UserCompany(tenant.Id, viewerUser.Id, company.Id, CompanyRole.CompanyViewer, isDefault: true));
         context.Assessments.Add(assessment);
@@ -306,6 +370,7 @@ public sealed class GovAiApiFactory : WebApplicationFactory<Program>
         fixture.TenantId = tenant.Id;
         fixture.UserId = admin.Id;
         fixture.OperatorUserId = operatorUser.Id;
+        fixture.OwnerUserId = ownerUser.Id;
         fixture.ExpertUserId = expertUser.Id;
         fixture.ViewerUserId = viewerUser.Id;
         fixture.SourceId = source.Id;
@@ -353,6 +418,9 @@ public sealed class TenantFixture(string name, string slug, string email, string
     public string OperatorEmail { get; } = $"operator-{email}";
 
     /// <summary>Şirkette CompanyExpert rolündeki hesap.</summary>
+    /// <summary>SuperAdmin <b>olmayan</b>, şirkette CompanyOwner rolündeki hesap.</summary>
+    public string OwnerEmail { get; } = $"sahip-{email}";
+
     public string ExpertEmail { get; } = $"uzman-{email}";
 
     /// <summary>Şirkette CompanyViewer rolündeki hesap.</summary>
@@ -364,6 +432,7 @@ public sealed class TenantFixture(string name, string slug, string email, string
     public Guid TenantId { get; set; }
     public Guid UserId { get; set; }
     public Guid OperatorUserId { get; set; }
+    public Guid OwnerUserId { get; set; }
     public Guid ExpertUserId { get; set; }
     public Guid ViewerUserId { get; set; }
     public Guid SourceId { get; set; }

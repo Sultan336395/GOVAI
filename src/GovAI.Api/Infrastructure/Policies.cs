@@ -46,6 +46,18 @@ public static class Policies
     public const string CompanyData = "CompanyData";
 
     /// <summary>
+    /// Kiracıya <b>yeni şirket kaydetme</b>. Aktif şirketteki sıradan yönetim
+    /// yetkisinden ayrı bir kiracı işlemidir: bir şirketin yöneticisi olmak, kiracıya
+    /// yeni tüzel kişilik eklemeye yetmez.
+    ///
+    /// Bu politika <b>kaba filtredir</b> — yalnızca kiracı rollerini içeri alır, platform
+    /// rollerini ve veri toplama kimliğini dışarıda bırakır. Asıl karar
+    /// <c>CompanyRegistryService.EnsureCanCreateCompanyAsync</c> içinde
+    /// <b>veritabanındaki üyelikten</b> verilir; jetondaki claim'e güvenilmez.
+    /// </summary>
+    public const string ManageTenantCompanies = "ManageTenantCompanies";
+
+    /// <summary>
     /// Yeniden skorlama tetikleme. Hem kiracı operasyon kullanıcısının ("Yeniden skorla"
     /// düğmesi) hem de gece toplu turunu çalıştıran worker'ın ihtiyacı olduğu için iki
     /// tarafı da kapsayan tek politika. Skor <b>okuma</b> yetkisi vermez.

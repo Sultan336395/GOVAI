@@ -19,7 +19,14 @@ public enum CompanyPermission
     ManageProfile = 2,
 
     /// <summary>Üyelik ve rol yönetimi. Yalnızca Owner karşılar.</summary>
-    ManageMembers = 3
+    ManageMembers = 3,
+
+    /// <summary>
+    /// Şirket kullanıcılarını <b>görme</b>. Owner ve Manager karşılar.
+    /// Uzman ve görüntüleyicinin, çalıştığı şirketteki diğer kişilerin adını ve
+    /// e-postasını görmesi için bir gerekçe yoktur.
+    /// </summary>
+    ViewMembers = 4
 }
 
 /// <summary>
@@ -163,6 +170,9 @@ public sealed class CompanyAccessGuard(
             role is CompanyRole.CompanyOwner or CompanyRole.CompanyManager or CompanyRole.CompanyExpert,
 
         CompanyPermission.ManageProfile =>
+            role is CompanyRole.CompanyOwner or CompanyRole.CompanyManager,
+
+        CompanyPermission.ViewMembers =>
             role is CompanyRole.CompanyOwner or CompanyRole.CompanyManager,
 
         CompanyPermission.ManageMembers =>

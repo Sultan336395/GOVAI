@@ -37,8 +37,10 @@ public sealed class CompanyMembershipService(
         Guid companyId,
         CancellationToken cancellationToken = default)
     {
-        // Üyeleri görmek için şirkete erişim yeterlidir; yönetmek için sahiplik gerekir.
-        await access.EnsureAccessAsync(companyId, CompanyPermission.Read, cancellationToken);
+        // Üye listesini yalnızca sahip ve yönetici okuyabilir; yönetmek için sahiplik
+        // gerekir. Uzman ve görüntüleyici listeyi hiç göremez — çalıştıkları şirketteki
+        // diğer kişilerin adını ve e-postasını görmeleri için bir gerekçe yoktur.
+        await access.EnsureAccessAsync(companyId, CompanyPermission.ViewMembers, cancellationToken);
 
         var items = await memberships.ListForCompanyAsync(companyId, cancellationToken);
         var result = new List<CompanyMemberDto>();

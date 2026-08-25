@@ -30,6 +30,7 @@ public sealed class CompaniesController(CompanyRegistryService registry) : Contr
     /// <c>409</c> aynı çalışma alanında, <c>202</c> doğrulama gerekiyor.
     /// </summary>
     [HttpPost]
+    [Authorize(Policy = Policies.ManageTenantCompanies)]
     [Audited("Company.Created", "Company")]
     public async Task<ActionResult<CreateCompanyResult>> Create(
         [FromBody] CreateCompanyRequest request,

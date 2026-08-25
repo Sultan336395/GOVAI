@@ -98,6 +98,16 @@ builder.Services.AddAuthorization(options =>
         nameof(GovAI.Domain.Common.UserRole.Consultant),
         nameof(GovAI.Domain.Common.UserRole.ReadOnly)));
 
+    // Yeni şirket kaydetme: kiracı rolleri içeri alınır, platform rolleri ve veri
+    // toplama kimliği dışarıda bırakılır. Hangi kiracı kullanıcısının gerçekten
+    // ekleyebileceğine servis katmanı üyelikten karar verir.
+    options.AddPolicy(Policies.ManageTenantCompanies, policy => policy.RequireRole(
+        nameof(GovAI.Domain.Common.UserRole.SuperAdmin),
+        nameof(GovAI.Domain.Common.UserRole.CompanyManager),
+        nameof(GovAI.Domain.Common.UserRole.OperationUser),
+        nameof(GovAI.Domain.Common.UserRole.Consultant),
+        nameof(GovAI.Domain.Common.UserRole.ReadOnly)));
+
     options.AddPolicy(Policies.Read, policy => policy.RequireAuthenticatedUser());
 });
 

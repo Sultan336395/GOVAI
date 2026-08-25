@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import type { CompanyRole } from '@/api/types'
-import { companyPermissions, useAuth, useCompanies } from '@/app/contexts'
+import { canCreateCompany, companyPermissions, useAuth, useCompanies } from '@/app/contexts'
 import { buildNavigation } from '@/app/navigation'
 import NavIcon from '@/components/NavIcons'
 import { companyRoleLabels } from '@/lib/companyLabels'
@@ -42,10 +42,8 @@ export default function AppLayout() {
     [user?.role, activeRole, selectedCompanyId, canManageAnyCompany, fallbackOwnedCompanyId],
   )
 
-  // Şirket ekleme bir yönetim işidir: sahip ve yönetici yapar, uzman ve görüntüleyici
-  // yapmaz. Aynı kural Şirketlerim sayfasındaki düğmede ve /companies/new ekranında da
-  // uygulanır (companyPermissions.manageProfile).
-  const canAddCompany = companyPermissions.manageProfile(activeRole)
+  // Şirket ekleme kiracı işlemidir; aktif şirketteki role bakılmaz.
+  const canAddCompany = canCreateCompany(user?.role ?? null, companies)
 
   return (
     <div className="app-shell" data-nav={isNavOpen ? 'open' : 'closed'}>
