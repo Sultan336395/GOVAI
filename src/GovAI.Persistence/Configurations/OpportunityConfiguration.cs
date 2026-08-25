@@ -109,7 +109,36 @@ public sealed class SourceConfiguration : IEntityTypeConfiguration<Source>
         builder.Property(s => s.Type).HasConversion<int>();
         builder.Property(s => s.LastRunStatus).HasConversion<int>();
 
+        // ── Faz 2: RegTech künyesi ──
+        builder.Property(s => s.Category).HasConversion<int>();
+        builder.Property(s => s.Health).HasConversion<int>();
+
+        builder.OwnsOne(s => s.Profile, profile =>
+        {
+            profile.Property(x => x.Authority).HasColumnName("authority").HasMaxLength(300);
+            profile.Property(x => x.Jurisdiction).HasColumnName("jurisdiction").HasMaxLength(10);
+            profile.Property(x => x.OfficialDomain).HasColumnName("official_domain").HasMaxLength(300);
+            profile.Property(x => x.Language).HasColumnName("language").HasMaxLength(10);
+        });
+
+        builder.OwnsOne(s => s.CrawlPlan, plan =>
+        {
+            plan.Property(x => x.StartUrl).HasColumnName("start_url").HasMaxLength(2000);
+            plan.Property(x => x.ListSelector).HasColumnName("list_selector").HasMaxLength(500);
+            plan.Property(x => x.ContentSelector).HasColumnName("content_selector").HasMaxLength(500);
+            plan.Property(x => x.UrlPattern).HasColumnName("url_pattern").HasMaxLength(500);
+            plan.Property(x => x.MaxPages).HasColumnName("max_pages");
+            plan.Property(x => x.AllowedDomains).HasColumnName("allowed_domains").HasMaxLength(1000);
+            plan.Property(x => x.DocumentTypes).HasColumnName("document_types").HasMaxLength(500);
+        });
+
+        // Tüm alanları null olan sahipli referansı EF "yok" sayar ve sonradan değer
+        // atandığında var olmayan satırı güncellemeye çalışır (bkz. docs/data-model.md).
+        builder.Navigation(s => s.Profile).IsRequired();
+        builder.Navigation(s => s.CrawlPlan).IsRequired();
+
         builder.HasIndex(s => s.IsEnabled);
+        builder.HasIndex(s => new { s.Category, s.Health }).HasDatabaseName("ix_sources_category_health");
     }
 }
 
@@ -134,6 +163,20 @@ public sealed class SourceDocumentConfiguration : IEntityTypeConfiguration<Sourc
             .OnDelete(DeleteBehavior.Cascade);
 
         // Aynı kaynaktan aynı adres tek kayıt olarak tutulur; sürümler Revision ile izlenir.
+        builder.Property(d => d.CanonicalUrl).HasMaxLength(2000);
+        builder.Property(d => d.QuarantineReason).HasConversion<int>();
+        builder.Property(d => d.QuarantineNote).HasMaxLength(1000);
+
+        builder.HasMany(d => d.Versions)
+            .WithOne()
+            .HasForeignKey(v => v.SourceDocumentId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Metadata.FindNavigation(nameof(GovAI.Domain.Sources.SourceDocument.Versions))!
+            .SetPropertyAccessMode(PropertyAccessMode.Field);
+
+        builder.HasIndex(d => d.QuarantineReason).HasDatabaseName("ix_source_documents_quarantine");
+
         builder.HasIndex(d => new { d.SourceId, d.Url }).IsUnique();
         builder.HasIndex(d => d.ContentHash);
         builder.HasIndex(d => d.Status);

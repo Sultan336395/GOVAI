@@ -34,9 +34,30 @@ public sealed record IngestDocumentRequest
     public required string RawContent { get; init; }
 
     public string MediaType { get; init; } = "text/html";
+
+    // ── Faz 2: kanıt alanları ──
+
+    /// <summary>Yönlendirmeler sonrası ulaşılan nihai adres.</summary>
+    public string? CanonicalUrl { get; init; }
+
+    /// <summary>Sunucunun bildirdiği karakter kümesi; kaybedilirse Türkçe karakterler bozulur.</summary>
+    public string? Charset { get; init; }
+
+    public int HttpStatusCode { get; init; } = 200;
+
+    /// <summary>Kaynağın bildirdiği son güncelleme zamanı.</summary>
+    public DateTimeOffset? LastModifiedAt { get; init; }
 }
 
-public sealed record IngestDocumentResult(Guid DocumentId, bool IsNew, bool ContentChanged, int Revision);
+public sealed record IngestDocumentResult(
+    Guid DocumentId,
+    bool IsNew,
+    bool ContentChanged,
+    int Revision,
+    /// <summary>Bu yakalanış için açılan belge sürümü. İçerik değişmediyse <c>null</c>.</summary>
+    Guid? DocumentVersionId = null,
+    /// <summary>Kayıt karantinaya alındıysa nedeni.</summary>
+    QuarantineReason Quarantine = QuarantineReason.None);
 
 public sealed record RecordCrawlRunRequest(CrawlStatus Status, string? Message, int DocumentCount);
 
@@ -135,18 +156,69 @@ public sealed class SourceService(
         if (existing is null)
         {
             var document = new SourceDocument(request.SourceId, request.Url, request.Title, request.RawContent, request.MediaType, now);
+            document.SetCanonicalUrl(request.CanonicalUrl);
+
+            // Her yakalanış kalıcı bir sürüm bırakır; belge kaydı yerinde güncellense de
+            // geçmiş kaybolmaz (Faz 2 kanıt zinciri).
+            var firstVersion = document.AddVersion(
+                request.Url,
+                request.CanonicalUrl ?? request.Url,
+                request.HttpStatusCode,
+                request.MediaType,
+                request.Charset,
+                request.RawContent,
+                now);
+
+            firstVersion.SetLastModified(request.LastModifiedAt);
+
+            var quarantine = Screen(request);
+            if (quarantine != QuarantineReason.None)
+            {
+                document.Quarantine(quarantine, "Otomatik ön eleme.");
+            }
+
             await documents.AddAsync(document, cancellationToken);
             await unitOfWork.SaveChangesAsync(cancellationToken);
+
+            if (quarantine != QuarantineReason.None)
+            {
+                logger.LogInformation(
+                    "Doküman karantinaya alındı. DocumentId={DocumentId} Neden={Reason}",
+                    document.Id, quarantine);
+
+                return new IngestDocumentResult(
+                    document.Id, IsNew: true, ContentChanged: true, document.Revision,
+                    firstVersion.Id, quarantine);
+            }
 
             await events.PublishAsync(
                 QueueNames.DocumentParseRequested,
                 ParsePayload(source, document),
                 cancellationToken);
 
-            return new IngestDocumentResult(document.Id, IsNew: true, ContentChanged: true, document.Revision);
+            return new IngestDocumentResult(
+                document.Id, IsNew: true, ContentChanged: true, document.Revision, firstVersion.Id);
         }
 
         var changed = existing.TryUpdateContent(request.RawContent, now);
+        existing.SetCanonicalUrl(request.CanonicalUrl);
+
+        SourceDocumentVersion? newVersion = null;
+        if (changed)
+        {
+            // Aynı adresin değişen içeriği ÜSTÜNE YAZILMAZ: yeni sürüm açılır.
+            newVersion = existing.AddVersion(
+                request.Url,
+                request.CanonicalUrl ?? request.Url,
+                request.HttpStatusCode,
+                request.MediaType,
+                request.Charset,
+                request.RawContent,
+                now);
+
+            newVersion.SetLastModified(request.LastModifiedAt);
+        }
+
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         if (changed)
@@ -161,8 +233,59 @@ public sealed class SourceService(
                 existing.Id, existing.Revision);
         }
 
-        return new IngestDocumentResult(existing.Id, IsNew: false, changed, existing.Revision);
+        return new IngestDocumentResult(
+            existing.Id, IsNew: false, changed, existing.Revision, newVersion?.Id, existing.QuarantineReason);
     }
+
+    /// <summary>
+    /// Katalog öncesi ön eleme (Faz 2).
+    ///
+    /// Menü, iletişim, hakkımızda gibi sayfalar ilan değildir; skorlanmamalı ve şirketlere
+    /// fırsat olarak gösterilmemelidir. Bunlar <b>silinmez</b>, karantinaya alınır: yanlış
+    /// elenen bir kayıt platform yöneticisi tarafından geri alınabilir.
+    /// </summary>
+    private static QuarantineReason Screen(IngestDocumentRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Title) || string.IsNullOrWhiteSpace(request.RawContent))
+        {
+            return QuarantineReason.MissingRequiredFields;
+        }
+
+        var haystack = $"{request.Url} {request.Title}".ToLowerInvariant();
+
+        foreach (var marker in NonOpportunityMarkers)
+        {
+            if (haystack.Contains(marker, StringComparison.Ordinal))
+            {
+                return QuarantineReason.InvalidSourcePage;
+            }
+        }
+
+        // Gövdesi bir ilanı taşıyamayacak kadar kısa olan sayfalar insana bırakılır.
+        return request.RawContent.Trim().Length < MinimumContentLength
+            ? QuarantineReason.NeedsManualReview
+            : QuarantineReason.None;
+    }
+
+    /// <summary>
+    /// Kurumsal sitelerde ilan olmayan sayfaların adres ve başlıklarında geçen kalıplar.
+    /// Liste bilinçli olarak dar tutulur: şüphede kalan kayıt elenmez, incelemeye gider.
+    /// </summary>
+    private static readonly string[] NonOpportunityMarkers =
+    [
+        "/iletisim", "/contact", "iletişim",
+        "/hakkimizda", "/hakkinda", "/about", "hakkımızda",
+        "/tarihce", "tarihçe", "/history",
+        "/misyon", "/vizyon", "/mission", "/vision",
+        "/sitemap", "site haritası",
+        "/gizlilik", "/privacy", "/kvkk",
+        "/cerez", "çerez", "/cookie",
+        "/personel", "/yonetim-kurulu", "/organizasyon",
+        "/basin", "/foto-galeri", "/video-galeri",
+        "javascript:", "/login", "/giris"
+    ];
+
+    private const int MinimumContentLength = 200;
 
     public async Task RecordRunAsync(Guid sourceId, RecordCrawlRunRequest request, CancellationToken cancellationToken = default)
     {

@@ -34,6 +34,121 @@ public enum SourceType
     Other = 99
 }
 
+/// <summary>
+/// Kaynağın hangi konuyu beslediği (Faz 2). <see cref="SourceType"/> kurumun cinsini,
+/// bu ise topladığı içeriğin türünü söyler: aynı kurum hem mevzuat hem destek yayımlayabilir.
+/// </summary>
+public enum SourceCategory
+{
+    Regulation = 1,
+    Tax = 2,
+    SocialSecurity = 3,
+    LabourLaw = 4,
+    CommercialLaw = 5,
+    Grant = 6,
+    Incentive = 7,
+    Fund = 8,
+    Tender = 9,
+    EuProgramme = 10
+}
+
+/// <summary>
+/// Kaynağın işletim sağlığı. Tarama kararı buna bakılarak verilir; yapılandırması
+/// doğrulanmamış kaynak tarama sırasına hiç girmez.
+/// </summary>
+public enum SourceHealth
+{
+    /// <summary>Yapılandırıldı ama henüz canlı doğrulanmadı — taranmaz.</summary>
+    Unverified = 0,
+
+    /// <summary>Canlı doğrulandı, seçicileri çalışıyor — taranabilir.</summary>
+    Healthy = 1,
+
+    /// <summary>Son taramalarda kısmi hata; taranmaya devam eder.</summary>
+    Degraded = 2,
+
+    /// <summary>Erişilemiyor veya seçiciler kırıldı — taranmaz.</summary>
+    Failing = 3
+}
+
+/// <summary>Mevzuatın konu alanı (Faz 2 – RegTech).</summary>
+public enum RegulationDomain
+{
+    Tax = 1,
+    SocialSecurity = 2,
+    LabourLaw = 3,
+    CommercialLaw = 4,
+    DataProtection = 5,
+    CorporateGovernance = 6,
+    Other = 99
+}
+
+/// <summary>Mevzuat değişikliğinin türü.</summary>
+public enum RegulatoryChangeType
+{
+    NewRegulation = 1,
+    Amendment = 2,
+    Repeal = 3,
+    Circular = 4,
+    Communique = 5,
+    Decision = 6,
+    Guidance = 7,
+    Announcement = 8
+}
+
+/// <summary>Mevzuat kaydının yaşam döngüsü.</summary>
+public enum RegulatoryChangeStatus
+{
+    /// <summary>Tespit edildi, resmî kaynak doğrulaması bekliyor.</summary>
+    Detected = 0,
+
+    /// <summary>Resmî kaynağa karşı doğrulandı; panelde gösterilebilir.</summary>
+    Verified = 1,
+
+    /// <summary>Yeni bir sürümle değiştirildi.</summary>
+    Superseded = 2,
+
+    /// <summary>İlgisiz veya hatalı; karantinada.</summary>
+    Quarantined = 3
+}
+
+/// <summary>
+/// Bir kaydın neden katalog dışında tutulduğu (Faz 2). Karantina <b>silmez</b>:
+/// kayıt durur, incelenebilir ve yeniden ayrıştırılabilir; ama skorlanmaz ve
+/// şirketlere fırsat olarak gösterilmez.
+/// </summary>
+public enum QuarantineReason
+{
+    /// <summary>Karantinada değil.</summary>
+    None = 0,
+
+    /// <summary>Menü, iletişim, hakkımızda gibi ilan olmayan sayfa.</summary>
+    InvalidSourcePage = 1,
+
+    /// <summary>Aynı içerik başka bir kayıtta zaten var.</summary>
+    Duplicate = 2,
+
+    /// <summary>Zorunlu alanlar eksik.</summary>
+    MissingRequiredFields = 3,
+
+    /// <summary>Ayrıştırıcı bu belgeden anlamlı içerik çıkaramadı.</summary>
+    ParserFailed = 4,
+
+    /// <summary>Otomatik karar verilemedi; insan incelemesi gerekiyor.</summary>
+    NeedsManualReview = 5
+}
+
+/// <summary>Belge sürümünün ayrıştırma durumu.</summary>
+public enum DocumentParseStatus
+{
+    Pending = 0,
+    Parsed = 1,
+    Failed = 2,
+
+    /// <summary>Taranmış PDF; metin katmanı yok, OCR gerekiyor.</summary>
+    NeedsOcr = 3
+}
+
 /// <summary>Destek türü sınıflandırması (Modül 4 – Teşvik / Hibe / İhale ayrıştırması).</summary>
 public enum SupportCategory
 {

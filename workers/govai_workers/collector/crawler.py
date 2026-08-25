@@ -18,11 +18,12 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, field
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 
 from govai_workers.collector.fetcher import FetchedDocument, PoliteFetcher
+from govai_workers.collector.safety import DomainPolicy
 from govai_workers.config import settings
 from govai_workers.logging_setup import get_logger
 from govai_workers.parser.extractors import extract_text
@@ -32,14 +33,53 @@ log = get_logger(__name__)
 
 @dataclass(slots=True)
 class SourceConfig:
-    """Kaynak kaydındaki `configurationJson` alanının tipli hâli."""
+    """Kaynağın tarama planı.
+
+    Faz 2'de plan alanları kaynak kaydında kolonlara taşındı; eski
+    ``configurationJson`` gövdesi geriye uyumluluk için hâlâ okunur.
+
+    ``link_selector`` artık varsayılan olarak ``"a"`` DEĞİLDİR. Eskiden öyleydi ve
+    seçicisi girilmemiş bir kaynak sitedeki bütün bağlantıları (menü, iletişim,
+    hakkımızda) ilan sanıp topluyordu.
+    """
 
     list_url: str = ""
-    link_selector: str = "a"
+    link_selector: str = ""
     title_selector: str = "h1"
     content_selector: str = ""
     url_pattern: str = ""
     max_pages: int = 1
+    allowed_domains: str = ""
+
+    @property
+    def is_crawlable(self) -> bool:
+        """Liste seçicisi veya URL kalıbından en az biri olmadan tarama yapılmaz."""
+        return bool(self.link_selector.strip() or self.url_pattern.strip())
+
+    @classmethod
+    def from_source(cls, source: dict) -> SourceConfig:
+        """Önce kaynak kolonlarından, eksik kalanı eski JSON gövdesinden okur."""
+        legacy = cls.parse(source.get("configurationJson"))
+
+        def pick(column: str, fallback: str) -> str:
+            value = source.get(column)
+            return str(value).strip() if value not in (None, "") else fallback
+
+        raw_max = source.get("maxPages")
+        try:
+            resolved_max = int(raw_max) if raw_max not in (None, "") else legacy.max_pages
+        except (TypeError, ValueError):
+            resolved_max = legacy.max_pages
+
+        return cls(
+            list_url=pick("startUrl", legacy.list_url),
+            link_selector=pick("listSelector", legacy.link_selector),
+            title_selector=pick("titleSelector", legacy.title_selector) or "h1",
+            content_selector=pick("contentSelector", legacy.content_selector),
+            url_pattern=pick("urlPattern", legacy.url_pattern),
+            max_pages=max(1, resolved_max),
+            allowed_domains=pick("allowedDomains", legacy.allowed_domains),
+        )
 
     @classmethod
     def parse(cls, raw: str | None) -> SourceConfig:
@@ -52,13 +92,19 @@ class SourceConfig:
             log.warning("source_config_invalid_json")
             return cls()
 
+        try:
+            max_pages = int(data.get("maxPages", 1))
+        except (TypeError, ValueError):
+            max_pages = 1
+
         return cls(
             list_url=data.get("listUrl", ""),
-            link_selector=data.get("linkSelector", "a"),
+            link_selector=data.get("linkSelector", ""),
             title_selector=data.get("titleSelector", "h1"),
             content_selector=data.get("contentSelector", ""),
             url_pattern=data.get("urlPattern", ""),
-            max_pages=int(data.get("maxPages", 1)),
+            max_pages=max(1, max_pages),
+            allowed_domains=data.get("allowedDomains", ""),
         )
 
 
@@ -81,20 +127,40 @@ class SourceCrawler:
         self._ingest = ingest
 
     def crawl(self, source: dict) -> CrawlResult:
-        config = SourceConfig.parse(source.get("configurationJson"))
+        config = SourceConfig.from_source(source)
         base_url = source["baseUrl"]
-        list_url = urljoin(base_url, config.list_url) if config.list_url else base_url
 
         result = CrawlResult()
+
+        # Yapılandırması olmayan kaynak TARANMAZ. Bu bir performans tercihi değil,
+        # veri kalitesi kuralıdır: seçicisiz tarama siteyi olduğu gibi toplar.
+        if not config.is_crawlable:
+            log.warning("source_not_configured", source=source.get("name"))
+            result.errors.append(
+                "Liste seçicisi veya URL kalıbı tanımlı değil; kaynak taranmadı."
+            )
+            result.skipped += 1
+            return result
+
+        # Tarayıcı bu kaynağın izin verdiği alan adlarının dışına çıkamaz; yönlendirme
+        # sonrası da aynı politika yeniden uygulanır.
+        policy = DomainPolicy.build(base_url, source.get("officialDomain"), config.allowed_domains)
+        self._fetcher.with_policy(policy)
+
+        list_url = urljoin(base_url, config.list_url) if config.list_url else base_url
 
         listing = self._safe_fetch(list_url, result)
         if listing is None:
             return result
 
-        links = self._discover_links(listing, base_url, config)
+        links = self._discover_links(listing, policy, config)
         log.info("links_discovered", source=source["name"], count=len(links))
 
-        for link in links[: settings.crawl_max_pages]:
+        # Kaynağın kendi sınırı ile genel üst sınırın küçüğü uygulanır. Eskiden yalnızca
+        # genel ayar okunuyordu ve kaynağın maxPages değeri hiçbir şey ifade etmiyordu.
+        page_limit = min(config.max_pages, settings.crawl_max_pages)
+
+        for link in links[:page_limit]:
             document = self._safe_fetch(link, result)
             if document is None:
                 result.skipped += 1
@@ -112,6 +178,9 @@ class SourceCrawler:
                     title=title,
                     raw_content=content,
                     media_type=document.media_type,
+                    canonical_url=document.canonical_url,
+                    charset=document.charset,
+                    http_status_code=document.status_code,
                 )
 
                 if response and response.get("contentChanged", True):
@@ -136,13 +205,16 @@ class SourceCrawler:
             return None
 
     @staticmethod
-    def _discover_links(listing: FetchedDocument, base_url: str, config: SourceConfig) -> list[str]:
+    def _discover_links(
+        listing: FetchedDocument, policy: DomainPolicy, config: SourceConfig
+    ) -> list[str]:
         if listing.is_pdf:
-            return [listing.url]
+            return [listing.canonical_url]
 
-        soup = BeautifulSoup(listing.content, "lxml")
+        # Doğru karakter kümesiyle çözülmüş metin verilir; aksi hâlde Türkçe karakterler
+        # bozulur ve başlıklar hatalı çıkar.
+        soup = BeautifulSoup(listing.text(), "lxml")
         pattern = re.compile(config.url_pattern, re.IGNORECASE) if config.url_pattern else None
-        base_host = urlparse(base_url).netloc
 
         links: list[str] = []
         seen: set[str] = set()
@@ -152,10 +224,10 @@ class SourceCrawler:
             if not href or href.startswith(("#", "mailto:", "javascript:")):
                 continue
 
-            absolute = urljoin(listing.url, href)
+            absolute = urljoin(listing.canonical_url, href)
 
-            # Kaynak dışı alan adlarına çıkma; tarayıcı kendi sitesinde kalmalı.
-            if urlparse(absolute).netloc != base_host:
+            # Kaynak dışı alan adlarına çıkma; tarayıcı izin verilen alan adlarında kalmalı.
+            if not policy.allows(absolute):
                 continue
 
             if pattern is not None and not pattern.search(absolute):
@@ -176,7 +248,7 @@ class SourceCrawler:
             title = text.strip().splitlines()[0][:300] if text.strip() else document.url
             return title, text
 
-        soup = BeautifulSoup(document.content, "lxml")
+        soup = BeautifulSoup(document.text(), "lxml")
 
         title_node = soup.select_one(config.title_selector) if config.title_selector else None
         title = (title_node.get_text(strip=True) if title_node else None) or (

@@ -91,7 +91,15 @@ class GovAiClient:
         title: str,
         raw_content: str,
         media_type: str,
+        canonical_url: str | None = None,
+        charset: str | None = None,
+        http_status_code: int = 200,
     ) -> dict[str, Any]:
+        """Belgeyi API'ye bırakır.
+
+        Kanıt alanları (nihai adres, karakter kümesi, HTTP durumu) sunucuda belge
+        sürümüne yazılır; ileride DeepTech motoru kaynak gösterirken bunlara dayanır.
+        """
         return self._request(
             "POST",
             "/api/sources/documents",
@@ -101,6 +109,9 @@ class GovAiClient:
                 "title": title,
                 "rawContent": raw_content,
                 "mediaType": media_type,
+                "canonicalUrl": canonical_url or url,
+                "charset": charset,
+                "httpStatusCode": http_status_code,
             },
         )
 

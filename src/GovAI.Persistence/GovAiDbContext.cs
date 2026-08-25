@@ -6,6 +6,7 @@ using GovAI.Domain.Companies;
 using GovAI.Domain.Identity;
 using GovAI.Domain.Notifications;
 using GovAI.Domain.Opportunities;
+using GovAI.Domain.Regulatory;
 using GovAI.Domain.Sources;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore;
@@ -47,6 +48,9 @@ public class GovAiDbContext(
     public DbSet<CompanyVerificationRequest> CompanyVerificationRequests => Set<CompanyVerificationRequest>();
     public DbSet<Source> Sources => Set<Source>();
     public DbSet<SourceDocument> SourceDocuments => Set<SourceDocument>();
+    public DbSet<SourceDocumentVersion> SourceDocumentVersions => Set<SourceDocumentVersion>();
+    public DbSet<DocumentEvidenceChunk> DocumentEvidenceChunks => Set<DocumentEvidenceChunk>();
+    public DbSet<RegulatoryChange> RegulatoryChanges => Set<RegulatoryChange>();
     public DbSet<Opportunity> Opportunities => Set<Opportunity>();
     public DbSet<EligibilityAssessment> Assessments => Set<EligibilityAssessment>();
     public DbSet<ScenarioSimulation> ScenarioSimulations => Set<ScenarioSimulation>();

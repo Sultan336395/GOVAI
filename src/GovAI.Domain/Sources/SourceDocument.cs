@@ -56,6 +56,71 @@ public class SourceDocument : AggregateRoot, IAuditable
     /// <summary>Aynı ilanın kaçıncı sürümü olduğu; içerik değiştikçe artar.</summary>
     public int Revision { get; private set; } = 1;
 
+    // ── Faz 2: sürüm zinciri ve karantina ─────────────────────────────────
+
+    private readonly List<SourceDocumentVersion> _versions = [];
+
+    /// <summary>
+    /// Belgenin tüm yakalanışları. Bu kayıt kanonik adresin kimliğidir ve içerik
+    /// değiştikçe yerinde güncellenir; geçmiş burada saklanır ve <b>üstüne yazılmaz</b>.
+    /// </summary>
+    public IReadOnlyList<SourceDocumentVersion> Versions => _versions.AsReadOnly();
+
+    /// <summary>Yönlendirmeler sonrası ulaşılan nihai adres.</summary>
+    public string? CanonicalUrl { get; private set; }
+
+    /// <summary>Karantinadaysa nedeni; katalog dışında tutulmasının gerekçesi.</summary>
+    public QuarantineReason QuarantineReason { get; private set; } = QuarantineReason.None;
+
+    public string? QuarantineNote { get; private set; }
+
+    /// <summary>Karantinadaki belge skorlanmaz ve şirketlere fırsat olarak gösterilmez.</summary>
+    public bool IsQuarantined => QuarantineReason != QuarantineReason.None;
+
+    public void SetCanonicalUrl(string? canonicalUrl) =>
+        CanonicalUrl = string.IsNullOrWhiteSpace(canonicalUrl) ? CanonicalUrl : canonicalUrl.Trim();
+
+    /// <summary>
+    /// Bu yakalanışı sürüm zincirine ekler. Sürüm numarası <see cref="Revision"/> ile
+    /// hizalıdır; böylece belge kaydı ile kanıt zinciri aynı sayıyı gösterir.
+    /// </summary>
+    public SourceDocumentVersion AddVersion(
+        string sourceUrl,
+        string canonicalUrl,
+        int httpStatusCode,
+        string mediaType,
+        string? charset,
+        string rawContent,
+        DateTimeOffset retrievedAt)
+    {
+        var version = new SourceDocumentVersion(
+            Id, Revision, sourceUrl, canonicalUrl, httpStatusCode, mediaType, charset, rawContent, retrievedAt);
+
+        _versions.Add(version);
+        return version;
+    }
+
+    /// <summary>
+    /// Karantinaya alır. <b>Silmez</b>: kayıt durur, platform yöneticisi inceleyebilir ve
+    /// istenirse yeniden ayrıştırabilir.
+    /// </summary>
+    public void Quarantine(QuarantineReason reason, string? note = null)
+    {
+        DomainException.ThrowIf(reason == QuarantineReason.None, "Karantina nedeni belirtilmelidir.");
+
+        QuarantineReason = reason;
+        QuarantineNote = note?[..Math.Min(note.Length, 1000)];
+        Status = DocumentProcessingStatus.Discarded;
+    }
+
+    /// <summary>Karantinadan çıkarır ve yeniden ayrıştırma için sıraya döndürür.</summary>
+    public void ReleaseFromQuarantine()
+    {
+        QuarantineReason = QuarantineReason.None;
+        QuarantineNote = null;
+        Status = DocumentProcessingStatus.Raw;
+    }
+
     public DateTimeOffset CreatedAt { get; set; }
     public string? CreatedBy { get; set; }
     public DateTimeOffset? UpdatedAt { get; set; }
