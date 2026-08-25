@@ -6,6 +6,7 @@ using GovAI.Domain.Identity;
 using GovAI.Domain.Notifications;
 using GovAI.Domain.Opportunities;
 using GovAI.Domain.Sources;
+using GovAI.Application.Sources;
 
 namespace GovAI.Application.Abstractions.Persistence;
 
@@ -64,6 +65,37 @@ public interface ISourceRepository
     Task AddAsync(Source source, CancellationToken cancellationToken = default);
 
     void Remove(Source source);
+}
+
+/// <summary>Triyaj için gereken, belgeye ait özet bilgi.</summary>
+public sealed record TriageCandidate(
+    Guid DocumentId,
+    Guid SourceId,
+    string Title,
+    string Url,
+    string ContentHash,
+    int ContentLength,
+    DateTimeOffset CollectedAt,
+    int LinkedAssessmentCount);
+
+/// <summary>
+/// Karantina ekranlarının okuma sorguları.
+///
+/// Ayrı bir arayüzdür çünkü bu sorgular birden çok tabloyu birleştirir ve tek bir
+/// varlığın deposuna ait değildir.
+/// </summary>
+public interface IQuarantineQueryRepository
+{
+    /// <summary>Henüz karantinada olmayan tüm belgeler.</summary>
+    Task<IReadOnlyList<TriageCandidate>> ListTriageCandidatesAsync(CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<QuarantinedDocumentDto>> ListQuarantinedAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Bu belgeye dayanan değerlendirmeleri "yeniden değerlendirilmeli" olarak işaretler.
+    /// Kayıtlar SİLİNMEZ; yalnızca güncelliğini yitirdiği bildirilir.
+    /// </summary>
+    Task<int> MarkAssessmentsForReevaluationAsync(Guid documentId, CancellationToken cancellationToken = default);
 }
 
 public interface ISourceDocumentRepository

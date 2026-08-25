@@ -1,4 +1,5 @@
 using GovAI.Application.Abstractions.Persistence;
+using GovAI.Application.Sources;
 using GovAI.Domain.Common;
 using GovAI.Domain.Companies;
 using GovAI.Domain.Identity;
@@ -154,5 +155,108 @@ public sealed class CrossTenantCompanyLookup(GovAiDbContext context) : ICrossTen
                      && c.TenantId != currentTenantId
                      && !c.IsDeleted,
                 cancellationToken);
+    }
+}
+
+
+/// <summary>
+/// Karantina okuma sorguları.
+///
+/// <b>Kiracı filtresi bilinçli olarak devre dışı bırakılmaz</b>: belgeler ve fırsatlar
+/// ortak kataloğa aittir ve zaten kiracıya bağlı değildir. Değerlendirme sayımı ise
+/// kiracılar arasıdır çünkü karantina kararı bütün müşterileri ilgilendirir; bu yüzden
+/// yalnızca <b>sayı</b> döner, hiçbir kiracının verisi çağırana açılmaz.
+/// </summary>
+public sealed class QuarantineQueryRepository(GovAiDbContext context) : IQuarantineQueryRepository
+{
+    public async Task<IReadOnlyList<TriageCandidate>> ListTriageCandidatesAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var documents = await context.SourceDocuments
+            .Where(d => d.QuarantineReason == QuarantineReason.None)
+            .Select(d => new
+            {
+                d.Id,
+                d.SourceId,
+                d.Title,
+                d.Url,
+                d.ContentHash,
+                Length = d.RawContent.Length,
+                d.CollectedAt,
+            })
+            .ToListAsync(cancellationToken);
+
+        var documentIds = documents.Select(d => d.Id).ToList();
+
+        // Bir belgeden doğan fırsatlara bağlı değerlendirme sayısı.
+        var assessmentCounts = await context.Opportunities
+            .IgnoreQueryFilters()
+            .Where(o => o.SourceDocumentId != null && documentIds.Contains(o.SourceDocumentId!.Value))
+            .Select(o => new
+            {
+                DocumentId = o.SourceDocumentId!.Value,
+                Count = context.Assessments.IgnoreQueryFilters().Count(a => a.OpportunityId == o.Id),
+            })
+            .ToListAsync(cancellationToken);
+
+        var counts = assessmentCounts
+            .GroupBy(x => x.DocumentId)
+            .ToDictionary(g => g.Key, g => g.Sum(x => x.Count));
+
+        return documents
+            .Select(d => new TriageCandidate(
+                d.Id, d.SourceId, d.Title, d.Url, d.ContentHash, d.Length, d.CollectedAt,
+                counts.GetValueOrDefault(d.Id, 0)))
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<QuarantinedDocumentDto>> ListQuarantinedAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var rows = await context.SourceDocuments
+            .Where(d => d.QuarantineReason != QuarantineReason.None)
+            .Join(context.Sources, d => d.SourceId, s => s.Id, (d, s) => new
+            {
+                d.Id, d.Title, d.Url, SourceName = s.Name, d.QuarantineReason,
+                d.QuarantineNote, d.CollectedAt, VersionCount = d.Versions.Count,
+            })
+            .OrderByDescending(x => x.CollectedAt)
+            .ToListAsync(cancellationToken);
+
+        return rows
+            .Select(x => new QuarantinedDocumentDto(
+                x.Id, x.Title, x.Url, x.SourceName, x.QuarantineReason,
+                x.QuarantineNote, x.CollectedAt, x.VersionCount))
+            .ToList();
+    }
+
+    public async Task<int> MarkAssessmentsForReevaluationAsync(
+        Guid documentId,
+        CancellationToken cancellationToken = default)
+    {
+        var opportunityIds = await context.Opportunities
+            .IgnoreQueryFilters()
+            .Where(o => o.SourceDocumentId == documentId)
+            .Select(o => o.Id)
+            .ToListAsync(cancellationToken);
+
+        if (opportunityIds.Count == 0)
+        {
+            return 0;
+        }
+
+        var assessments = await context.Assessments
+            .IgnoreQueryFilters()
+            .Where(a => opportunityIds.Contains(a.OpportunityId) && a.IsLatest)
+            .ToListAsync(cancellationToken);
+
+        foreach (var assessment in assessments)
+        {
+            // Kayıt SİLİNMEZ: yalnızca "en güncel" işareti kalkar, böylece panelde
+            // geçerli sonuç gibi görünmez ve yeniden skorlama beklenir.
+            assessment.Supersede();
+        }
+
+        return assessments.Count;
     }
 }
