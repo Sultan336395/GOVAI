@@ -64,3 +64,6 @@ reports-out/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# TypeScript artimli derleme onbellegi (uretim ciktisi degil)
+*.tsbuildinfo
