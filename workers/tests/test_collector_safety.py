@@ -47,7 +47,8 @@ def _doc(html: str, charset: str | None = "utf-8", url: str = "https://kurum.gov
 
 class TestCharset:
     def test_content_type_charset_ayristirilir(self) -> None:
-        assert _parse_content_type("text/html; charset=windows-1254") == ("text/html", "windows-1254")
+        basligi_coz = _parse_content_type
+        assert basligi_coz("text/html; charset=windows-1254") == ("text/html", "windows-1254")
         assert _parse_content_type("application/pdf") == ("application/pdf", None)
 
     def test_sunucunun_bildirdigi_charset_uygulanir(self) -> None:

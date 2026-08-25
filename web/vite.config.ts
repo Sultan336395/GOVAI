@@ -1,6 +1,7 @@
 import { fileURLToPath, URL } from 'node:url'
 import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vite'
+// `vitest/config`, vite'ın defineConfig'ini `test` alanıyla birlikte dışa aktarır.
+import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
   plugins: [react()],
@@ -22,5 +23,10 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
+  },
+  test: {
+    // Menü kuralları saf TypeScript'tir; DOM ortamı gerekmez.
+    environment: 'node',
+    include: ['src/**/*.test.ts'],
   },
 })

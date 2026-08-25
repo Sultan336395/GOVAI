@@ -125,11 +125,11 @@ Solution dosyası **`GovAI.slnx`**'tir (yeni XML formatı), `.sln` değil.
 
 ```bash
 dotnet build -c Release          # tüm .NET projeleri
-dotnet test                      # 34 test (29 domain + 5 application)
+dotnet test                      # 153 test (29 domain + 5 application + 119 API)
 ```
 
 ```bash
-cd workers && .venv/Scripts/python -m pytest -q      # 12 test
+cd workers && .venv/Scripts/python -m pytest -q      # 53 test
 cd workers && .venv/Scripts/python -m ruff check .   # lint (satır sınırı 100)
 ```
 
@@ -140,10 +140,12 @@ cd workers && python -m venv .venv && .venv/bin/pip install -e ".[dev]"
 ```
 
 ```bash
-cd web && npm ci && npm run lint && npm run typecheck && npm run build
+cd web && npm ci && npm run lint && npm run typecheck && npm run test && npm run build
 ```
 
 `npm run lint` **`--max-warnings 0`** ile çalışır; uyarı da hatadır.
+`npm run test` vitest'i tek seferlik koşturur; şu an yalnızca `navigation.ts`
+(sol menünün rol görünürlüğü) kapsanır — ekran testleri hâlâ yok.
 
 ### EF Core
 
@@ -222,7 +224,6 @@ Bunlar hata değil, bilinçli ertelemedir. Tamamı gerekçesi ve hedef ayıyla
 | E-posta / webhook gönderimi | Bildirim üretiliyor ve kuyruğa bırakılıyor, gerçek adaptör yok |
 | ERP adaptörleri | `/erp-sync` sözleşmesi hazır, Logo/Netsis/SAP tarafı yok |
 | Ağırlık kalibrasyonu | Uzman görüşüne dayalı; gerçek başvuru sonucu verisiyle kalibre edilmedi |
-| Web birim testleri | Yok — API sözleşmesi oturmadan yazmak erken görüldü |
 | Kod bölme | Bundle ~714 KB, tek parça |
 
 `docker compose up` ile servislerin **birlikte** ayağa kalkması 19.08.2026'da denendi ve

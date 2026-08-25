@@ -82,14 +82,17 @@ class TestKanitUretimi:
             assert dilim.strip() == chunk.text.strip()
 
     def test_bos_ve_anlamsiz_parcalar_kaydedilmez(self) -> None:
-        metin = "12345\n\n...\n\n-\n\nA\n\n" + "Bu paragraf kanıt sayılacak kadar uzun ve anlamlıdır."
+        gurultu = "12345\n\n...\n\n-\n\nA\n\n"
+        metin = gurultu + "Bu paragraf kanıt sayılacak kadar uzun ve anlamlıdır."
         chunks = build_chunks(metin)
 
         assert len(chunks) == 1
         assert chunks[0].text.startswith("Bu paragraf")
 
     def test_sayfa_numarasi_korunur(self) -> None:
-        metin = f"Birinci sayfadaki paragraf yeterince uzundur.{PAGE_BREAK}İkinci sayfadaki paragraf da yeterince uzundur."
+        birinci = "Birinci sayfadaki paragraf yeterince uzundur."
+        ikinci = "İkinci sayfadaki paragraf da yeterince uzundur."
+        metin = f"{birinci}{PAGE_BREAK}{ikinci}"
         chunks = build_chunks(metin)
 
         assert [c.page_number for c in chunks] == [1, 2]

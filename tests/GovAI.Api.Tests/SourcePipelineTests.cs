@@ -637,4 +637,122 @@ public sealed class SourcePipelineTests(GovAiApiFactory factory)
         var firsatBasliklari = await QueryAsync(db => db.Opportunities.Select(o => o.Title).ToListAsync());
         Assert.DoesNotContain("Ar-Ge Harcamaları Tebliği", firsatBasliklari);
     }
+
+    // ═══════════════ Karantina inceleme ═══════════════
+
+    [Fact(DisplayName = "Faz2-S. Karantina kararı mevcut değerlendirmeyi günceller, silmez")]
+    public async Task Karantina_assessment_durumunu_gunceller()
+    {
+        var sourceId = await CreateSourceAsync("Değerlendirme Etkisi Testi");
+
+        var belge = await IngestAsync(
+            sourceId, "https://kurum.gov.tr/ilan/etki-1", "Ar-Ge Destek Çağrısı", GercekIcerik);
+
+        var documentId = belge.GetProperty("documentId").GetGuid();
+
+        var firsat = await UpsertOpportunityAsync(sourceId, new
+        {
+            sourceId,
+            sourceDocumentId = documentId,
+            sourceType = "Ministry",
+            supportCategory = "Grant",
+            title = "Ar-Ge Destek Çağrısı",
+            publisher = "Test Kurumu",
+            publishedAt = DateTimeOffset.UtcNow,
+            summary = GercekIcerik,
+            sourceUrl = "https://kurum.gov.tr/ilan/etki-1",
+            deadline = DateTimeOffset.UtcNow.AddDays(45)
+        });
+
+        var opportunityId = firsat.GetProperty("id").GetGuid();
+
+        // Önce skorlanır: elimizde geçerli bir değerlendirme olsun.
+        var rescore = await _tenantAdmin.PostAsync(
+            $"/api/eligibility/companies/{_factory.TenantA.CompanyId}/rescore", null);
+        rescore.EnsureSuccessStatusCode();
+
+        var oncekiSayi = await QueryAsync(db => db.Assessments
+            .IgnoreQueryFilters()
+            .CountAsync(a => a.OpportunityId == opportunityId && a.IsLatest));
+
+        Assert.True(oncekiSayi > 0, "Karantina öncesinde geçerli bir değerlendirme bulunmalı.");
+
+        // İnceleyici kaydı karantinaya alır.
+        var reviewer = await _factory.CreateAuthenticatedClientAsync(
+            GovAiApiFactory.PlatformReviewerEmail);
+
+        var reddet = await reviewer.PostAsJsonAsync(
+            $"/api/quarantine/{documentId}/reject",
+            new { reason = "InvalidSourcePage", note = "Kurumsal menü sayfası." });
+
+        Assert.Equal(HttpStatusCode.NoContent, reddet.StatusCode);
+
+        var sonrakiGecerli = await QueryAsync(db => db.Assessments
+            .IgnoreQueryFilters()
+            .CountAsync(a => a.OpportunityId == opportunityId && a.IsLatest));
+
+        var toplam = await QueryAsync(db => db.Assessments
+            .IgnoreQueryFilters()
+            .CountAsync(a => a.OpportunityId == opportunityId));
+
+        // Değerlendirme SİLİNMEZ; yalnızca "en güncel" işareti kalkar.
+        Assert.Equal(0, sonrakiGecerli);
+        Assert.Equal(oncekiSayi, toplam);
+    }
+
+    [Fact(DisplayName = "Faz2-T. PlatformReviewer karantinayı yönetir, kiracı kullanıcısı yönetemez")]
+    public async Task PlatformReviewer_karantina_yonetebilir()
+    {
+        var sourceId = await CreateSourceAsync("İnceleyici Yetkisi Testi");
+
+        // Gerçek bir ilan kullanılır: rapor modunun hiçbir şeyi değiştirmediği ancak
+        // temiz bir kayıtla gösterilebilir. (Kurumsal menü sayfası zaten ingest sırasında
+        // ön elemeden karantinaya düşer; Faz2-N bunu ayrıca doğruluyor.)
+        var belge = await IngestAsync(
+            sourceId, "https://kurum.gov.tr/ilan/inceleyici-1", "Ar-Ge Destek Çağrısı", GercekIcerik);
+
+        var documentId = belge.GetProperty("documentId").GetGuid();
+
+        var reviewer = await _factory.CreateAuthenticatedClientAsync(
+            GovAiApiFactory.PlatformReviewerEmail);
+
+        // Rapor modu hiçbir şeyi değiştirmez.
+        var rapor = await reviewer.PostAsync("/api/quarantine/triage?apply=false", null);
+        rapor.EnsureSuccessStatusCode();
+
+        var raporGovde = await rapor.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(0, raporGovde.GetProperty("applied").GetInt32());
+
+        var raporSonrasi = await QueryAsync(db => db.SourceDocuments
+            .SingleAsync(d => d.Id == documentId));
+
+        Assert.Equal(QuarantineReason.None, raporSonrasi.QuarantineReason);
+
+        // Karantinaya alma ve geri çıkarma da inceleyicinin yetkisindedir.
+        var reddet = await reviewer.PostAsJsonAsync(
+            $"/api/quarantine/{documentId}/reject",
+            new { reason = "NeedsManualReview", note = "İnceleme bekliyor." });
+
+        var liste = await reviewer.GetAsync("/api/quarantine");
+        var onayla = await reviewer.PostAsync($"/api/quarantine/{documentId}/approve", null);
+
+        Assert.Equal(HttpStatusCode.NoContent, reddet.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, liste.StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, onayla.StatusCode);
+
+        var cikarilan = await QueryAsync(db => db.SourceDocuments
+            .SingleAsync(d => d.Id == documentId));
+
+        Assert.Equal(QuarantineReason.None, cikarilan.QuarantineReason);
+
+        // Kiracı kullanıcısı bu uçların hiçbirine giremez.
+        var kiraciListe = await _tenantAdmin.GetAsync("/api/quarantine");
+        var kiraciTriyaj = await _tenantAdmin.PostAsync("/api/quarantine/triage?apply=true", null);
+        var kiraciReddet = await _tenantAdmin.PostAsJsonAsync(
+            $"/api/quarantine/{documentId}/reject", new { reason = "Duplicate", note = (string?)null });
+
+        Assert.Equal(HttpStatusCode.Forbidden, kiraciListe.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, kiraciTriyaj.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, kiraciReddet.StatusCode);
+    }
 }
