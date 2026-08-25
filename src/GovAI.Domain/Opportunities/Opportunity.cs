@@ -98,6 +98,45 @@ public class Opportunity : AggregateRoot, IAuditable, ISoftDeletable
 
     public void SetBudget(BudgetRange? budget) => Budget = budget;
 
+    // ── Faz 2: veri kalitesi ──────────────────────────────────────────────
+
+    /// <summary>
+    /// Çıkarılamayan alanların kaydı. Eksik değer <b>tahmin edilmez</b>; arayüz boş
+    /// alan yerine "Resmî kaynakta belirtilmemiş" gösterir.
+    /// </summary>
+    public OpportunityFieldAvailability FieldAvailability { get; private set; } =
+        OpportunityFieldAvailability.Unknown;
+
+    /// <summary>Karantinadaysa nedeni. Karantinadaki fırsat skorlanmaz ve gösterilmez.</summary>
+    public QuarantineReason QuarantineReason { get; private set; } = QuarantineReason.None;
+
+    public string? QuarantineNote { get; private set; }
+
+    /// <summary>
+    /// Katalogda gösterilebilir mi? Karantinadaki kayıt eşleşmeye girmez, skorlanmaz,
+    /// bildirim üretmez ve haftalık rapora yazılmaz.
+    /// </summary>
+    public bool IsPublishable => QuarantineReason == QuarantineReason.None;
+
+    public void SetFieldAvailability(OpportunityFieldAvailability availability) =>
+        FieldAvailability = availability;
+
+    /// <summary>Karantinaya alır. Kayıt <b>silinmez</b>; PlatformReviewer inceleyebilir.</summary>
+    public void Quarantine(QuarantineReason reason, string? note = null)
+    {
+        DomainException.ThrowIf(reason == QuarantineReason.None, "Karantina nedeni belirtilmelidir.");
+
+        QuarantineReason = reason;
+        QuarantineNote = note?[..Math.Min(note.Length, 1000)];
+    }
+
+    /// <summary>Karantinadan çıkarır.</summary>
+    public void ReleaseFromQuarantine()
+    {
+        QuarantineReason = QuarantineReason.None;
+        QuarantineNote = null;
+    }
+
     /// <summary>Parser/AI tarafından çıkarılan kural setini değiştirir. Onay bayrağı sıfırlanır.</summary>
     public void ReplaceRules(IEnumerable<OpportunityRule> rules, decimal extractionConfidence)
     {

@@ -1,6 +1,7 @@
 using GovAI.Application.Abstractions.Persistence;
 using GovAI.Application.Abstractions.Services;
 using GovAI.Application.Common;
+using GovAI.Domain.Common;
 using GovAI.Domain.Opportunities;
 using Microsoft.Extensions.Logging;
 
@@ -76,6 +77,19 @@ public sealed class OpportunityService(
         opportunity.ReplaceRules(request.Rules.Select(ToDomain), request.RuleExtractionConfidence);
         opportunity.ReplaceDocumentChecklist(request.DocumentChecklist.Select(ToDomain));
 
+        // Faz 2: bulunamayan alanlar tahmin edilmez, durumları kaydedilir.
+        opportunity.SetFieldAvailability(BuildAvailability(request));
+
+        // Zorunlu veri doğrulaması: asgari alanları taşımayan kayıt kataloğa girmez,
+        // karantinaya alınır ve PlatformReviewer tarafından incelenir.
+        var eksik = MissingMandatoryFields(request);
+        if (eksik.Count > 0)
+        {
+            opportunity.Quarantine(
+                QuarantineReason.MissingRequiredFields,
+                "Eksik zorunlu alan: " + string.Join(", ", eksik));
+        }
+
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation(
@@ -89,6 +103,53 @@ public sealed class OpportunityService(
             cancellationToken);
 
         return ToDetail(opportunity, clock.UtcNow);
+    }
+
+    /// <summary>
+    /// Hangi alanın neden boş olduğunu belirler.
+    ///
+    /// Değer varsa <c>Provided</c>. Yoksa <c>NotProvided</c> — yani "resmî kaynakta
+    /// yazmıyor". Tek istisna sürekli açık çağrılardaki son başvuru tarihidir: orada
+    /// eksik veri yoktur, alan zaten uygulanamaz.
+    /// </summary>
+    private static OpportunityFieldAvailability BuildAvailability(UpsertOpportunityRequest request)
+    {
+        static FieldAvailability State(bool hasValue) =>
+            hasValue ? FieldAvailability.Provided : FieldAvailability.NotProvided;
+
+        var deadline = request.IsContinuouslyOpen
+            ? FieldAvailability.NotApplicable
+            : State(request.Deadline is not null);
+
+        var budgetVar = request.Budget is not null
+            && (request.Budget.MinAmount is not null || request.Budget.MaxAmount is not null);
+
+        return new OpportunityFieldAvailability(
+            deadline,
+            State(budgetVar),
+            State(!string.IsNullOrWhiteSpace(request.Budget?.Currency)),
+            State(!string.IsNullOrWhiteSpace(request.EligibleApplicant)),
+            State(!string.IsNullOrWhiteSpace(request.Geography)),
+            State(!string.IsNullOrWhiteSpace(request.Sector)),
+            State(!string.IsNullOrWhiteSpace(request.ProgrammeType)),
+            State(!string.IsNullOrWhiteSpace(request.OfficialDocumentUrl)));
+    }
+
+    /// <summary>
+    /// Kataloğa girmek için zorunlu asgari alanlar. Bunlar olmadan kayıt bir şirkete
+    /// "şuna başvurabilirsin" demek için yeterli değildir.
+    /// </summary>
+    private static List<string> MissingMandatoryFields(UpsertOpportunityRequest request)
+    {
+        var eksik = new List<string>();
+
+        if (string.IsNullOrWhiteSpace(request.Title)) eksik.Add("başlık");
+        if (string.IsNullOrWhiteSpace(request.SourceUrl)) eksik.Add("kaynak adresi");
+        if (string.IsNullOrWhiteSpace(request.Publisher)) eksik.Add("kaynak kurum");
+        if (string.IsNullOrWhiteSpace(request.Summary)) eksik.Add("içerik");
+        if (request.PublishedAt == default) eksik.Add("yayın tarihi");
+
+        return eksik;
     }
 
     /// <summary>Danışman, otomatik çıkarılan bir kuralı düzeltir. Elle düzeltilen kurallar korunur.</summary>
@@ -173,5 +234,14 @@ public sealed class OpportunityService(
         opportunity.IsReviewedByConsultant,
         opportunity.Rules.Select(r => new OpportunityRuleDto(
             r.Id, r.Field, r.Operator, r.Value, r.Dimension, r.Severity, r.HumanReadable, r.SourceExcerpt, r.Confidence, r.IsManuallyOverridden)).ToList(),
-        opportunity.DocumentChecklist.Select(d => new DocumentRequirementDto(d.Code, d.Name, d.IsMandatory, d.IssuingAuthority, d.Notes)).ToList());
+        opportunity.DocumentChecklist.Select(d => new DocumentRequirementDto(d.Code, d.Name, d.IsMandatory, d.IssuingAuthority, d.Notes)).ToList(),
+        new FieldAvailabilityDto(
+            opportunity.FieldAvailability.Deadline.ToString(),
+            opportunity.FieldAvailability.Budget.ToString(),
+            opportunity.FieldAvailability.Currency.ToString(),
+            opportunity.FieldAvailability.EligibleApplicant.ToString(),
+            opportunity.FieldAvailability.Geography.ToString(),
+            opportunity.FieldAvailability.Sector.ToString(),
+            opportunity.FieldAvailability.ProgrammeType.ToString(),
+            opportunity.FieldAvailability.OfficialDocumentUrl.ToString()));
 }

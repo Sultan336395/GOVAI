@@ -13,6 +13,9 @@ public sealed class OpportunityConfiguration : IEntityTypeConfiguration<Opportun
         builder.HasKey(o => o.Id);
         builder.Ignore(o => o.DomainEvents);
 
+        // Faz 2: alan durumu ve karantina kolonları.
+        OpportunityFieldAvailabilityConfiguration.Apply(builder);
+
         builder.Property(o => o.Title).HasMaxLength(600).IsRequired();
         builder.Property(o => o.Publisher).HasMaxLength(300).IsRequired();
         builder.Property(o => o.Summary).HasMaxLength(4000);
@@ -90,6 +93,35 @@ public sealed class DocumentRequirementConfiguration : IEntityTypeConfiguration<
         builder.Property(d => d.Notes).HasMaxLength(2000);
 
         builder.HasIndex(d => d.OpportunityId);
+    }
+}
+
+public sealed partial class OpportunityFieldAvailabilityConfiguration
+{
+    /// <summary>
+    /// Alan durumu kolonları. Sekiz alanın her biri ayrı kolonda tutulur; jsonb yerine
+    /// kolon seçilmesinin sebebi katalog sorgularının bu alanlara göre filtrelenmesi.
+    /// </summary>
+    public static void Apply(EntityTypeBuilder<Opportunity> builder)
+    {
+        builder.OwnsOne(o => o.FieldAvailability, fa =>
+        {
+            fa.Property(x => x.Deadline).HasColumnName("availability_deadline").HasConversion<int>();
+            fa.Property(x => x.Budget).HasColumnName("availability_budget").HasConversion<int>();
+            fa.Property(x => x.Currency).HasColumnName("availability_currency").HasConversion<int>();
+            fa.Property(x => x.EligibleApplicant).HasColumnName("availability_eligible_applicant").HasConversion<int>();
+            fa.Property(x => x.Geography).HasColumnName("availability_geography").HasConversion<int>();
+            fa.Property(x => x.Sector).HasColumnName("availability_sector").HasConversion<int>();
+            fa.Property(x => x.ProgrammeType).HasColumnName("availability_programme_type").HasConversion<int>();
+            fa.Property(x => x.OfficialDocumentUrl).HasColumnName("availability_official_document_url").HasConversion<int>();
+        });
+
+        // Tüm alanları null olan sahipli referansı EF "yok" sayar; IsRequired bunu önler.
+        builder.Navigation(o => o.FieldAvailability).IsRequired();
+
+        builder.Property(o => o.QuarantineReason).HasConversion<int>();
+        builder.Property(o => o.QuarantineNote).HasMaxLength(1000);
+        builder.HasIndex(o => o.QuarantineReason).HasDatabaseName("ix_opportunities_quarantine");
     }
 }
 

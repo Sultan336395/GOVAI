@@ -57,6 +57,9 @@ public sealed class OpportunityRepository(GovAiDbContext context) : IOpportunity
         var query = context.Opportunities
             .Include(o => o.Rules)
             .Include(o => o.DocumentChecklist)
+            // Karantinadaki kayıt SKORLANMAZ: eşleşmeye girmez, bildirim üretmez ve
+            // haftalık rapora yazılmaz (Faz 2 veri kalitesi kuralı).
+            .Where(o => o.QuarantineReason == QuarantineReason.None)
             .Where(o => o.Deadline == null || o.Deadline >= asOf);
 
         if (categories is { Count: > 0 })
@@ -74,6 +77,8 @@ public sealed class OpportunityRepository(GovAiDbContext context) : IOpportunity
         var source = context.Opportunities
             .Include(o => o.Rules)
             .Include(o => o.DocumentChecklist)
+            // Karantinadaki kayıt fırsat kataloğunda GÖRÜNMEZ.
+            .Where(o => o.QuarantineReason == QuarantineReason.None)
             .AsQueryable();
 
         if (query.OnlyOpen)

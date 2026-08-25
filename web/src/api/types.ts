@@ -187,6 +187,20 @@ export interface OpportunitySummary {
   documentCount: number
 }
 
+/** Bir alanın neden boş olduğu (Faz 2). C# karşılığı: FieldAvailabilityDto. */
+export interface FieldAvailability {
+  deadline: FieldAvailabilityState
+  budget: FieldAvailabilityState
+  currency: FieldAvailabilityState
+  eligibleApplicant: FieldAvailabilityState
+  geography: FieldAvailabilityState
+  sector: FieldAvailabilityState
+  programmeType: FieldAvailabilityState
+  officialDocumentUrl: FieldAvailabilityState
+}
+
+export type FieldAvailabilityState = 'Provided' | 'NotProvided' | 'NotApplicable'
+
 export interface OpportunityMatch {
   assessmentId: string
   opportunityId: string

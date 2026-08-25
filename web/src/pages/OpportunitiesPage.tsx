@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { api } from '@/api/client'
 import { EmptyState, ErrorBox, Loading } from '@/components/Common'
-import { categoryLabels, formatCurrency, formatDate, formatDeadline } from '@/lib/format'
+import { NOT_PROVIDED_LABEL, categoryLabels, formatCurrency, formatDate, formatDeadline } from '@/lib/format'
 
 export default function OpportunitiesPage() {
   const [search, setSearch] = useState('')
@@ -80,12 +80,26 @@ export default function OpportunitiesPage() {
                     <td>{categoryLabels[opportunity.supportCategory]}</td>
                     <td>{formatDate(opportunity.publishedAt)}</td>
                     <td>
-                      {formatDate(opportunity.deadline)}
-                      <div className="muted" style={{ fontSize: 12 }}>
-                        {formatDeadline(opportunity.daysUntilDeadline)}
-                      </div>
+                      {opportunity.deadline ? (
+                        <>
+                          {formatDate(opportunity.deadline)}
+                          <div className="muted" style={{ fontSize: 12 }}>
+                            {formatDeadline(opportunity.daysUntilDeadline)}
+                          </div>
+                        </>
+                      ) : (
+                        // Boş bırakmak "son başvuru yok" demektir; gerçek çoğu zaman
+                        // "resmî kaynakta yazmıyor"dur (Faz 2 veri kalitesi).
+                        <span className="muted">{NOT_PROVIDED_LABEL}</span>
+                      )}
                     </td>
-                    <td>{formatCurrency(opportunity.maxAmount)}</td>
+                    <td>
+                      {opportunity.maxAmount !== null ? (
+                        formatCurrency(opportunity.maxAmount)
+                      ) : (
+                        <span className="muted">{NOT_PROVIDED_LABEL}</span>
+                      )}
+                    </td>
                     <td>
                       {opportunity.ruleCount} / {opportunity.documentCount}
                     </td>

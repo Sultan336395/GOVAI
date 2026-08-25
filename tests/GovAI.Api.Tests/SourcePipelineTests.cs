@@ -346,6 +346,184 @@ public sealed class SourcePipelineTests(GovAiApiFactory factory)
         Assert.Equal("NeedsManualReview", sonuc.GetProperty("quarantine").GetString());
     }
 
+    // ═══════════════ Veri kalitesi: NotProvided ═══════════════
+
+    private async Task<JsonElement> UpsertOpportunityAsync(Guid sourceId, object payload)
+    {
+        var response = await _ingest.PostAsJsonAsync("/api/opportunities", payload);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<JsonElement>();
+    }
+
+    [Fact(DisplayName = "Faz2-M. Bulunamayan alanlar NotProvided olur, tahmin edilmez")]
+    public async Task Bulunamayan_alanlar_notprovided_olur()
+    {
+        var sourceId = await CreateSourceAsync("Eksik Alan Fırsatı");
+
+        var sonuc = await UpsertOpportunityAsync(sourceId, new
+        {
+            sourceId,
+            sourceType = "Ministry",
+            supportCategory = "Grant",
+            title = "Yalnızca başlığı olan çağrı",
+            publisher = "Test Kurumu",
+            publishedAt = DateTimeOffset.UtcNow,
+            summary = GercekIcerik,
+            sourceUrl = "https://kurum.gov.tr/cagri/eksik"
+            // deadline, budget, eligibleApplicant, geography, sector,
+            // programmeType, officialDocumentUrl BİLEREK verilmedi.
+        });
+
+        var availability = sonuc.GetProperty("fieldAvailability");
+
+        Assert.Equal("NotProvided", availability.GetProperty("deadline").GetString());
+        Assert.Equal("NotProvided", availability.GetProperty("budget").GetString());
+        Assert.Equal("NotProvided", availability.GetProperty("currency").GetString());
+        Assert.Equal("NotProvided", availability.GetProperty("eligibleApplicant").GetString());
+        Assert.Equal("NotProvided", availability.GetProperty("geography").GetString());
+        Assert.Equal("NotProvided", availability.GetProperty("sector").GetString());
+        Assert.Equal("NotProvided", availability.GetProperty("programmeType").GetString());
+        Assert.Equal("NotProvided", availability.GetProperty("officialDocumentUrl").GetString());
+
+        // Değerler UYDURULMAZ. API null alanları hiç yazmaz (WhenWritingNull), bu yüzden
+        // alan ya yoktur ya da null'dır; ikisi de "değer üretilmedi" demektir.
+        Assert.True(!sonuc.TryGetProperty("deadline", out var dl) || dl.ValueKind == JsonValueKind.Null);
+        Assert.True(!sonuc.TryGetProperty("budget", out var bt) || bt.ValueKind == JsonValueKind.Null);
+    }
+
+    [Fact(DisplayName = "Faz2-N. Çıkarılan alanlar Provided olur")]
+    public async Task Cikarilan_alanlar_provided_olur()
+    {
+        var sourceId = await CreateSourceAsync("Dolu Alan Fırsatı");
+
+        var sonuc = await UpsertOpportunityAsync(sourceId, new
+        {
+            sourceId,
+            sourceType = "Ministry",
+            supportCategory = "Grant",
+            title = "Tam künyeli çağrı",
+            publisher = "Test Kurumu",
+            publishedAt = DateTimeOffset.UtcNow,
+            summary = GercekIcerik,
+            sourceUrl = "https://kurum.gov.tr/cagri/tam",
+            deadline = DateTimeOffset.UtcNow.AddDays(45),
+            budget = new { minAmount = 100_000m, maxAmount = 1_000_000m, currency = "TRY", supportRate = 0.6m },
+            eligibleApplicant = "KOBİ",
+            geography = "TR62",
+            sector = "Makine imalatı",
+            programmeType = "KOBİGEL",
+            officialDocumentUrl = "https://kurum.gov.tr/cagri/tam/belge.pdf"
+        });
+
+        var availability = sonuc.GetProperty("fieldAvailability");
+
+        foreach (var alan in new[]
+                 {
+                     "deadline", "budget", "currency", "eligibleApplicant",
+                     "geography", "sector", "programmeType", "officialDocumentUrl"
+                 })
+        {
+            Assert.Equal("Provided", availability.GetProperty(alan).GetString());
+        }
+    }
+
+    [Fact(DisplayName = "Faz2-O. Sürekli açık çağrıda son başvuru NotApplicable olur")]
+    public async Task Surekli_acik_cagri_notapplicable_olur()
+    {
+        var sourceId = await CreateSourceAsync("Sürekli Açık Çağrı");
+
+        var sonuc = await UpsertOpportunityAsync(sourceId, new
+        {
+            sourceId,
+            sourceType = "Ministry",
+            supportCategory = "Grant",
+            title = "Sürekli açık çağrı",
+            publisher = "Test Kurumu",
+            publishedAt = DateTimeOffset.UtcNow,
+            summary = GercekIcerik,
+            sourceUrl = "https://kurum.gov.tr/cagri/surekli",
+            isContinuouslyOpen = true
+        });
+
+        // "Eksik veri" ile "uygulanamaz" AYRI şeylerdir.
+        Assert.Equal("NotApplicable", sonuc.GetProperty("fieldAvailability").GetProperty("deadline").GetString());
+        Assert.Equal("NotProvided", sonuc.GetProperty("fieldAvailability").GetProperty("budget").GetString());
+    }
+
+    [Fact(DisplayName = "Faz2-P. Zorunlu alanı eksik fırsat karantinaya gider ve katalogda görünmez")]
+    public async Task Zorunlu_alani_eksik_firsat_karantinaya_gider()
+    {
+        var sourceId = await CreateSourceAsync("Zorunlu Alan Testi");
+
+        var sonuc = await UpsertOpportunityAsync(sourceId, new
+        {
+            sourceId,
+            sourceType = "Ministry",
+            supportCategory = "Grant",
+            title = "İçeriksiz kayıt",
+            publisher = "Test Kurumu",
+            publishedAt = DateTimeOffset.UtcNow
+            // summary ve sourceUrl YOK → zorunlu alan eksik.
+        });
+
+        var opportunityId = sonuc.GetProperty("id").GetGuid();
+
+        var opportunity = await QueryAsync(db => db.Opportunities
+            .IgnoreQueryFilters()
+            .SingleAsync(o => o.Id == opportunityId));
+
+        Assert.Equal(QuarantineReason.MissingRequiredFields, opportunity.QuarantineReason);
+        Assert.Contains("içerik", opportunity.QuarantineNote!, StringComparison.Ordinal);
+
+        // Katalogda GÖRÜNMEZ.
+        var katalog = await _tenantAdmin.GetFromJsonAsync<JsonElement>("/api/opportunities?pageSize=100");
+        var basliklar = katalog.GetProperty("items").EnumerateArray()
+            .Select(x => x.GetProperty("title").GetString()).ToList();
+
+        Assert.DoesNotContain("İçeriksiz kayıt", basliklar);
+    }
+
+    [Fact(DisplayName = "Faz2-R. Karantinadaki fırsat skorlanmaz")]
+    public async Task Karantinadaki_firsat_skorlanmaz()
+    {
+        var sourceId = await CreateSourceAsync("Skorlama Karantina Testi");
+
+        var sonuc = await UpsertOpportunityAsync(sourceId, new
+        {
+            sourceId,
+            sourceType = "Ministry",
+            supportCategory = "Grant",
+            title = "Karantinaya alınacak çağrı",
+            publisher = "Test Kurumu",
+            publishedAt = DateTimeOffset.UtcNow,
+            summary = GercekIcerik,
+            sourceUrl = "https://kurum.gov.tr/cagri/karantina",
+            deadline = DateTimeOffset.UtcNow.AddDays(30)
+        });
+
+        var opportunityId = sonuc.GetProperty("id").GetGuid();
+
+        await QueryAsync(async db =>
+        {
+            var o = await db.Opportunities.SingleAsync(x => x.Id == opportunityId);
+            o.Quarantine(QuarantineReason.InvalidSourcePage, "Menü sayfası.");
+            await db.SaveChangesAsync();
+            return true;
+        });
+
+        // Yeniden skorlama çalıştırılır; karantinadaki çağrı değerlendirmeye GİRMEZ.
+        var rescore = await _tenantAdmin.PostAsync(
+            $"/api/eligibility/companies/{_factory.TenantA.CompanyId}/rescore", null);
+
+        rescore.EnsureSuccessStatusCode();
+
+        var degerlendirmeVarMi = await QueryAsync(db => db.Assessments
+            .IgnoreQueryFilters()
+            .AnyAsync(a => a.OpportunityId == opportunityId));
+
+        Assert.False(degerlendirmeVarMi, "Karantinadaki fırsat skorlanmamalı.");
+    }
+
     // ═══════════════ Yetki ═══════════════
 
     [Fact(DisplayName = "Faz2-I. Kiracı kullanıcısı kaynak yapılandırmasını değiştiremez")]

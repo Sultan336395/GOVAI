@@ -58,3 +58,31 @@ export function formatDeadline(days: number | null): string {
   if (days === 1) return 'Yarın son gün'
   return `${days} gün kaldı`
 }
+
+/**
+ * Faz 2 – veri kalitesi gösterimi.
+ *
+ * Boş bir alanı boş bırakmak, kullanıcıya "bu çağrının son başvuru tarihi yok" demekle
+ * aynı şeydir. Oysa gerçek çoğu zaman "resmî kaynakta yazmıyor"dur. İkisi ayrı gösterilir.
+ */
+export const NOT_PROVIDED_LABEL = 'Resmî kaynakta belirtilmemiş'
+export const NOT_APPLICABLE_LABEL = 'Bu çağrı için geçerli değil'
+
+export type FieldAvailabilityState = 'Provided' | 'NotProvided' | 'NotApplicable'
+
+/**
+ * Bir alanı gösterime hazırlar: değer varsa biçimlendirir, yoksa nedenini yazar.
+ * `null`, boş dize veya `undefined` hiçbir zaman doğrudan ekrana çıkmaz.
+ */
+export function displayField(
+  value: string | number | null | undefined,
+  availability?: FieldAvailabilityState,
+): string {
+  if (value !== null && value !== undefined && String(value).trim() !== '') {
+    return String(value)
+  }
+
+  if (availability === 'NotApplicable') return NOT_APPLICABLE_LABEL
+
+  return NOT_PROVIDED_LABEL
+}
