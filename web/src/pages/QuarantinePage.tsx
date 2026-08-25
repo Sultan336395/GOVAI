@@ -28,7 +28,7 @@ export default function QuarantinePage() {
       setReport(result)
       setNotice(
         apply
-          ? `${result.applied} kayıt karantinaya alındı; ${result.affectedAssessments} değerlendirme yeniden değerlendirilmek üzere işaretlendi.`
+          ? `${result.applied} belge karantinaya alındı, ${result.affectedOpportunities} fırsat katalogdan çıkarıldı; ${result.affectedAssessments} değerlendirme yeniden değerlendirilmek üzere işaretlendi.`
           : `${result.reviewed} kayıt incelendi, ${result.flagged} tanesi işaretlendi. Hiçbir şey değiştirilmedi.`,
       )
       if (apply) await queryClient.invalidateQueries({ queryKey: ['quarantine'] })

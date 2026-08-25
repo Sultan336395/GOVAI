@@ -698,6 +698,33 @@ public sealed class SourcePipelineTests(GovAiApiFactory factory)
         // Değerlendirme SİLİNMEZ; yalnızca "en güncel" işareti kalkar.
         Assert.Equal(0, sonrakiGecerli);
         Assert.Equal(oncekiSayi, toplam);
+
+        // Belge karantinaya girdiyse ondan türeyen fırsat da katalogdan çıkar;
+        // yoksa kayıt "karantinada" görünüp müşteriye gösterilmeye devam ederdi.
+        var firsatDurumu = await QueryAsync(db => db.Opportunities
+            .IgnoreQueryFilters()
+            .SingleAsync(o => o.Id == opportunityId));
+
+        Assert.Equal(QuarantineReason.InvalidSourcePage, firsatDurumu.QuarantineReason);
+
+        var katalog = await _tenantAdmin.GetFromJsonAsync<JsonElement>("/api/opportunities?pageSize=200");
+        var basliklar = katalog.GetProperty("items").EnumerateArray()
+            .Select(x => x.GetProperty("id").GetGuid()).ToList();
+
+        Assert.DoesNotContain(opportunityId, basliklar);
+
+        // Karantinadan çıkarılınca kayıt katalogdaki yerine döner.
+        var reviewerClient = await _factory.CreateAuthenticatedClientAsync(
+            GovAiApiFactory.PlatformReviewerEmail);
+
+        var geriAl = await reviewerClient.PostAsync($"/api/quarantine/{documentId}/approve", null);
+        geriAl.EnsureSuccessStatusCode();
+
+        var geriDonen = await QueryAsync(db => db.Opportunities
+            .IgnoreQueryFilters()
+            .SingleAsync(o => o.Id == opportunityId));
+
+        Assert.Equal(QuarantineReason.None, geriDonen.QuarantineReason);
     }
 
     [Fact(DisplayName = "Faz2-T. PlatformReviewer karantinayı yönetir, kiracı kullanıcısı yönetemez")]

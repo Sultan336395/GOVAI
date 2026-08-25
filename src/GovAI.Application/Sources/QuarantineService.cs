@@ -24,6 +24,7 @@ public sealed record TriageReport(
     int Clean,
     int Flagged,
     int Applied,
+    int AffectedOpportunities,
     int AffectedAssessments,
     IReadOnlyList<TriageRow> Rows);
 
@@ -111,6 +112,7 @@ public sealed class QuarantineService(
         var seenHashes = new Dictionary<string, Guid>();
         var applied = 0;
         var affectedAssessments = 0;
+        var affectedOpportunities = 0;
 
         foreach (var candidate in candidates.OrderBy(c => c.CollectedAt))
         {
@@ -150,6 +152,11 @@ public sealed class QuarantineService(
             document.Quarantine(reason, evidence);
             applied++;
 
+            // Belgeyi karantinaya alıp ondan türeyen fırsatı bırakmak kaydı katalogda
+            // görünür bırakırdı; karantinanın tek anlamı katalogdan ve skorlamadan çıkmaktır.
+            affectedOpportunities += await query.QuarantineOpportunitiesForDocumentAsync(
+                candidate.DocumentId, reason, evidence, cancellationToken);
+
             // Bu kayda dayanan değerlendirmeler SESSİZCE SİLİNMEZ; yeniden
             // değerlendirilmesi gerektiği işaretlenir ve sayısı raporlanır.
             affectedAssessments += await query.MarkAssessmentsForReevaluationAsync(
@@ -161,8 +168,9 @@ public sealed class QuarantineService(
             await unitOfWork.SaveChangesAsync(cancellationToken);
 
             logger.LogInformation(
-                "Karantina triyajı uygulandı. Kayıt={Applied} EtkilenenDeğerlendirme={Assessments}",
-                applied, affectedAssessments);
+                "Karantina triyajı uygulandı. Kayıt={Applied} Fırsat={Opportunities} "
+                + "EtkilenenDeğerlendirme={Assessments}",
+                applied, affectedOpportunities, affectedAssessments);
         }
 
         return new TriageReport(
@@ -170,6 +178,7 @@ public sealed class QuarantineService(
             Clean: candidates.Count - rows.Count,
             Flagged: rows.Count,
             Applied: applied,
+            AffectedOpportunities: affectedOpportunities,
             AffectedAssessments: affectedAssessments,
             Rows: rows);
     }
@@ -186,9 +195,15 @@ public sealed class QuarantineService(
             ?? throw new NotFoundException("Doküman", documentId);
 
         document.ReleaseFromQuarantine();
+
+        // Belge katalogdaki yerine dönüyorsa ondan türeyen fırsat da dönmelidir.
+        var released = await query.ReleaseOpportunitiesForDocumentAsync(documentId, cancellationToken);
+
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        logger.LogInformation("Kayıt karantinadan çıkarıldı. DocumentId={DocumentId}", documentId);
+        logger.LogInformation(
+            "Kayıt karantinadan çıkarıldı. DocumentId={DocumentId} Fırsat={Released}",
+            documentId, released);
     }
 
     /// <summary>Kaydı elle karantinaya alır (inceleme sonucu).</summary>
@@ -202,12 +217,17 @@ public sealed class QuarantineService(
             ?? throw new NotFoundException("Doküman", documentId);
 
         document.Quarantine(reason, note);
+
+        var quarantined = await query.QuarantineOpportunitiesForDocumentAsync(
+            documentId, reason, note, cancellationToken);
+
         var affected = await query.MarkAssessmentsForReevaluationAsync(documentId, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation(
-            "Kayıt karantinaya alındı. DocumentId={DocumentId} Neden={Reason} Değerlendirme={Affected}",
-            documentId, reason, affected);
+            "Kayıt karantinaya alındı. DocumentId={DocumentId} Neden={Reason} "
+            + "Fırsat={Quarantined} Değerlendirme={Affected}",
+            documentId, reason, quarantined, affected);
     }
 
     /// <summary>

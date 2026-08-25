@@ -261,6 +261,46 @@ public sealed class QuarantineQueryRepository(GovAiDbContext context) : IQuarant
 
         return assessments.Count;
     }
+
+    public async Task<int> QuarantineOpportunitiesForDocumentAsync(
+        Guid documentId,
+        QuarantineReason reason,
+        string? note,
+        CancellationToken cancellationToken = default)
+    {
+        // Ortak katalog kiracıdan bağımsızdır; global filtre burada kasıtlı olarak
+        // devre dışı bırakılır (izinli istisna, bkz. CLAUDE.md).
+        var opportunities = await context.Opportunities
+            .IgnoreQueryFilters()
+            .Where(o => o.SourceDocumentId == documentId
+                && o.QuarantineReason == QuarantineReason.None)
+            .ToListAsync(cancellationToken);
+
+        foreach (var opportunity in opportunities)
+        {
+            opportunity.Quarantine(reason, note);
+        }
+
+        return opportunities.Count;
+    }
+
+    public async Task<int> ReleaseOpportunitiesForDocumentAsync(
+        Guid documentId,
+        CancellationToken cancellationToken = default)
+    {
+        var opportunities = await context.Opportunities
+            .IgnoreQueryFilters()
+            .Where(o => o.SourceDocumentId == documentId
+                && o.QuarantineReason != QuarantineReason.None)
+            .ToListAsync(cancellationToken);
+
+        foreach (var opportunity in opportunities)
+        {
+            opportunity.ReleaseFromQuarantine();
+        }
+
+        return opportunities.Count;
+    }
 }
 
 

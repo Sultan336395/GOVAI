@@ -657,6 +657,7 @@ export interface TriageReport {
   clean: number
   flagged: number
   applied: number
+  affectedOpportunities: number
   affectedAssessments: number
   rows: TriageRow[]
 }

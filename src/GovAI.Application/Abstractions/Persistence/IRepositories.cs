@@ -98,6 +98,23 @@ public interface IQuarantineQueryRepository
     /// Kayıtlar SİLİNMEZ; yalnızca güncelliğini yitirdiği bildirilir.
     /// </summary>
     Task<int> MarkAssessmentsForReevaluationAsync(Guid documentId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Belgeden türetilmiş fırsatları da karantinaya alır.
+    ///
+    /// Belgeyi karantinaya alıp fırsatı bırakmak kaydı katalogda görünür bırakırdı;
+    /// karantinanın tek anlamı katalogdan ve skorlamadan çıkmaktır.
+    /// </summary>
+    Task<int> QuarantineOpportunitiesForDocumentAsync(
+        Guid documentId,
+        QuarantineReason reason,
+        string? note,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Belge karantinadan çıkınca türev fırsatlar da katalogdaki yerine döner.</summary>
+    Task<int> ReleaseOpportunitiesForDocumentAsync(
+        Guid documentId,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>Mevzuat kayıtlarının deposu (ortak katalog; kiracıya bağlı değildir).</summary>
