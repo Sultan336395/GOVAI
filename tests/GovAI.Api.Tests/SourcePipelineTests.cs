@@ -1,0 +1,380 @@
+using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
+using GovAI.Domain.Common;
+using GovAI.Domain.Sources;
+using GovAI.Persistence;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace GovAI.Api.Tests;
+
+/// <summary>
+/// Faz 2 – resmî belge hattının veri garantileri.
+///
+/// Tümü gerçek HTTP hattı üzerinden koşar. Canlı web sayfasına bağımlılık yoktur:
+/// belgeler ingest ucundan verilir, böylece CI resmî kurum sitelerine erişmek zorunda
+/// kalmaz ve o siteler gereksiz yüklenmez.
+/// </summary>
+public sealed class SourcePipelineTests(GovAiApiFactory factory)
+    : IClassFixture<GovAiApiFactory>, IAsyncLifetime
+{
+    private readonly GovAiApiFactory _factory = factory;
+
+    private HttpClient _ingest = null!;    // SystemIngest — worker kimliği
+    private HttpClient _catalog = null!;   // PlatformCatalogManager
+    private HttpClient _tenantAdmin = null!; // kiracı yöneticisi
+
+    public async Task InitializeAsync()
+    {
+        await _factory.SeedAsync();
+
+        _ingest = await _factory.CreateAuthenticatedClientAsync(GovAiApiFactory.SystemIngestEmail);
+        _catalog = await _factory.CreateAuthenticatedClientAsync(GovAiApiFactory.PlatformCatalogEmail);
+        _tenantAdmin = await _factory.CreateAuthenticatedClientAsync(_factory.TenantA);
+    }
+
+    public Task DisposeAsync() => Task.CompletedTask;
+
+    /// <summary>Testin kendi kaynağını açar; başka testlerin belgeleriyle karışmasın.</summary>
+    private async Task<Guid> CreateSourceAsync(string name)
+    {
+        var response = await _catalog.PostAsJsonAsync("/api/sources", new
+        {
+            name,
+            type = "Ministry",
+            baseUrl = "https://kurum.gov.tr",
+            cronExpression = "0 6 * * *",
+            configurationJson = "{\"linkSelector\":\"a.ilan\"}"
+        });
+
+        response.EnsureSuccessStatusCode();
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        return body.GetProperty("id").GetGuid();
+    }
+
+    private async Task<JsonElement> IngestAsync(
+        Guid sourceId,
+        string url,
+        string title,
+        string content,
+        string? charset = "utf-8")
+    {
+        var response = await _ingest.PostAsJsonAsync("/api/sources/documents", new
+        {
+            sourceId,
+            url,
+            title,
+            rawContent = content,
+            mediaType = "text/html",
+            canonicalUrl = url,
+            charset,
+            httpStatusCode = 200
+        });
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<JsonElement>();
+    }
+
+    private async Task<T> QueryAsync<T>(Func<GovAiDbContext, Task<T>> query)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<GovAiDbContext>();
+        return await query(db);
+    }
+
+    private const string GercekIcerik =
+        "Şirketlerin Ar-Ge harcamalarına ilişkin usul ve esaslar hakkında tebliğ. " +
+        "Bu tebliğ, 5746 sayılı Kanun kapsamında yapılan harcamaların belgelendirilmesine " +
+        "ve indirim olarak dikkate alınmasına ilişkin uygulama esaslarını düzenler. " +
+        "Yürürlük tarihi yayımı izleyen ayın ilk günüdür ve geriye dönük uygulanmaz.";
+
+    // ═══════════════ Tekrar kaydetme ve sürümleme ═══════════════
+
+    [Fact(DisplayName = "Faz2-A. Aynı URL ve aynı içerik ikinci kez kaydedilmez")]
+    public async Task Ayni_url_ve_icerik_tekrar_kaydedilmez()
+    {
+        var sourceId = await CreateSourceAsync("Tekrar Testi");
+        const string url = "https://kurum.gov.tr/ilan/tekrar-1";
+
+        var ilk = await IngestAsync(sourceId, url, "Ar-Ge Tebliği", GercekIcerik);
+        var ikinci = await IngestAsync(sourceId, url, "Ar-Ge Tebliği", GercekIcerik);
+
+        Assert.True(ilk.GetProperty("isNew").GetBoolean());
+        Assert.False(ikinci.GetProperty("isNew").GetBoolean());
+        Assert.False(ikinci.GetProperty("contentChanged").GetBoolean());
+
+        // Aynı içerik ikinci bir sürüm açmaz.
+        Assert.Equal(1, ilk.GetProperty("revision").GetInt32());
+        Assert.Equal(1, ikinci.GetProperty("revision").GetInt32());
+
+        var documentId = ilk.GetProperty("documentId").GetGuid();
+        var versiyonSayisi = await QueryAsync(db =>
+            db.SourceDocumentVersions.CountAsync(v => v.SourceDocumentId == documentId));
+
+        Assert.Equal(1, versiyonSayisi);
+    }
+
+    [Fact(DisplayName = "Faz2-B. İçerik değişince yeni belge sürümü oluşur ve eskisi durur")]
+    public async Task Icerik_degisince_yeni_surum_olusur()
+    {
+        var sourceId = await CreateSourceAsync("Sürüm Testi");
+        const string url = "https://kurum.gov.tr/ilan/surum-1";
+
+        var ilk = await IngestAsync(sourceId, url, "Tebliğ", GercekIcerik);
+        var ikinci = await IngestAsync(
+            sourceId, url, "Tebliğ (değişik)", GercekIcerik + " Ek madde: geçici 2. madde eklenmiştir.");
+
+        Assert.True(ikinci.GetProperty("contentChanged").GetBoolean());
+        Assert.Equal(2, ikinci.GetProperty("revision").GetInt32());
+
+        var documentId = ilk.GetProperty("documentId").GetGuid();
+
+        var versiyonlar = await QueryAsync(db => db.SourceDocumentVersions
+            .Where(v => v.SourceDocumentId == documentId)
+            .OrderBy(v => v.VersionNumber)
+            .ToListAsync());
+
+        // İki ayrı sürüm; eskisinin üstüne YAZILMAZ.
+        Assert.Equal(2, versiyonlar.Count);
+        Assert.Equal([1, 2], versiyonlar.Select(v => v.VersionNumber));
+        Assert.NotEqual(versiyonlar[0].RawContentHash, versiyonlar[1].RawContentHash);
+
+        // Eski sürümün içeriği hâlâ okunabilir — kanıt kaybolmaz.
+        Assert.Contains("5746 sayılı Kanun", versiyonlar[0].RawContent, StringComparison.Ordinal);
+    }
+
+    [Fact(DisplayName = "Faz2-C. Belge sürümü charset ve nihai adresi kanıt olarak saklar")]
+    public async Task Surum_charset_ve_kanonik_adresi_saklar()
+    {
+        var sourceId = await CreateSourceAsync("Kanıt Testi");
+        const string url = "https://kurum.gov.tr/ilan/kanit-1";
+
+        var sonuc = await IngestAsync(sourceId, url, "Tebliğ", GercekIcerik, charset: "windows-1254");
+        var versionId = sonuc.GetProperty("documentVersionId").GetGuid();
+
+        var version = await QueryAsync(db => db.SourceDocumentVersions.SingleAsync(v => v.Id == versionId));
+
+        Assert.Equal("windows-1254", version.Charset);
+        Assert.Equal(url, version.CanonicalUrl);
+        Assert.Equal(200, version.HttpStatusCode);
+        Assert.Equal(64, version.RawContentHash.Length);
+
+        // Türkçe karakterler bozulmadan saklanır.
+        Assert.Contains("Şirketlerin", version.RawContent, StringComparison.Ordinal);
+    }
+
+    [Fact(DisplayName = "Faz2-D. Kanıt parçası belge sürümüne geri bağlanır")]
+    public async Task Kanit_parcasi_belge_surumune_baglanir()
+    {
+        var sourceId = await CreateSourceAsync("Parça Testi");
+        var sonuc = await IngestAsync(
+            sourceId, "https://kurum.gov.tr/ilan/parca-1", "Tebliğ", GercekIcerik);
+
+        var versionId = sonuc.GetProperty("documentVersionId").GetGuid();
+
+        // Ayrıştırıcının üreteceği kanıt parçası; konumuyla birlikte saklanır.
+        await QueryAsync(async db =>
+        {
+            var version = await db.SourceDocumentVersions.SingleAsync(v => v.Id == versionId);
+            version.RecordParse(GercekIcerik, "Ar-Ge Tebliği", "tr", 1, null);
+            version.ReplaceChunks([
+                new DocumentEvidenceChunk(
+                    versionId, 0, "Yürürlük tarihi yayımı izleyen ayın ilk günüdür.",
+                    startOffset: 260, endOffset: 310,
+                    pageNumber: 1, sectionTitle: "Yürürlük", paragraphNumber: 4)
+            ]);
+
+            await db.SaveChangesAsync();
+            return true;
+        });
+
+        var chunk = await QueryAsync(db => db.DocumentEvidenceChunks
+            .SingleAsync(c => c.DocumentVersionId == versionId));
+
+        // Parçadan belgeye ve kaynağa kadar zincir kurulabiliyor.
+        Assert.Equal(versionId, chunk.DocumentVersionId);
+        Assert.Equal("Yürürlük", chunk.SectionTitle);
+        Assert.Equal(1, chunk.PageNumber);
+        Assert.Equal(64, chunk.TextHash.Length);
+
+        var zincir = await QueryAsync(db => db.SourceDocumentVersions
+            .Where(v => v.Id == chunk.DocumentVersionId)
+            .Select(v => new { v.SourceDocumentId, v.CanonicalUrl })
+            .SingleAsync());
+
+        Assert.Equal(sonuc.GetProperty("documentId").GetGuid(), zincir.SourceDocumentId);
+        Assert.Equal("https://kurum.gov.tr/ilan/parca-1", zincir.CanonicalUrl);
+    }
+
+    // ═══════════════ Karantina ═══════════════
+
+    [Fact(DisplayName = "Faz2-E. Zorunlu alanı eksik kayıt karantinaya gider")]
+    public async Task Eksik_alanli_kayit_karantinaya_gider()
+    {
+        var sourceId = await CreateSourceAsync("Eksik Alan Testi");
+
+        var sonuc = await IngestAsync(
+            sourceId, "https://kurum.gov.tr/ilan/eksik-1", title: "", content: GercekIcerik);
+
+        Assert.Equal("MissingRequiredFields", sonuc.GetProperty("quarantine").GetString());
+
+        var documentId = sonuc.GetProperty("documentId").GetGuid();
+        var document = await QueryAsync(db => db.SourceDocuments.SingleAsync(d => d.Id == documentId));
+
+        // Silinmez — durur ve incelenebilir.
+        Assert.True(document.IsQuarantined);
+        Assert.Equal(QuarantineReason.MissingRequiredFields, document.QuarantineReason);
+    }
+
+    [Theory(DisplayName = "Faz2-F. Menü ve kurumsal sayfalar fırsat olarak kaydedilmez")]
+    [InlineData("https://kurum.gov.tr/iletisim", "İletişim")]
+    [InlineData("https://kurum.gov.tr/hakkimizda", "Hakkımızda")]
+    [InlineData("https://kurum.gov.tr/tarihce", "Tarihçe")]
+    [InlineData("https://kurum.gov.tr/kvkk", "KVKK Aydınlatma Metni")]
+    public async Task Alakasiz_sayfalar_karantinaya_alinir(string url, string title)
+    {
+        var sourceId = await CreateSourceAsync($"Alakasız {title}");
+
+        var sonuc = await IngestAsync(sourceId, url, title, GercekIcerik);
+
+        Assert.Equal("InvalidSourcePage", sonuc.GetProperty("quarantine").GetString());
+    }
+
+    [Fact(DisplayName = "Faz2-G. Gerçek ilan karantinaya alınmaz")]
+    public async Task Gercek_ilan_karantinaya_alinmaz()
+    {
+        var sourceId = await CreateSourceAsync("Geçerli İlan Testi");
+
+        var sonuc = await IngestAsync(
+            sourceId, "https://kurum.gov.tr/ilan/2026-14", "Ar-Ge Tebliği", GercekIcerik);
+
+        Assert.Equal("None", sonuc.GetProperty("quarantine").GetString());
+    }
+
+    [Fact(DisplayName = "Faz2-H. Çok kısa içerik insana bırakılır, sessizce atılmaz")]
+    public async Task Cok_kisa_icerik_incelemeye_gider()
+    {
+        var sourceId = await CreateSourceAsync("Kısa İçerik Testi");
+
+        var sonuc = await IngestAsync(
+            sourceId, "https://kurum.gov.tr/ilan/kisa-1", "Duyuru", "Kısa duyuru.");
+
+        Assert.Equal("NeedsManualReview", sonuc.GetProperty("quarantine").GetString());
+    }
+
+    // ═══════════════ Yetki ═══════════════
+
+    [Fact(DisplayName = "Faz2-I. Kiracı kullanıcısı kaynak yapılandırmasını değiştiremez")]
+    public async Task Kiraci_kullanicisi_kaynak_degistiremez()
+    {
+        var sourceId = await CreateSourceAsync("Yetki Testi");
+
+        var olustur = await _tenantAdmin.PostAsJsonAsync("/api/sources", new
+        {
+            name = "Kiracının kaynağı",
+            type = "Ministry",
+            baseUrl = "https://baska.gov.tr",
+            cronExpression = "0 6 * * *"
+        });
+
+        var guncelle = await _tenantAdmin.PutAsJsonAsync($"/api/sources/{sourceId}", new
+        {
+            name = "Ele geçirildi",
+            type = "Ministry",
+            baseUrl = "https://kotu.example",
+            cronExpression = "0 6 * * *"
+        });
+
+        var kapat = await _tenantAdmin.PostAsJsonAsync($"/api/sources/{sourceId}/enabled", new { enabled = false });
+
+        Assert.Equal(HttpStatusCode.Forbidden, olustur.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, guncelle.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, kapat.StatusCode);
+
+        // Kaynak değişmedi.
+        var source = await QueryAsync(db => db.Sources.SingleAsync(s => s.Id == sourceId));
+        Assert.Equal("Yetki Testi", source.Name);
+        Assert.Equal("https://kurum.gov.tr", source.BaseUrl);
+    }
+
+    [Fact(DisplayName = "Faz2-J. Kiracı kullanıcısı belge bırakamaz")]
+    public async Task Kiraci_kullanicisi_belge_birakamaz()
+    {
+        var sourceId = await CreateSourceAsync("Belge Yetkisi Testi");
+
+        var response = await _tenantAdmin.PostAsJsonAsync("/api/sources/documents", new
+        {
+            sourceId,
+            url = "https://kurum.gov.tr/sahte",
+            title = "Sahte belge",
+            rawContent = GercekIcerik,
+            mediaType = "text/html"
+        });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact(DisplayName = "Faz2-K. SystemIngest kullanıcı ve şirket verisine erişemez")]
+    public async Task SystemIngest_kullanici_ve_sirket_verisine_erisemez()
+    {
+        var kullanicilar = await _ingest.GetAsync("/api/admin/users");
+        var sirketler = await _ingest.GetAsync("/api/companies");
+        var uyeler = await _ingest.GetAsync($"/api/companies/{_factory.TenantA.CompanyId}/members");
+        var rapor = await _ingest.GetAsync($"/api/reports/companies/{_factory.TenantA.CompanyId}/dashboard");
+
+        Assert.Equal(HttpStatusCode.Forbidden, kullanicilar.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, sirketler.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, uyeler.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, rapor.StatusCode);
+    }
+
+    // ═══════════════ Mevzuat / fırsat ayrımı ═══════════════
+
+    [Fact(DisplayName = "Faz2-L. Mevzuat fırsat tablosuna, fırsat mevzuat tablosuna yazılmaz")]
+    public async Task Mevzuat_ve_firsat_tablolari_ayridir()
+    {
+        var sourceId = await CreateSourceAsync("Ayrım Testi");
+        var sonuc = await IngestAsync(
+            sourceId, "https://kurum.gov.tr/ilan/ayrim-1", "Vergi Tebliği", GercekIcerik);
+
+        var documentId = sonuc.GetProperty("documentId").GetGuid();
+        var versionId = sonuc.GetProperty("documentVersionId").GetGuid();
+
+        await QueryAsync(async db =>
+        {
+            db.RegulatoryChanges.Add(new GovAI.Domain.Regulatory.RegulatoryChange(
+                sourceId, documentId, versionId,
+                jurisdiction: "TR",
+                authority: "Gelir İdaresi Başkanlığı",
+                domain: GovAI.Domain.Common.RegulationDomain.Tax,
+                changeType: GovAI.Domain.Common.RegulatoryChangeType.Communique,
+                title: "Ar-Ge Harcamaları Tebliği",
+                officialUrl: "https://kurum.gov.tr/ilan/ayrim-1",
+                contentHash: new string('a', 64),
+                detectedAt: DateTimeOffset.UtcNow));
+
+            await db.SaveChangesAsync();
+            return true;
+        });
+
+        // Mevzuat kaydı fırsat kataloğunda GÖRÜNMEZ.
+        var firsatlar = await _tenantAdmin.GetFromJsonAsync<JsonElement>("/api/opportunities?pageSize=100");
+        var basliklar = firsatlar.GetProperty("items").EnumerateArray()
+            .Select(x => x.GetProperty("title").GetString())
+            .ToList();
+
+        Assert.DoesNotContain("Ar-Ge Harcamaları Tebliği", basliklar);
+
+        // İki tablo birbirinden bağımsız.
+        var mevzuatSayisi = await QueryAsync(db => db.RegulatoryChanges.CountAsync());
+        var firsatSayisi = await QueryAsync(db => db.Opportunities.CountAsync());
+
+        Assert.True(mevzuatSayisi >= 1);
+        Assert.True(firsatSayisi >= 1);
+
+        var firsatBasliklari = await QueryAsync(db => db.Opportunities.Select(o => o.Title).ToListAsync());
+        Assert.DoesNotContain("Ar-Ge Harcamaları Tebliği", firsatBasliklari);
+    }
+}
