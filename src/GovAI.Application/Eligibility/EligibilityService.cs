@@ -66,6 +66,81 @@ public sealed class EligibilityService(
     /// Firmanın tüm açık fırsatlara karşı yeniden skorlanması.
     /// Profil değiştiğinde veya yeni çağrı geldiğinde worker tarafından tetiklenir.
     /// </summary>
+    /// <summary>
+    /// Kiracıdaki <b>tüm</b> firmaları yeniden skorlar (sistem işlemi).
+    ///
+    /// Neden ayrı bir yol: gece toplu turu ve skorlama kuyruğu tüketicisi worker
+    /// kimliğiyle çalışır. Worker'ın hiçbir şirkette üyeliği yoktur ve olmamalıdır;
+    /// firma listesini üyelikten okuyan yol ona <b>boş liste</b> döndürür — bu yüzden
+    /// gece turu fiilen hiçbir şey yapmıyordu.
+    ///
+    /// Burada firma listesi kiracı sınırı içinde doğrudan okunur. Çağırana <b>şirket
+    /// verisi dönmez</b>, yalnızca sayılar döner; böylece worker müşteri verisi görmez.
+    /// </summary>
+    public async Task<RescoreBatchResult> RescoreTenantAsync(
+        IReadOnlyCollection<SupportCategory>? categories = null,
+        CancellationToken cancellationToken = default)
+    {
+        var tenantId = access.RequireTenant();
+        var all = await companies.ListAsync(tenantId, cancellationToken);
+
+        var evaluated = 0;
+        var eligible = 0;
+        var failed = 0;
+
+        foreach (var company in all)
+        {
+            try
+            {
+                var result = await RescoreCompanyAsync(company.Id, categories, cancellationToken);
+                evaluated += result.EvaluatedOpportunityCount;
+                eligible += result.EligibleCount;
+            }
+            catch (Exception exception)
+            {
+                // Bir firmanın hatası turu durdurmamalı.
+                failed++;
+                logger.LogError(
+                    exception,
+                    "Toplu skorlamada firma atlandı. TenantId={TenantId} CompanyId={CompanyId}",
+                    tenantId, company.Id);
+            }
+        }
+
+        logger.LogInformation(
+            "Toplu skorlama tamamlandı. TenantId={TenantId} Firma={CompanyCount} Değerlendirme={Evaluated} Hata={Failed}",
+            tenantId, all.Count, evaluated, failed);
+
+        return new RescoreBatchResult(all.Count, evaluated, eligible, failed);
+    }
+
+    /// <summary>
+    /// Bir fırsata ait güncel değerlendirmeleri <b>geçersiz</b> kılar.
+    ///
+    /// Fırsat güncellendiğinde eski skor artık o çağrıyı anlatmıyordur. Kayıtlar
+    /// SİLİNMEZ; yalnızca "en güncel" işareti kalkar, böylece panelde geçerli sonuç
+    /// gibi görünmez ve yeniden skorlama beklenir.
+    /// </summary>
+    public async Task<InvalidateResult> InvalidateOpportunityAsync(
+        Guid opportunityId,
+        CancellationToken cancellationToken = default)
+    {
+        var stale = await assessments.ListLatestForOpportunityAsync(opportunityId, cancellationToken);
+
+        foreach (var assessment in stale)
+        {
+            assessment.Supersede();
+        }
+
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        logger.LogInformation(
+            "Fırsatın değerlendirmeleri geçersiz kılındı. OpportunityId={OpportunityId} Adet={Count}",
+            opportunityId, stale.Count);
+
+        return new InvalidateResult(opportunityId, stale.Count);
+    }
+
     public async Task<RescoreResult> RescoreCompanyAsync(
         Guid companyId,
         IReadOnlyCollection<SupportCategory>? categories = null,

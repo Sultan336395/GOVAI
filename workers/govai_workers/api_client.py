@@ -172,6 +172,17 @@ class GovAiClient:
 
     # ---- skorlama ve bildirim ----
 
+    def rescore_batch(self) -> dict[str, Any]:
+        """Kiracıdaki tüm firmaları yeniden skorlar.
+
+        Yanıt yalnızca sayı içerir; worker müşteri verisi görmez.
+        """
+        return self._request("POST", "/api/eligibility/rescore-batch")
+
+    def invalidate_opportunity(self, opportunity_id: str) -> dict[str, Any]:
+        """Bir çağrının eski skorlarını geçersiz işaretler. Kayıt silinmez."""
+        return self._request("POST", f"/api/eligibility/opportunities/{opportunity_id}/invalidate")
+
     def rescore_company(self, company_id: str) -> dict[str, Any]:
         return self._request("POST", f"/api/eligibility/companies/{company_id}/rescore")
 

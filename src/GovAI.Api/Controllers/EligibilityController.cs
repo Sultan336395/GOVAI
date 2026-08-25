@@ -65,6 +65,32 @@ public sealed class EligibilityController(EligibilityService service) : Controll
     /// Firmayı tüm açık çağrılara karşı yeniden skorlar.
     /// Uzun sürebilir; büyük katalogda worker üzerinden tetiklenmesi önerilir.
     /// </summary>
+    /// <summary>
+    /// Kiracıdaki tüm firmaları yeniden skorlar (worker ve gece toplu turu için).
+    ///
+    /// Şirket verisi <b>dönmez</b>; yalnızca sayılar döner. Worker'ın müşteri verisi
+    /// görmesine gerek yoktur ve görmez.
+    /// </summary>
+    [HttpPost("rescore-batch")]
+    [Authorize(Policy = Policies.Rescore)]
+    [Audited("Eligibility.RescoredBatch", "Tenant")]
+    public async Task<ActionResult<RescoreBatchResult>> RescoreBatch(
+        [FromQuery] SupportCategory[]? categories,
+        CancellationToken cancellationToken) =>
+        Ok(await service.RescoreTenantAsync(categories, cancellationToken));
+
+    /// <summary>
+    /// Bir fırsatın güncel değerlendirmelerini geçersiz kılar.
+    /// Kayıtlar silinmez; yalnızca güncelliğini yitirdiği işaretlenir.
+    /// </summary>
+    [HttpPost("opportunities/{opportunityId:guid}/invalidate")]
+    [Authorize(Policy = Policies.Rescore)]
+    [Audited("Eligibility.Invalidated", "Opportunity", RouteKey = "opportunityId")]
+    public async Task<ActionResult<InvalidateResult>> Invalidate(
+        Guid opportunityId,
+        CancellationToken cancellationToken) =>
+        Ok(await service.InvalidateOpportunityAsync(opportunityId, cancellationToken));
+
     [HttpPost("companies/{companyId:guid}/rescore")]
     [Authorize(Policy = Policies.Rescore)]
     [Audited("Eligibility.Rescored", "Company", RouteKey = "companyId")]

@@ -79,6 +79,16 @@ public sealed record DocumentCheckDto(
     string? Action);
 
 /// <summary>Toplu yeniden hesaplama sonucu.</summary>
+/// <summary>Toplu yeniden skorlama sonucu. Şirket verisi DÖNMEZ; yalnızca sayılar.</summary>
+public sealed record RescoreBatchResult(
+    int CompanyCount,
+    int EvaluatedOpportunityCount,
+    int EligibleCount,
+    int FailedCompanyCount);
+
+/// <summary>Bir fırsatın değerlendirmelerinin geçersiz kılınma sonucu.</summary>
+public sealed record InvalidateResult(Guid OpportunityId, int SupersededAssessmentCount);
+
 public sealed record RescoreResult(
     Guid CompanyId,
     int EvaluatedOpportunityCount,

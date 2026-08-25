@@ -50,21 +50,26 @@ def _dispatch_notifications(client: GovAiClient) -> None:
 
 
 def _nightly_rescore(client: GovAiClient) -> None:
-    """Gece toplu doğrulama turu; kaçan skorlama olaylarını telafi eder."""
-    companies = client.list_companies()
-    log.info("nightly_rescore_started", company_count=len(companies))
+    """Gece toplu doğrulama turu; kaçan skorlama olaylarını telafi eder.
 
-    for company in companies:
-        try:
-            result = client.rescore_company(company["id"])
-            log.info(
-                "company_rescored",
-                company=company.get("legalName"),
-                evaluated=(result or {}).get("evaluatedOpportunityCount"),
-                eligible=(result or {}).get("eligibleCount"),
-            )
-        except ApiError:
-            log.exception("company_rescore_failed", company=company.get("legalName"))
+    Eskiden firma listesini ``/api/company-profile`` üzerinden okuyordu. O uç Faz 1'den
+    beri üyelikten filtreleniyor ve worker'ın hiçbir şirkette üyeliği yok; liste **boş**
+    dönüyordu, yani gece turu fiilen hiçbir şey yapmıyordu. Artık firmaları sunucu
+    tarafında dolaşan toplu uç kullanılıyor — worker müşteri verisi görmez.
+    """
+    log.info("nightly_rescore_started")
+
+    try:
+        result = client.rescore_batch()
+        log.info(
+            "nightly_rescore_finished",
+            companies=(result or {}).get("companyCount"),
+            evaluated=(result or {}).get("evaluatedOpportunityCount"),
+            eligible=(result or {}).get("eligibleCount"),
+            failed=(result or {}).get("failedCompanyCount"),
+        )
+    except ApiError:
+        log.exception("nightly_rescore_failed")
 
 
 def main() -> int:

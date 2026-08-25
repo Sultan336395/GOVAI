@@ -9,6 +9,22 @@ namespace GovAI.Persistence.Repositories;
 
 public sealed class AssessmentRepository(GovAiDbContext context) : IAssessmentRepository
 {
+    /// <summary>
+    /// Bir fırsata ait güncel değerlendirmeler — <b>tüm kiracılarda</b>.
+    ///
+    /// Fırsat ortak kataloğa aittir; güncellendiğinde her müşterinin skoru eskir.
+    /// Bu yüzden kiracı filtresi bilinçli olarak atlanır. Çağırana hiçbir kiracı verisi
+    /// açılmaz: yalnızca kayıtlar "en güncel değil" olarak işaretlenir ve sayısı döner.
+    /// (Belgelenmiş yetkili istisna, bkz. docs/security.md)
+    /// </summary>
+    public async Task<IReadOnlyList<EligibilityAssessment>> ListLatestForOpportunityAsync(
+        Guid opportunityId,
+        CancellationToken cancellationToken = default) =>
+        await context.Assessments
+            .IgnoreQueryFilters()
+            .Where(a => a.OpportunityId == opportunityId && a.IsLatest)
+            .ToListAsync(cancellationToken);
+
     public Task<EligibilityAssessment?> GetAsync(Guid assessmentId, CancellationToken cancellationToken = default) =>
         context.Assessments
             .Include(a => a.Dimensions)

@@ -11,7 +11,7 @@
 #   rabbitmq  → 5672 / 15672 (kuyruk + yönetim arayüzü)
 #   api       → 8080   (.NET REST API + Swagger)
 #   web       → 5180   (React panel, nginx)
-#   collector / parser / scheduler → Python worker'ları
+#   collector / parser / scheduler / scoring → Python worker'ları
 
 name: govai
 
@@ -157,6 +157,24 @@ services:
         PIP_INDEX_URL: ${PIP_INDEX_URL:-}
     restart: unless-stopped
     command: ["govai-parser"]
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      api:
+        condition: service_started
+    environment: *worker-env
+
+  # govai.scoring.requested kuyruğunun tüketicisi. Denetimde bu kuyruğun hiç tüketicisi
+  # olmadığı, yani mesajların üretilip hiç işlenmediği bulunmuştu (Faz 2, madde 8).
+  scoring:
+    build:
+      context: ../workers
+      dockerfile: Dockerfile
+      args:
+        APT_MIRROR: ${APT_MIRROR:-}
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-}
+    restart: unless-stopped
+    command: ["govai-scoring"]
     depends_on:
       rabbitmq:
         condition: service_healthy

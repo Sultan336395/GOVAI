@@ -114,6 +114,11 @@ public interface ISourceDocumentRepository
 
 public interface IAssessmentRepository
 {
+    /// <summary>Bir fırsata ait, hâlâ güncel sayılan değerlendirmeler (tüm kiracılar).</summary>
+    Task<IReadOnlyList<EligibilityAssessment>> ListLatestForOpportunityAsync(
+        Guid opportunityId,
+        CancellationToken cancellationToken = default);
+
     Task<EligibilityAssessment?> GetAsync(Guid assessmentId, CancellationToken cancellationToken = default);
 
     Task<EligibilityAssessment?> GetLatestAsync(Guid companyId, Guid opportunityId, CancellationToken cancellationToken = default);

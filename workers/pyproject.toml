@@ -31,6 +31,7 @@ dev = [
 govai-collector = "govai_workers.collector.runner:main"
 govai-parser = "govai_workers.parser.runner:main"
 govai-scheduler = "govai_workers.scheduler:main"
+govai-scoring = "govai_workers.scoring.runner:main"
 
 [build-system]
 requires = ["setuptools>=69"]
