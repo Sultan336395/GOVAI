@@ -25,10 +25,10 @@ import { formatDate } from '@/lib/format'
  * gösterilir; sunucuda yalnızca özeti saklanır.
  */
 export default function CompanyMembersPage() {
-  const { companyId } = useParams<{ companyId: string }>()
+  const { companyId: routeCompanyId } = useParams<{ companyId?: string }>()
   const queryClient = useQueryClient()
   const { user } = useAuth()
-  const { companies, isLoading: companiesLoading, refresh } = useCompanies()
+  const { companies, selectedCompanyId, isLoading: companiesLoading, refresh } = useCompanies()
 
   const [notice, setNotice] = useState<string | null>(null)
   const [actionError, setActionError] = useState<unknown>(null)
@@ -40,6 +40,9 @@ export default function CompanyMembersPage() {
 
   const [newMemberUserId, setNewMemberUserId] = useState('')
   const [newMemberRole, setNewMemberRole] = useState<CompanyRole>('CompanyExpert')
+
+  // Yol şirket kimliği taşımıyorsa çalışılan şirkete düşülür; menü de bu yolu kullanır.
+  const companyId = routeCompanyId ?? selectedCompanyId ?? undefined
 
   const company = companies.find((candidate) => candidate.id === companyId)
   const canManage = companyPermissions.manageMembers(company?.companyRole ?? null)
@@ -133,6 +136,11 @@ export default function CompanyMembersPage() {
   })
 
   if (companiesLoading || membersLoading) return <Loading />
+
+  // Hiç şirket seçilmemişse ekran boş bir kimlikle açılmaz; kullanıcı yönlendirilir.
+  if (!companyId) {
+    return <EmptyState>Önce bir şirket seçin.</EmptyState>
+  }
 
   if (!company) {
     return <EmptyState>Bu şirket listenizde yok veya erişiminiz kaldırılmış.</EmptyState>

@@ -20,6 +20,12 @@ export default function AppLayout() {
     companyPermissions.manageProfile(company.companyRole),
   )
 
+  // Aktif şirket çözülene kadar menünün yerinde durması için: varsayılan, yoksa ilk
+  // sahibi olunan şirket.
+  const fallbackOwnedCompanyId =
+    (companies.find((c) => c.isDefault && c.companyRole === 'CompanyOwner') ??
+      companies.find((c) => c.companyRole === 'CompanyOwner'))?.id ?? null
+
   const groups = useMemo(
     () =>
       buildNavigation({
@@ -27,8 +33,9 @@ export default function AppLayout() {
         activeRole,
         activeCompanyId: selectedCompanyId,
         canManageAnyCompany,
+        fallbackOwnedCompanyId,
       }),
-    [user?.role, activeRole, selectedCompanyId, canManageAnyCompany],
+    [user?.role, activeRole, selectedCompanyId, canManageAnyCompany, fallbackOwnedCompanyId],
   )
 
   // Şirket ekleme bir yönetim işidir; görüntüleyiciye kısayol gösterilmez.

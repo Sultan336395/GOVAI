@@ -47,6 +47,9 @@ export default function App() {
         <Route path="/companies/groups" element={<CompanyGroupsPage />} />
         <Route path="/companies/:companyId/edit" element={<CompanyEditPage />} />
         <Route path="/companies/:companyId/members" element={<CompanyMembersPage />} />
+        {/* Aynı ekran, şirket kimliği olmadan da açılabilir: aktif şirkete düşer,
+            o da yoksa "önce bir şirket seçin" der. İkinci bir kopya değildir. */}
+        <Route path="/companies/members" element={<CompanyMembersPage />} />
 
         <Route path="/company" element={<CompanyPage />} />
         <Route path="/simulation" element={<SimulationPage />} />

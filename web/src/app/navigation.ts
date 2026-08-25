@@ -34,6 +34,11 @@ export interface NavContext {
   activeCompanyId: string | null
   /** Kullanıcı, şirketlerinden herhangi birinde sahip veya yönetici mi? */
   canManageAnyCompany: boolean
+  /**
+   * Kullanıcının CompanyOwner olduğu varsayılan şirket. Yalnızca aktif şirket henüz
+   * çözülmediğinde (liste yükleniyor ya da kayıtlı seçim eskimiş) kullanılır.
+   */
+  fallbackOwnedCompanyId: string | null
 }
 
 /** Ortak katalogu ve kaynakları işleten roller. Kiracı yöneticisi bunlara dâhil değildir. */
@@ -48,6 +53,7 @@ export function buildNavigation({
   activeRole,
   activeCompanyId,
   canManageAnyCompany,
+  fallbackOwnedCompanyId,
 }: NavContext): NavGroup[] {
   // Veri toplama servisi bir insan hesabı değildir; panelde işi yoktur.
   if (userRole === 'SystemIngest') {
@@ -104,11 +110,22 @@ export function buildNavigation({
     })
   }
 
-  // Üyelik ekranı aktif şirkete bağlıdır; şirket seçilmeden bağlantının hedefi yoktur.
-  // Sahip tam yetkiyle, yönetici kendi kapsamında görür; görüntüleyici ve uzman görmez.
-  if (activeCompanyId && (activeRole === 'CompanyOwner' || activeRole === 'CompanyManager')) {
+  // Üyelik ve rol yönetimi yalnızca CompanyOwner'a açıktır: sunucudaki karşılığı
+  // CompanyPermission.ManageMembers'tır ve orada da yalnızca sahibi karşılar.
+  // CompanyManager'a göstermek, açıldığında "yetkiniz yok" diyen bir menü üretirdi.
+  //
+  // Aktif şirket henüz çözülmediyse (liste yükleniyor ya da kayıtlı seçim başka bir
+  // hesaba ait) menü kaybolmasın diye sahibi olunan varsayılan şirkete düşülür.
+  const membersCompanyId =
+    activeRole === 'CompanyOwner'
+      ? activeCompanyId
+      : activeRole === null
+        ? fallbackOwnedCompanyId
+        : null
+
+  if (membersCompanyId) {
     companyItems.push({
-      to: `/companies/${activeCompanyId}/members`,
+      to: `/companies/${membersCompanyId}/members`,
       label: 'Kullanıcılar ve Yetkiler',
       icon: 'members',
     })
