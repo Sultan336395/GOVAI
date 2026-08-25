@@ -7,6 +7,8 @@ using GovAI.Domain.Notifications;
 using GovAI.Domain.Opportunities;
 using GovAI.Domain.Sources;
 using GovAI.Application.Sources;
+using GovAI.Domain.Regulatory;
+using GovAI.Application.Regulatory;
 
 namespace GovAI.Application.Abstractions.Persistence;
 
@@ -96,6 +98,23 @@ public interface IQuarantineQueryRepository
     /// Kayıtlar SİLİNMEZ; yalnızca güncelliğini yitirdiği bildirilir.
     /// </summary>
     Task<int> MarkAssessmentsForReevaluationAsync(Guid documentId, CancellationToken cancellationToken = default);
+}
+
+/// <summary>Mevzuat kayıtlarının deposu (ortak katalog; kiracıya bağlı değildir).</summary>
+public interface IRegulatoryChangeRepository
+{
+    /// <summary>Aynı sürümden aynı içerik ikinci kez kaydedilmesin diye.</summary>
+    Task<bool> ExistsAsync(Guid documentVersionId, string contentHash, CancellationToken cancellationToken = default);
+
+    Task AddAsync(RegulatoryChange change, CancellationToken cancellationToken = default);
+
+    /// <summary>Panelde gösterilebilir kayıtlar: yalnızca doğrulanmış olanlar.</summary>
+    Task<IReadOnlyList<RegulatoryChangeSummaryDto>> ListPublishableAsync(
+        RegulationDomain? domain,
+        string? jurisdiction,
+        CancellationToken cancellationToken = default);
+
+    Task<RegulatoryChangeDetailDto?> GetDetailAsync(Guid changeId, CancellationToken cancellationToken = default);
 }
 
 public interface ISourceDocumentRepository

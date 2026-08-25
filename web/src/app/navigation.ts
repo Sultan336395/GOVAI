@@ -63,7 +63,7 @@ export function buildNavigation({
   // Platform işletimi kiracı verisine erişemez (Policies.CompanyData onları dışarıda
   // bırakır). Şirket ekranlarını göstermek çalışmayan bağlantı üretirdi.
   if (isPlatformRole(userRole)) {
-    return [
+    const platform: NavGroup[] = [
       {
         title: 'Fırsat ve Analiz',
         items: [
@@ -71,10 +71,26 @@ export function buildNavigation({
         ],
       },
       {
-        title: 'Sistem Yönetimi',
-        items: [{ to: '/sources', label: 'Veri Kaynakları', icon: 'sources' }],
+        title: 'Mevzuat ve Uyum',
+        items: [
+          { to: '/regulatory-changes', label: 'Mevzuat Değişiklikleri', icon: 'regulation' },
+        ],
       },
     ]
+
+    // Kaynak yönetimi katalog yöneticisinin, karantina incelemesi her iki platform
+    // rolünün işidir; sunucu politikaları da böyle ayrılmıştır.
+    const system: NavItem[] = []
+
+    if (userRole === 'PlatformCatalogManager') {
+      system.push({ to: '/sources', label: 'Veri Kaynakları', icon: 'sources' })
+    }
+
+    system.push({ to: '/quarantine', label: 'Karantina İnceleme', icon: 'quarantine' })
+
+    platform.push({ title: 'Platform Yönetimi', items: system })
+
+    return platform
   }
 
   const groups: NavGroup[] = [
@@ -94,6 +110,12 @@ export function buildNavigation({
       ],
     },
   ]
+
+  // Mevzuat kiracı kullanıcılarına da açıktır: resmî ve doğrulanmış kayıtları okurlar.
+  groups.push({
+    title: 'Mevzuat ve Uyum',
+    items: [{ to: '/regulatory-changes', label: 'Mevzuat Değişiklikleri', icon: 'regulation' }],
+  })
 
   const companyItems: NavItem[] = [
     { to: '/companies', label: 'Şirketlerim', icon: 'companies', end: true },

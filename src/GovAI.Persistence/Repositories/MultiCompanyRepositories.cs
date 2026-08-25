@@ -1,5 +1,7 @@
 using GovAI.Application.Abstractions.Persistence;
 using GovAI.Application.Sources;
+using GovAI.Domain.Regulatory;
+using GovAI.Application.Regulatory;
 using GovAI.Domain.Common;
 using GovAI.Domain.Companies;
 using GovAI.Domain.Identity;
@@ -258,5 +260,98 @@ public sealed class QuarantineQueryRepository(GovAiDbContext context) : IQuarant
         }
 
         return assessments.Count;
+    }
+}
+
+
+/// <summary>
+/// Mevzuat kayıtları ortak kataloğa aittir; kiracı filtresi uygulanmaz ve
+/// uygulanmamalıdır — aynı tebliğ bütün müşterileri ilgilendirir.
+/// </summary>
+public sealed class RegulatoryChangeRepository(GovAiDbContext context) : IRegulatoryChangeRepository
+{
+    public Task<bool> ExistsAsync(
+        Guid documentVersionId,
+        string contentHash,
+        CancellationToken cancellationToken = default) =>
+        context.RegulatoryChanges
+            .AnyAsync(r => r.DocumentVersionId == documentVersionId && r.ContentHash == contentHash,
+                cancellationToken);
+
+    public async Task AddAsync(RegulatoryChange change, CancellationToken cancellationToken = default) =>
+        await context.RegulatoryChanges.AddAsync(change, cancellationToken);
+
+    public async Task<IReadOnlyList<RegulatoryChangeSummaryDto>> ListPublishableAsync(
+        RegulationDomain? domain,
+        string? jurisdiction,
+        CancellationToken cancellationToken = default)
+    {
+        // Yalnızca DOĞRULANMIŞ kayıtlar; karantinadaki ya da yalnızca tespit edilmiş
+        // kayıt kullanıcıya gösterilmez.
+        var query = context.RegulatoryChanges
+            .Where(r => r.Status == RegulatoryChangeStatus.Verified);
+
+        if (domain is not null)
+        {
+            query = query.Where(r => r.RegulationDomain == domain);
+        }
+
+        if (!string.IsNullOrWhiteSpace(jurisdiction))
+        {
+            query = query.Where(r => r.Jurisdiction == jurisdiction);
+        }
+
+        return await query
+            .OrderByDescending(r => r.PublicationDate ?? r.DetectedAt)
+            .Select(r => new RegulatoryChangeSummaryDto(
+                r.Id, r.Title, r.RegulationDomain, r.Authority, r.Jurisdiction, r.ChangeType,
+                r.PublicationDate, r.EffectiveDate, r.Status, r.OfficialUrl, r.DetectedAt))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<RegulatoryChangeDetailDto?> GetDetailAsync(
+        Guid changeId,
+        CancellationToken cancellationToken = default)
+    {
+        var change = await context.RegulatoryChanges
+            .FirstOrDefaultAsync(r => r.Id == changeId && r.Status == RegulatoryChangeStatus.Verified,
+                cancellationToken);
+
+        if (change is null)
+        {
+            return null;
+        }
+
+        var version = await context.SourceDocumentVersions
+            .Include(v => v.Chunks)
+            .FirstOrDefaultAsync(v => v.Id == change.DocumentVersionId, cancellationToken);
+
+        var sourceName = await context.Sources
+            .Where(s => s.Id == change.SourceId)
+            .Select(s => s.Name)
+            .FirstOrDefaultAsync(cancellationToken) ?? "(bilinmiyor)";
+
+        var evidence = version?.Chunks
+            .OrderBy(c => c.SequenceNumber)
+            .Select(c => new EvidenceChunkDto(
+                c.SequenceNumber, c.PageNumber, c.SectionTitle, c.ParagraphNumber,
+                c.Text, c.StartOffset, c.EndOffset))
+            .ToList() ?? [];
+
+        return new RegulatoryChangeDetailDto(
+            change.Id, change.Title, change.RegulationDomain, change.Authority, change.Jurisdiction,
+            change.ChangeType, change.OfficialNumber, change.PublicationDate, change.EffectiveDate,
+            change.Summary, change.OfficialUrl, change.Status, change.DetectedAt, change.LastVerifiedAt,
+            change.PreviousVersionId, sourceName,
+            version?.VersionNumber ?? 0,
+            version?.CanonicalUrl ?? change.OfficialUrl,
+            version?.Charset,
+            version?.MediaType ?? "text/html",
+            version?.HttpStatusCode ?? 0,
+            version?.RetrievedAt ?? change.DetectedAt,
+            version?.ParseStatus ?? DocumentParseStatus.Pending,
+            version?.RequiresOcr ?? false,
+            version?.PageCount,
+            evidence);
     }
 }

@@ -20,6 +20,8 @@ export type NavIconName =
   | 'companyGroups'
   | 'members'
   | 'sources'
+  | 'regulation'
+  | 'quarantine'
   | 'menu'
   | 'close'
 
@@ -138,6 +140,26 @@ const icons: Record<NavIconName, (props: IconProps) => ReactElement> = {
       <ellipse cx="12" cy="6" rx="7.5" ry="3" />
       <path d="M4.5 6v12c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3V6" />
       <path d="M4.5 12c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3" />
+    </Svg>
+  ),
+
+  // Mevzuat: terazi
+  regulation: (p) => (
+    <Svg {...p}>
+      <path d="M12 3.5v17" />
+      <path d="M6 20.5h12" />
+      <path d="M5 7.5h14" />
+      <path d="M5 7.5 2.5 14h5L5 7.5Z" />
+      <path d="M19 7.5 16.5 14h5L19 7.5Z" />
+    </Svg>
+  ),
+
+  // Karantina: uyarı üçgeni
+  quarantine: (p) => (
+    <Svg {...p}>
+      <path d="M12 4.5 21 19.5H3L12 4.5Z" />
+      <path d="M12 10v4" />
+      <circle cx="12" cy="16.75" r="0.6" fill="currentColor" stroke="none" />
     </Svg>
   ),
 

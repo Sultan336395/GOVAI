@@ -20,6 +20,11 @@ from govai_workers.parser.rule_extractor import extract_rules, rules_to_payload
 
 log = get_logger(__name__)
 
+#: Bu kategorilerdeki kaynaklardan gelen belge mevzuattır, fırsat değildir.
+REGULATION_CATEGORIES = frozenset(
+    {"Regulation", "Tax", "SocialSecurity", "LabourLaw", "CommercialLaw"}
+)
+
 # Metinde geçen anahtar kelimelerden destek türü tahmini; LLM devre dışıyken de kategori dolar.
 _CATEGORY_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
     ("Tender", ("ihale", "teklif verme", "ekap", "yaklaşık maliyet")),
@@ -112,6 +117,17 @@ def process_document(client: GovAiClient, document: dict[str, Any]) -> None:
         version_id=parse_result.get("documentVersionId"),
         chunk_count=parse_result.get("chunkCount"),
     )
+
+    # Mevzuat kaynağından gelen belge FIRSAT KATALOĞUNA YAZILMAZ.
+    # Mevzuata başvurulmaz; uyulur. Kaydı sunucu, kaynağın kategorisine bakarak
+    # RegulatoryChange olarak açar (bkz. SourceService.TryRecordRegulatoryChangeAsync).
+    if document.get("sourceCategory") in REGULATION_CATEGORIES:
+        log.info(
+            "regulation_document_not_an_opportunity",
+            document_id=document_id,
+            category=document.get("sourceCategory"),
+        )
+        return
 
     title = document.get("title") or text.splitlines()[0][:300]
     extraction = extract_rules(title, text)

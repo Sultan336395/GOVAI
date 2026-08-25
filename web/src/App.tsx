@@ -6,6 +6,9 @@ import CompanyEditPage from '@/pages/CompanyEditPage'
 import CompanyGroupsPage from '@/pages/CompanyGroupsPage'
 import CompanyMembersPage from '@/pages/CompanyMembersPage'
 import CompanyPage from '@/pages/CompanyPage'
+import QuarantinePage from '@/pages/QuarantinePage'
+import RegulatoryChangeDetailPage from '@/pages/RegulatoryChangeDetailPage'
+import RegulatoryChangesPage from '@/pages/RegulatoryChangesPage'
 import DashboardPage from '@/pages/DashboardPage'
 import EligibilityDetailPage from '@/pages/EligibilityDetailPage'
 import LoginPage from '@/pages/LoginPage'
@@ -55,6 +58,11 @@ export default function App() {
         <Route path="/simulation" element={<SimulationPage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/sources" element={<SourcesPage />} />
+
+        {/* Faz 2 — RegTech */}
+        <Route path="/regulatory-changes" element={<RegulatoryChangesPage />} />
+        <Route path="/regulatory-changes/:changeId" element={<RegulatoryChangeDetailPage />} />
+        <Route path="/quarantine" element={<QuarantinePage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

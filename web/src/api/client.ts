@@ -19,7 +19,11 @@ import type {
   MyCompany,
   ScenarioRequest,
   ScenarioResult,
+  QuarantinedDocument,
+  RegulatoryChangeDetail,
+  RegulatoryChangeSummary,
   SourceDto,
+  TriageReport,
   TenantUser,
   UpdateCompanyHierarchyRequest,
   VerificationRequest,
@@ -285,8 +289,39 @@ export const api = {
   /** Yalnızca kiracı yöneticisi çağırabilir; üye eklerken kullanıcı seçimi için. */
   listTenantUsers: () => request<TenantUser[]>('/api/admin/users'),
 
+  // ---- mevzuat (Faz 2) ----
+
+  /** Doğrulanmış mevzuat değişiklikleri. Karantinadaki kayıt dönmez. */
+  listRegulatoryChanges: (params: { domain?: string; jurisdiction?: string } = {}) =>
+    request<RegulatoryChangeSummary[]>(`/api/regulatory-changes${query(params)}`),
+
+  getRegulatoryChange: (changeId: string) =>
+    request<RegulatoryChangeDetail>(`/api/regulatory-changes/${changeId}`),
+
+  // ---- karantina (yalnızca platform incelemesi) ----
+  listQuarantined: () => request<QuarantinedDocument[]>('/api/quarantine'),
+
+  /** apply=false yalnızca rapor üretir, hiçbir şeyi değiştirmez. */
+  runTriage: (apply = false) =>
+    request<TriageReport>(`/api/quarantine/triage${query({ apply })}`, { method: 'POST' }),
+
+  approveQuarantined: (documentId: string) =>
+    request<void>(`/api/quarantine/${documentId}/approve`, { method: 'POST' }),
+
+  rejectQuarantined: (documentId: string, reason: string, note?: string) =>
+    request<void>(`/api/quarantine/${documentId}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ reason, note }),
+    }),
+
   // ---- kaynaklar ----
   listSources: () => request<SourceDto[]>('/api/sources'),
+
+  setSourceEnabled: (sourceId: string, enabled: boolean) =>
+    request<SourceDto>(`/api/sources/${sourceId}/enabled`, {
+      method: 'POST',
+      body: JSON.stringify({ enabled }),
+    }),
 
   triggerCrawl: (sourceId: string) =>
     request<void>(`/api/sources/${sourceId}/crawl`, { method: 'POST' }),

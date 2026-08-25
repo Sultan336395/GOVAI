@@ -373,6 +373,25 @@ export interface SourceDto {
   lastRunMessage: string | null
   consecutiveFailureCount: number
   configurationJson: string | null
+
+  // ── Faz 2 künyesi ──
+  category: SourceCategory
+  health: SourceHealth
+  configurationVerified: boolean
+  configurationVerifiedAt: string | null
+  lastSuccessfulRunAt: string | null
+  isCrawlable: boolean
+  authority: string | null
+  jurisdiction: string | null
+  officialDomain: string | null
+  language: string | null
+  startUrl: string | null
+  listSelector: string | null
+  contentSelector: string | null
+  urlPattern: string | null
+  maxPages: number
+  allowedDomains: string | null
+  documentTypes: string | null
 }
 
 // ══════════════════════════ Faz 1 — çoklu şirket ══════════════════════════
@@ -538,4 +557,106 @@ export interface TenantUser {
   role: UserRole
   isActive: boolean
   lastLoginAt: string | null
+}
+
+// ══════════════════════ Faz 2 — RegTech ══════════════════════
+// C# karşılıkları: GovAI.Application/Regulatory ve GovAI.Application/Sources.
+
+export type RegulationDomain =
+  | 'Tax' | 'SocialSecurity' | 'LabourLaw' | 'CommercialLaw'
+  | 'DataProtection' | 'CorporateGovernance' | 'Other'
+
+export type RegulatoryChangeType =
+  | 'NewRegulation' | 'Amendment' | 'Repeal' | 'Circular'
+  | 'Communique' | 'Decision' | 'Guidance' | 'Announcement'
+
+export type RegulatoryChangeStatus = 'Detected' | 'Verified' | 'Superseded' | 'Quarantined'
+
+export type QuarantineReason =
+  | 'None' | 'InvalidSourcePage' | 'Duplicate'
+  | 'MissingRequiredFields' | 'ParserFailed' | 'NeedsManualReview'
+
+export type SourceCategory =
+  | 'Regulation' | 'Tax' | 'SocialSecurity' | 'LabourLaw' | 'CommercialLaw'
+  | 'Grant' | 'Incentive' | 'Fund' | 'Tender' | 'EuProgramme'
+
+export type SourceHealth = 'Unverified' | 'Healthy' | 'Degraded' | 'Failing'
+
+export type DocumentParseStatus = 'Pending' | 'Parsed' | 'Failed' | 'NeedsOcr'
+
+export interface RegulatoryChangeSummary {
+  id: string
+  title: string
+  regulationDomain: RegulationDomain
+  authority: string
+  jurisdiction: string
+  changeType: RegulatoryChangeType
+  publicationDate: string | null
+  effectiveDate: string | null
+  status: RegulatoryChangeStatus
+  officialUrl: string
+  detectedAt: string
+}
+
+/** Kanıt parçası; metin resmî belgeye geri gösterilebilir. */
+export interface EvidenceChunk {
+  sequenceNumber: number
+  pageNumber: number | null
+  sectionTitle: string | null
+  paragraphNumber: number | null
+  text: string
+  startOffset: number
+  endOffset: number
+}
+
+export interface RegulatoryChangeDetail extends RegulatoryChangeSummary {
+  officialNumber: string | null
+  summary: string | null
+  lastVerifiedAt: string
+  previousVersionId: string | null
+  sourceName: string
+  documentVersion: number
+  canonicalUrl: string
+  charset: string | null
+  mediaType: string
+  httpStatusCode: number
+  retrievedAt: string
+  parseStatus: DocumentParseStatus
+  requiresOcr: boolean
+  pageCount: number | null
+  evidence: EvidenceChunk[]
+}
+
+/** Karantinadaki kayıt (PlatformReviewer inceleme ekranı). */
+export interface QuarantinedDocument {
+  documentId: string
+  title: string
+  url: string
+  sourceName: string
+  reason: QuarantineReason
+  note: string | null
+  collectedAt: string
+  versionCount: number
+}
+
+export interface TriageRow {
+  documentId: string
+  title: string
+  url: string
+  sourceName: string
+  proposedReason: QuarantineReason
+  evidence: string
+  missingField: string | null
+  isScored: boolean
+  linkedAssessmentCount: number
+  recommendedAction: string
+}
+
+export interface TriageReport {
+  reviewed: number
+  clean: number
+  flagged: number
+  applied: number
+  affectedAssessments: number
+  rows: TriageRow[]
 }

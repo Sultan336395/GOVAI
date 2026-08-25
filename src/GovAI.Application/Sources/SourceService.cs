@@ -2,6 +2,7 @@ using GovAI.Application.Abstractions.Persistence;
 using GovAI.Application.Abstractions.Services;
 using GovAI.Application.Common;
 using GovAI.Domain.Common;
+using GovAI.Domain.Regulatory;
 using GovAI.Domain.Sources;
 using Microsoft.Extensions.Logging;
 
@@ -159,6 +160,7 @@ public sealed record RecordParseResultResult(
 public sealed class SourceService(
     ISourceRepository sources,
     ISourceDocumentRepository documents,
+    IRegulatoryChangeRepository regulatoryChanges,
     IUnitOfWork unitOfWork,
     IDateTimeProvider clock,
     IEventPublisher events,
@@ -404,6 +406,10 @@ public sealed class SourceService(
             : document.Versions.OrderByDescending(v => v.VersionNumber).FirstOrDefault()
               ?? throw new NotFoundException("Belge sürümü", documentId);
 
+        // Kaynağın kategorisi, belgenin fırsat mı mevzuat mı olduğunu belirler.
+        var source = await sources.GetAsync(document.SourceId, cancellationToken)
+            ?? throw new NotFoundException("Kaynak", document.SourceId);
+
         if (request.Status == DocumentParseStatus.Parsed && !string.IsNullOrWhiteSpace(request.NormalizedText))
         {
             version.RecordParse(
@@ -430,6 +436,11 @@ public sealed class SourceService(
 
             version.ReplaceChunks(chunks);
             document.MarkParsed(request.NormalizedText);
+
+            // Kaynak bir mevzuat kaynağıysa kayıt fırsat değil MEVZUAT olarak açılır.
+            // Mevzuata başvurulmaz; uyulur. İkisini aynı tabloya koymak, panelde
+            // mevzuatı "başvurulabilir fırsat" gibi gösterip skorlanmasına yol açardı.
+            await TryRecordRegulatoryChangeAsync(source, document, version, cancellationToken);
 
             await unitOfWork.SaveChangesAsync(cancellationToken);
 
@@ -459,6 +470,109 @@ public sealed class SourceService(
 
         return new RecordParseResultResult(
             version.Id, version.ParseStatus, 0, document.QuarantineReason);
+    }
+
+    /// <summary>
+    /// Mevzuat kaynağından gelen belgeyi <see cref="RegulatoryChange"/> olarak kaydeder.
+    ///
+    /// <b>Bu fazda mevzuatın şirkete etkisi hesaplanmaz.</b> Yalnızca doğrulanabilir
+    /// künye ve kanıt üretilir; etki değerlendirmesi DeepTech motorunun işidir.
+    ///
+    /// Bulunamayan alan (resmî numara, yürürlük tarihi) <b>uydurulmaz</b>, null kalır.
+    /// </summary>
+    private async Task TryRecordRegulatoryChangeAsync(
+        Source source,
+        SourceDocument document,
+        SourceDocumentVersion version,
+        CancellationToken cancellationToken)
+    {
+        if (!IsRegulationSource(source.Category))
+        {
+            return;
+        }
+
+        var contentHash = version.NormalizedTextHash ?? version.RawContentHash;
+
+        // Aynı sürümden aynı içerik iki kez mevzuat kaydı üretmez.
+        if (await regulatoryChanges.ExistsAsync(version.Id, contentHash, cancellationToken))
+        {
+            return;
+        }
+
+        var title = string.IsNullOrWhiteSpace(version.Title) ? document.Title : version.Title!;
+
+        var change = new RegulatoryChange(
+            source.Id,
+            document.Id,
+            version.Id,
+            source.Profile.Jurisdiction ?? "TR",
+            source.Profile.Authority ?? source.Name,
+            MapDomain(source.Category),
+            GuessChangeType(title),
+            title,
+            document.CanonicalUrl ?? document.Url,
+            contentHash,
+            version.RetrievedAt);
+
+        // Özet YALNIZCA belgeden alınır; yapay zekâ yorumu yazılmaz.
+        var summary = version.NormalizedText is { Length: > 0 } text
+            ? text[..Math.Min(text.Length, 1500)]
+            : null;
+
+        change.Describe(
+            officialNumber: null,      // Belgede yazmıyorsa uydurulmaz.
+            publicationDate: version.PublishedAt,
+            effectiveDate: null,       // Yürürlük tarihi çıkarımı DeepTech fazında.
+            summary: summary);
+
+        // Kaynak doğrulanmışsa kayıt gösterilebilir; değilse tespit olarak bekler.
+        if (source.ConfigurationVerified)
+        {
+            change.MarkVerified(version.RetrievedAt);
+        }
+
+        await regulatoryChanges.AddAsync(change, cancellationToken);
+
+        logger.LogInformation(
+            "Mevzuat değişikliği kaydedildi. ChangeId={ChangeId} Kaynak={Source} Alan={Domain}",
+            change.Id, source.Name, change.RegulationDomain);
+    }
+
+    private static bool IsRegulationSource(SourceCategory category) => category is
+        SourceCategory.Regulation or SourceCategory.Tax or SourceCategory.SocialSecurity or
+        SourceCategory.LabourLaw or SourceCategory.CommercialLaw;
+
+    private static RegulationDomain MapDomain(SourceCategory category) => category switch
+    {
+        SourceCategory.Tax => RegulationDomain.Tax,
+        SourceCategory.SocialSecurity => RegulationDomain.SocialSecurity,
+        SourceCategory.LabourLaw => RegulationDomain.LabourLaw,
+        SourceCategory.CommercialLaw => RegulationDomain.CommercialLaw,
+        _ => RegulationDomain.Other,
+    };
+
+    /// <summary>
+    /// Başlıktaki resmî belge türü. Eşleşme yoksa <c>Announcement</c> kalır —
+    /// tür tahmin edilmez, en genel karşılık kullanılır.
+    /// </summary>
+    private static RegulatoryChangeType GuessChangeType(string title)
+    {
+        var lower = title.ToLowerInvariant();
+
+        if (lower.Contains("genelge", StringComparison.Ordinal)) return RegulatoryChangeType.Circular;
+        if (lower.Contains("tebliğ", StringComparison.Ordinal) ||
+            lower.Contains("teblig", StringComparison.Ordinal)) return RegulatoryChangeType.Communique;
+        if (lower.Contains("karar", StringComparison.Ordinal)) return RegulatoryChangeType.Decision;
+        if (lower.Contains("yönetmelik", StringComparison.Ordinal) ||
+            lower.Contains("yonetmelik", StringComparison.Ordinal)) return RegulatoryChangeType.NewRegulation;
+        if (lower.Contains("değişiklik", StringComparison.Ordinal) ||
+            lower.Contains("degisiklik", StringComparison.Ordinal)) return RegulatoryChangeType.Amendment;
+        if (lower.Contains("mülga", StringComparison.Ordinal) ||
+            lower.Contains("yürürlükten", StringComparison.Ordinal)) return RegulatoryChangeType.Repeal;
+        if (lower.Contains("rehber", StringComparison.Ordinal) ||
+            lower.Contains("kılavuz", StringComparison.Ordinal)) return RegulatoryChangeType.Guidance;
+
+        return RegulatoryChangeType.Announcement;
     }
 
     /// <summary>Bir kanıt parçasının anlamlı sayılması için gereken en az uzunluk.</summary>
@@ -555,6 +669,10 @@ public sealed class SourceService(
         SourceId = source.Id,
         SourceName = source.Name,
         SourceType = source.Type.ToString(),
+        // Parser, mevzuat kaynağından gelen belgeyi fırsat kataloğuna YAZMAZ.
+        SourceCategory = source.Category.ToString(),
+        Authority = source.Profile.Authority,
+        Jurisdiction = source.Profile.Jurisdiction,
         document.Url,
         document.Title,
         document.MediaType,
