@@ -125,11 +125,11 @@ Solution dosyası **`GovAI.slnx`**'tir (yeni XML formatı), `.sln` değil.
 
 ```bash
 dotnet build -c Release          # tüm .NET projeleri
-dotnet test                      # 153 test (29 domain + 5 application + 119 API)
+dotnet test                      # 187 test (29 domain + 24 application + 134 API)
 ```
 
 ```bash
-cd workers && .venv/Scripts/python -m pytest -q      # 53 test
+cd workers && .venv/Scripts/python -m pytest -q      # 94 test
 cd workers && .venv/Scripts/python -m ruff check .   # lint (satır sınırı 100)
 ```
 
@@ -144,8 +144,8 @@ cd web && npm ci && npm run lint && npm run typecheck && npm run test && npm run
 ```
 
 `npm run lint` **`--max-warnings 0`** ile çalışır; uyarı da hatadır.
-`npm run test` vitest'i tek seferlik koşturur; şu an yalnızca `navigation.ts`
-(sol menünün rol görünürlüğü) kapsanır — ekran testleri hâlâ yok.
+`npm run test` vitest'i tek seferlik koşturur (11 test); şu an yalnızca
+`navigation.ts` (sol menünün rol görünürlüğü) kapsanır — ekran testleri hâlâ yok.
 
 ### EF Core
 
@@ -233,6 +233,41 @@ Okuma sırası önerisi:
 `docs/architecture.md` → `docs/scoring.md` → `EligibilityEngine.cs` → `docs/adr/`.
 
 Proje dosyasındaki 10 modülün kod karşılıkları `docs/architecture.md` §3'te tablo hâlinde.
+
+---
+
+## 6.1 Resmî kaynaklara erişim (Faz 2)
+
+Her resmî kurum aynı şekilde taranamaz. Üç ayrı yol vardır ve hangisinin
+kullanıldığı kaynağın kaydında görünür:
+
+| Yol | Ne zaman | Nerede |
+|---|---|---|
+| Genel HTML taraması | Kurum statik bağlantı veriyorsa | `collector/crawler.py` |
+| Resmî makine erişimi | Kurum API/SPARQL/açık veri sunuyorsa | `collector/eurlex.py` |
+| Kontrollü manuel içe aktarma | Hiçbiri yoksa | `ManualImportService` |
+
+**TLS uyumu.** Bazı resmî sunucular Python'un varsayılan ayarlarıyla konuşmuyor.
+`collector/tls.py` bunu alan adı bazlı ve dar bir politikayla çözer:
+
+- `resmigazete.gov.tr` — sunucu ara sertifikayı göndermiyor. Eksik halka,
+  sertifikanın içinde yazan resmî CA adresinden çekilir ve SHA-256 parmak izi
+  sabittir. Kök hâlâ sistemin güven deposundan gelir.
+- `kik.gov.tr` — sunucu yalnızca eski RSA anahtar değişimli şifre takımını kabul
+  ediyor; OpenSSL'in varsayılanı da kabul eder.
+
+**Sertifika doğrulaması hiçbir koşulda kapatılmaz.** `baglam_olustur` iki `assert`
+ile bunu zorlar ve `test_collector_tls.py` politikayı korur. Listede olmayan hiçbir
+sunucu etkilenmez.
+
+**Manuel içe aktarma bir tarama değildir.** Kaynak doğrulanmış sayılmaz, sağlığı
+değişmez; kayıt `DocumentOrigin.ManualImport` olur ve ekranda "Elle aktarıldı"
+görünür. Adres kaynağın resmî alan adında olmak zorundadır ve içerik
+yapıştırılmaz — sistem indirir (SSRF korumalı).
+
+**Mevzuat fırsat değildir.** Mevzuat kategorili kaynaktan fırsat kaydı açılamaz;
+`OpportunityService.UpsertAsync` bunu 400 ile reddeder. Worker da aynı ayrımı
+gözetir ama ona güvenilmez.
 
 ---
 
