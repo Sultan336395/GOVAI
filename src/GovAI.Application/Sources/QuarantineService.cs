@@ -157,6 +157,9 @@ public sealed class QuarantineService(
             affectedOpportunities += await query.QuarantineOpportunitiesForDocumentAsync(
                 candidate.DocumentId, reason, evidence, cancellationToken);
 
+            affectedOpportunities += await query.QuarantineRegulatoryChangesForDocumentAsync(
+                candidate.DocumentId, reason, evidence, cancellationToken);
+
             // Bu kayda dayanan değerlendirmeler SESSİZCE SİLİNMEZ; yeniden
             // değerlendirilmesi gerektiği işaretlenir ve sayısı raporlanır.
             affectedAssessments += await query.MarkAssessmentsForReevaluationAsync(
@@ -198,6 +201,7 @@ public sealed class QuarantineService(
 
         // Belge katalogdaki yerine dönüyorsa ondan türeyen fırsat da dönmelidir.
         var released = await query.ReleaseOpportunitiesForDocumentAsync(documentId, cancellationToken);
+        released += await query.ReleaseRegulatoryChangesForDocumentAsync(documentId, cancellationToken);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
@@ -219,6 +223,9 @@ public sealed class QuarantineService(
         document.Quarantine(reason, note);
 
         var quarantined = await query.QuarantineOpportunitiesForDocumentAsync(
+            documentId, reason, note, cancellationToken);
+
+        quarantined += await query.QuarantineRegulatoryChangesForDocumentAsync(
             documentId, reason, note, cancellationToken);
 
         var affected = await query.MarkAssessmentsForReevaluationAsync(documentId, cancellationToken);
@@ -274,6 +281,15 @@ public sealed class QuarantineService(
             return QuarantineReason.InvalidSourcePage;
         }
 
+        // Bölüm listeleme sayfası: adres tek bir bölüm adından ibaret ve başlık da o
+        // bölümün adı (ör. ".../duyurular/" + "Duyurular"). Tekil bir belge değil,
+        // belgelerin listelendiği sayfa. Kanıt kesin olduğu için tahmin sayılmaz.
+        if (IsSectionIndex(candidate.Url, candidate.Title))
+        {
+            evidence = "Adres tek bölüm adından ibaret ve başlık o bölümün adı — liste sayfası.";
+            return QuarantineReason.InvalidSourcePage;
+        }
+
         if (seenHashes.TryGetValue(candidate.ContentHash, out var original))
         {
             evidence = $"İçeriği birebir aynı olan başka kayıt var ({original}).";
@@ -302,6 +318,37 @@ public sealed class QuarantineService(
 
         // "", "tr", "en" gibi yalnızca dil kökü olan yollar.
         return path.Length == 0 || (path.Length <= 5 && !path.Contains('/'));
+    }
+
+    /// <summary>
+    /// Bölüm listeleme sayfası mı? Yalnızca adres <b>tek</b> bölüm adı taşıyorsa ve
+    /// başlık bu adla birebir örtüşüyorsa doğrudur; alt sayfalar etkilenmez.
+    /// </summary>
+    private static bool IsSectionIndex(string url, string? title)
+    {
+        if (string.IsNullOrWhiteSpace(title) || !Uri.TryCreate(url, UriKind.Absolute, out var uri))
+        {
+            return false;
+        }
+
+        var path = uri.AbsolutePath.Trim('/');
+
+        if (path.Length == 0 || path.Contains('/', StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        return Slugify(title) == Slugify(path);
+    }
+
+    /// <summary>Başlık ile adres parçasını karşılaştırmak için sadeleştirir.</summary>
+    private static string Slugify(string value)
+    {
+        var lowered = value.Trim().ToLowerInvariant()
+            .Replace('ı', 'i').Replace('ğ', 'g').Replace('ü', 'u')
+            .Replace('ş', 's').Replace('ö', 'o').Replace('ç', 'c');
+
+        return new string([.. lowered.Where(char.IsLetterOrDigit)]);
     }
 
     private static string Recommend(QuarantineReason reason) => reason switch

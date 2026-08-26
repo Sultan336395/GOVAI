@@ -1,5 +1,7 @@
 using GovAI.Api.Infrastructure;
+using GovAI.Application.Abstractions.Services;
 using GovAI.Application.Sources;
+using GovAI.Domain.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,17 +15,27 @@ namespace GovAI.Api.Controllers;
 [Route("api/sources")]
 [Authorize(Policy = Policies.Read)]
 [Produces("application/json")]
-public sealed class SourcesController(SourceService service) : ControllerBase
+public sealed class SourcesController(SourceService service, ICurrentUser currentUser) : ControllerBase
 {
+    /// <summary>
+    /// Tarama seçicileri, URL kalıpları ve ham hata metinleri işletim ayrıntısıdır.
+    /// Kiracı kullanıcısı hangi resmî kurumların tarandığını görür (şeffaflık,
+    /// Faz 1 kararı); nasıl tarandığını görmez.
+    /// </summary>
+    private bool CanSeeOperationalDetail => currentUser.Role
+        is UserRole.PlatformCatalogManager
+        or UserRole.PlatformReviewer
+        or UserRole.SystemIngest;
+
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<SourceDto>>> List(
         [FromQuery] bool onlyEnabled = false,
         CancellationToken cancellationToken = default) =>
-        Ok(await service.ListAsync(onlyEnabled, cancellationToken));
+        Ok(await service.ListAsync(onlyEnabled, CanSeeOperationalDetail, cancellationToken));
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<SourceDto>> Get(Guid id, CancellationToken cancellationToken) =>
-        Ok(await service.GetAsync(id, cancellationToken));
+        Ok(await service.GetAsync(id, CanSeeOperationalDetail, cancellationToken));
 
     [HttpPost]
     [Authorize(Policy = Policies.PlatformCatalog)]

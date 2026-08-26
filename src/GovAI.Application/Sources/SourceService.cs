@@ -166,18 +166,32 @@ public sealed class SourceService(
     IEventPublisher events,
     ILogger<SourceService> logger)
 {
-    public async Task<IReadOnlyList<SourceDto>> ListAsync(bool onlyEnabled = false, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Kaynak listesi.
+    ///
+    /// <paramref name="includeOperationalDetail"/> yalnızca platform ve worker
+    /// kimlikleri için doğrudur. Kiracı kullanıcısı hangi resmî kurumların
+    /// tarandığını görebilir (şeffaflık, Faz 1 kararı) ama tarama seçicilerini,
+    /// URL kalıplarını ve ham hata metinlerini görmez: bunlar işletim ayrıntısıdır.
+    /// </summary>
+    public async Task<IReadOnlyList<SourceDto>> ListAsync(
+        bool onlyEnabled = false,
+        bool includeOperationalDetail = true,
+        CancellationToken cancellationToken = default)
     {
         var items = await sources.ListAsync(onlyEnabled, cancellationToken);
-        return items.Select(ToDto).ToList();
+        return items.Select(s => ToDto(s, includeOperationalDetail)).ToList();
     }
 
-    public async Task<SourceDto> GetAsync(Guid sourceId, CancellationToken cancellationToken = default)
+    public async Task<SourceDto> GetAsync(
+        Guid sourceId,
+        bool includeOperationalDetail = true,
+        CancellationToken cancellationToken = default)
     {
         var source = await sources.GetAsync(sourceId, cancellationToken)
                      ?? throw new NotFoundException("Kaynak", sourceId);
 
-        return ToDto(source);
+        return ToDto(source, includeOperationalDetail);
     }
 
     public async Task<SourceDto> CreateAsync(UpsertSourceRequest request, CancellationToken cancellationToken = default)
@@ -491,6 +505,13 @@ public sealed class SourceService(
             return;
         }
 
+        // Karantinadaki belgeden mevzuat kaydı üretilmez; üretilseydi kayıt panelde
+        // doğrulanmış mevzuat gibi görünürdü.
+        if (document.QuarantineReason != QuarantineReason.None)
+        {
+            return;
+        }
+
         var contentHash = version.NormalizedTextHash ?? version.RawContentHash;
 
         // Aynı sürümden aynı içerik iki kez mevzuat kaydı üretmez.
@@ -679,7 +700,7 @@ public sealed class SourceService(
         document.CollectedAt,
     };
 
-    private static SourceDto ToDto(Source source) => new(
+    private static SourceDto ToDto(Source source, bool includeOperationalDetail = true) => new(
         source.Id,
         source.Name,
         source.Type,
@@ -688,9 +709,9 @@ public sealed class SourceService(
         source.IsEnabled,
         source.LastRunAt,
         source.LastRunStatus,
-        source.LastRunMessage,
+        includeOperationalDetail ? source.LastRunMessage : null,
         source.ConsecutiveFailureCount,
-        source.ConfigurationJson,
+        includeOperationalDetail ? source.ConfigurationJson : null,
         source.Category,
         source.Health,
         source.ConfigurationVerified,
@@ -701,11 +722,11 @@ public sealed class SourceService(
         source.Profile.Jurisdiction,
         source.Profile.OfficialDomain,
         source.Profile.Language,
-        source.CrawlPlan.StartUrl,
-        source.CrawlPlan.ListSelector,
-        source.CrawlPlan.ContentSelector,
-        source.CrawlPlan.UrlPattern,
-        source.CrawlPlan.MaxPages,
-        source.CrawlPlan.AllowedDomains,
-        source.CrawlPlan.DocumentTypes);
+        includeOperationalDetail ? source.CrawlPlan.StartUrl : null,
+        includeOperationalDetail ? source.CrawlPlan.ListSelector : null,
+        includeOperationalDetail ? source.CrawlPlan.ContentSelector : null,
+        includeOperationalDetail ? source.CrawlPlan.UrlPattern : null,
+        includeOperationalDetail ? source.CrawlPlan.MaxPages : 0,
+        includeOperationalDetail ? source.CrawlPlan.AllowedDomains : null,
+        includeOperationalDetail ? source.CrawlPlan.DocumentTypes : null);
 }

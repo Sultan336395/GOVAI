@@ -559,6 +559,147 @@ public sealed class SourcePipelineTests(GovAiApiFactory factory)
         Assert.Equal("https://kurum.gov.tr", source.BaseUrl);
     }
 
+    [Fact(DisplayName = "Faz2-V. Bölüm liste sayfası kanıtla karantinaya alınır")]
+    public async Task Bolum_liste_sayfasi_karantinaya_alinir()
+    {
+        var sourceId = await CreateSourceAsync("Liste Sayfası Testi");
+
+        // Adres tek bölüm adından ibaret ve başlık o bölümün adı.
+        await IngestAsync(
+            sourceId, "https://kurum.gov.tr/duyurular/", "Duyurular", GercekIcerik);
+
+        // Aynı bölümün ALT sayfası etkilenmemeli.
+        var altSayfa = await IngestAsync(
+            sourceId, "https://kurum.gov.tr/duyurular/ar-ge-tebligi", "Ar-Ge Tebliği",
+            GercekIcerik + " Başvurular elektronik ortamda alınır ve ek belge istenmez.");
+
+        var reviewer = await _factory.CreateAuthenticatedClientAsync(
+            GovAiApiFactory.PlatformReviewerEmail);
+
+        var rapor = await reviewer.PostAsync("/api/quarantine/triage?apply=false", null);
+        rapor.EnsureSuccessStatusCode();
+
+        var govde = await rapor.Content.ReadFromJsonAsync<JsonElement>();
+        var isaretli = govde.GetProperty("rows").EnumerateArray()
+            .Where(r => r.GetProperty("sourceName").GetString() == "Liste Sayfası Testi")
+            .Select(r => r.GetProperty("title").GetString())
+            .ToList();
+
+        Assert.Contains("Duyurular", isaretli);
+        Assert.DoesNotContain("Ar-Ge Tebliği", isaretli);
+
+        // Alt sayfa gerçekten katalog akışında kalır.
+        var altBelge = altSayfa.GetProperty("documentId").GetGuid();
+        var durum = await QueryAsync(db => db.SourceDocuments.SingleAsync(d => d.Id == altBelge));
+
+        Assert.Equal(QuarantineReason.None, durum.QuarantineReason);
+    }
+
+    [Fact(DisplayName = "Faz2-Y. Karantina kararı mevzuat kaydını da kapsar")]
+    public async Task Karantina_mevzuat_kaydini_da_kapsar()
+    {
+        // Mevzuat kaynağı: kategorisi Regulation olan kaynak mevzuat kaydı üretir.
+        // Kategori ve künye API'den verilmez — resmî kaynak kataloğu tarafından kurulur —
+        // bu yüzden test kaynağı doğrudan tanımlanır.
+        var sourceId = await CreateSourceAsync("Mevzuat Karantina Testi");
+
+        await QueryAsync(async db =>
+        {
+            var source = await db.Sources.SingleAsync(s => s.Id == sourceId);
+            source.Describe(
+                SourceCategory.Regulation,
+                new SourceProfile("Test Kurumu", "TR", "kurum.gov.tr", "tr"));
+
+            await db.SaveChangesAsync();
+            return true;
+        });
+
+        var belge = await IngestAsync(
+            sourceId, "https://kurum.gov.tr/teblig/2026-1", "Ar-Ge Tebliği", GercekIcerik);
+
+        var documentId = belge.GetProperty("documentId").GetGuid();
+        var versionId = belge.GetProperty("documentVersionId").GetGuid();
+
+        var parse = await _ingest.PostAsJsonAsync(
+            $"/api/sources/documents/{documentId}/parse-result",
+            new
+            {
+                documentVersionId = versionId,
+                status = "Parsed",
+                normalizedText = GercekIcerik,
+                pageCount = 1
+            });
+
+        parse.EnsureSuccessStatusCode();
+
+        var oncesi = await QueryAsync(db => db.RegulatoryChanges
+            .CountAsync(r => r.SourceDocumentId == documentId));
+
+        Assert.True(oncesi > 0, "Mevzuat kaynağından mevzuat kaydı üretilmeli.");
+
+        var reviewer = await _factory.CreateAuthenticatedClientAsync(
+            GovAiApiFactory.PlatformReviewerEmail);
+
+        var reddet = await reviewer.PostAsJsonAsync(
+            $"/api/quarantine/{documentId}/reject",
+            new { reason = "InvalidSourcePage", note = "Liste sayfası." });
+
+        Assert.Equal(HttpStatusCode.NoContent, reddet.StatusCode);
+
+        // Kayıt SİLİNMEZ ama panelde gösterilmez.
+        var kalan = await QueryAsync(db => db.RegulatoryChanges
+            .CountAsync(r => r.SourceDocumentId == documentId));
+
+        var gosterilebilir = await QueryAsync(db => db.RegulatoryChanges
+            .CountAsync(r => r.SourceDocumentId == documentId
+                && r.Status == GovAI.Domain.Common.RegulatoryChangeStatus.Verified));
+
+        Assert.Equal(oncesi, kalan);
+        Assert.Equal(0, gosterilebilir);
+
+        var liste = await _tenantAdmin.GetFromJsonAsync<JsonElement>("/api/regulatory-changes");
+        var basliklar = liste.EnumerateArray()
+            .Select(x => x.GetProperty("title").GetString()).ToList();
+
+        Assert.DoesNotContain("Ar-Ge Tebliği", basliklar);
+    }
+
+    [Fact(DisplayName = "Faz2-U. Kiracı kullanıcısı tarama yapılandırmasını göremez")]
+    public async Task Kiraci_kullanicisi_tarama_ayrintisini_goremez()
+    {
+        var sourceId = await CreateSourceAsync("Ayrıntı Gizleme Testi");
+
+        // Şeffaflık: hangi resmî kurumların tarandığı görünür (Faz 1 kararı, R2/M2).
+        var kiraciGorunum = await _tenantAdmin.GetFromJsonAsync<JsonElement>($"/api/sources/{sourceId}");
+
+        Assert.Equal("Ayrıntı Gizleme Testi", kiraciGorunum.GetProperty("name").GetString());
+        Assert.Equal("https://kurum.gov.tr", kiraciGorunum.GetProperty("baseUrl").GetString());
+
+        // İşletim ayrıntısı: nasıl tarandığı görünmez. (Null alanlar yanıttan tamamen
+        // düşer — API `WhenWritingNull` ile serileştirir.)
+        string[] gizli =
+        [
+            "configurationJson", "listSelector", "contentSelector",
+            "urlPattern", "allowedDomains", "lastRunMessage", "startUrl"
+        ];
+
+        foreach (var alan in gizli)
+        {
+            var var_mi = kiraciGorunum.TryGetProperty(alan, out var deger)
+                && deger.ValueKind is not JsonValueKind.Null;
+
+            Assert.False(var_mi, $"Kiracı görünümünde '{alan}' bulunmamalı.");
+        }
+
+        // Platform hesabı aynı kaydı tam görür; yoksa ekranı yönetemezdi.
+        var platformGorunum = await _catalog.GetFromJsonAsync<JsonElement>($"/api/sources/{sourceId}");
+
+        Assert.Contains(
+            "a.ilan",
+            platformGorunum.GetProperty("configurationJson").GetString()!,
+            StringComparison.Ordinal);
+    }
+
     [Fact(DisplayName = "Faz2-J. Kiracı kullanıcısı belge bırakamaz")]
     public async Task Kiraci_kullanicisi_belge_birakamaz()
     {

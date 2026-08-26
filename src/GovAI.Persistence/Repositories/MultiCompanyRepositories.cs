@@ -301,6 +301,42 @@ public sealed class QuarantineQueryRepository(GovAiDbContext context) : IQuarant
 
         return opportunities.Count;
     }
+
+    public async Task<int> QuarantineRegulatoryChangesForDocumentAsync(
+        Guid documentId,
+        QuarantineReason reason,
+        string? note,
+        CancellationToken cancellationToken = default)
+    {
+        var changes = await context.RegulatoryChanges
+            .Where(r => r.SourceDocumentId == documentId
+                && r.Status != RegulatoryChangeStatus.Quarantined)
+            .ToListAsync(cancellationToken);
+
+        foreach (var change in changes)
+        {
+            change.Quarantine(reason, note);
+        }
+
+        return changes.Count;
+    }
+
+    public async Task<int> ReleaseRegulatoryChangesForDocumentAsync(
+        Guid documentId,
+        CancellationToken cancellationToken = default)
+    {
+        var changes = await context.RegulatoryChanges
+            .Where(r => r.SourceDocumentId == documentId
+                && r.Status == RegulatoryChangeStatus.Quarantined)
+            .ToListAsync(cancellationToken);
+
+        foreach (var change in changes)
+        {
+            change.ReleaseFromQuarantine();
+        }
+
+        return changes.Count;
+    }
 }
 
 

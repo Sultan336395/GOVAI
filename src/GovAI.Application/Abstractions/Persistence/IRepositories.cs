@@ -115,6 +115,21 @@ public interface IQuarantineQueryRepository
     Task<int> ReleaseOpportunitiesForDocumentAsync(
         Guid documentId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Belgeden türetilmiş mevzuat kayıtlarını da karantinaya alır.
+    /// Fırsatla aynı gerekçe: karantina, katalogdan ve panelden çıkmak demektir.
+    /// </summary>
+    Task<int> QuarantineRegulatoryChangesForDocumentAsync(
+        Guid documentId,
+        QuarantineReason reason,
+        string? note,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Belge karantinadan çıkınca mevzuat kayıtları yeniden doğrulamayı bekler.</summary>
+    Task<int> ReleaseRegulatoryChangesForDocumentAsync(
+        Guid documentId,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>Mevzuat kayıtlarının deposu (ortak katalog; kiracıya bağlı değildir).</summary>
