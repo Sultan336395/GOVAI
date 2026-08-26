@@ -5,6 +5,7 @@ using GovAI.Infrastructure.Identity;
 using GovAI.Infrastructure.Messaging;
 using GovAI.Infrastructure.Options;
 using GovAI.Infrastructure.Reporting;
+using GovAI.Infrastructure.Sources;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -41,6 +42,22 @@ public static class DependencyInjection
 
         services.AddHttpContextAccessor();
         services.AddSingleton<IDateTimeProvider, SystemDateTimeProvider>();
+
+        // Kontrollü manuel içe aktarmanın indiricisi. Yönlendirme takibi KAPALIDIR:
+        // her adım SSRF denetiminden yeniden geçmelidir (bkz. SafeDocumentDownloader).
+        services.AddHttpClient(SafeDocumentDownloader.HttpClientName, client =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(60);
+                client.DefaultRequestHeaders.UserAgent.ParseAdd(
+                    "GOVAI-RegTech/1.0 (+kamu tesvik eslestirme; iletisim: info@talenthubik.com)");
+                client.DefaultRequestHeaders.AcceptLanguage.ParseAdd("tr-TR,tr;q=0.9,en;q=0.8");
+            })
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+            {
+                AllowAutoRedirect = false,
+            });
+
+        services.AddScoped<IDocumentDownloader, SafeDocumentDownloader>();
         services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
         services.AddSingleton<ITokenService, JwtTokenService>();
         services.AddSingleton<IReportRenderer, ReportRenderer>();

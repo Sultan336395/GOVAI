@@ -38,6 +38,24 @@ public enum SourceType
 /// Kaynağın hangi konuyu beslediği (Faz 2). <see cref="SourceType"/> kurumun cinsini,
 /// bu ise topladığı içeriğin türünü söyler: aynı kurum hem mevzuat hem destek yayımlayabilir.
 /// </summary>
+/// <summary>
+/// Belgenin sisteme nasıl girdiği (Faz 2).
+///
+/// Ayrımı kaydetmek dürüstlük gereğidir: elle aktarılmış bir kayıt, otomatik
+/// taramanın ürünüymüş gibi gösterilmemelidir.
+/// </summary>
+public enum DocumentOrigin
+{
+    /// <summary>Zamanlanmış tarama sırasında toplandı.</summary>
+    Crawl = 0,
+
+    /// <summary>
+    /// İnceleyici resmî adresi vererek tek bir kaydı aldı. Kaynağın otomatik
+    /// taraması yapılmamıştır ve kaynak doğrulanmış sayılmaz.
+    /// </summary>
+    ManualImport = 1
+}
+
 public enum SourceCategory
 {
     /// <summary>

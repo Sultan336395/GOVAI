@@ -19,6 +19,7 @@ import type {
   MyCompany,
   ScenarioRequest,
   ScenarioResult,
+  ManualImportResult,
   QuarantinedDocument,
   RegulatoryChangeDetail,
   RegulatoryChangeSummary,
@@ -312,6 +313,16 @@ export const api = {
     request<void>(`/api/quarantine/${documentId}/reject`, {
       method: 'POST',
       body: JSON.stringify({ reason, note }),
+    }),
+
+  /**
+   * Kontrollü manuel içe aktarma: resmî ilan adresinden tek bir kaydı alır.
+   * Bu bir tarama DEĞİLDİR; kaynak doğrulanmış sayılmaz.
+   */
+  manualImport: (sourceId: string, url: string, title?: string) =>
+    request<ManualImportResult>(`/api/sources/${sourceId}/manual-import`, {
+      method: 'POST',
+      body: JSON.stringify({ url, title: title || null }),
     }),
 
   // ---- kaynaklar ----

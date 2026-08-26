@@ -220,7 +220,7 @@ public sealed class QuarantineQueryRepository(GovAiDbContext context) : IQuarant
             .Join(context.Sources, d => d.SourceId, s => s.Id, (d, s) => new
             {
                 d.Id, d.Title, d.Url, SourceName = s.Name, d.QuarantineReason,
-                d.QuarantineNote, d.CollectedAt, VersionCount = d.Versions.Count,
+                d.QuarantineNote, d.CollectedAt, VersionCount = d.Versions.Count, d.Origin,
             })
             .OrderByDescending(x => x.CollectedAt)
             .ToListAsync(cancellationToken);
@@ -228,7 +228,7 @@ public sealed class QuarantineQueryRepository(GovAiDbContext context) : IQuarant
         return rows
             .Select(x => new QuarantinedDocumentDto(
                 x.Id, x.Title, x.Url, x.SourceName, x.QuarantineReason,
-                x.QuarantineNote, x.CollectedAt, x.VersionCount))
+                x.QuarantineNote, x.CollectedAt, x.VersionCount, x.Origin))
             .ToList();
     }
 

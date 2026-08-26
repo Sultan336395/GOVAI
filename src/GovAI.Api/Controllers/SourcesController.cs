@@ -15,7 +15,10 @@ namespace GovAI.Api.Controllers;
 [Route("api/sources")]
 [Authorize(Policy = Policies.Read)]
 [Produces("application/json")]
-public sealed class SourcesController(SourceService service, ICurrentUser currentUser) : ControllerBase
+public sealed class SourcesController(
+    SourceService service,
+    ManualImportService manualImport,
+    ICurrentUser currentUser) : ControllerBase
 {
     /// <summary>
     /// Tarama seçicileri, URL kalıpları ve ham hata metinleri işletim ayrıntısıdır.
@@ -80,6 +83,24 @@ public sealed class SourcesController(SourceService service, ICurrentUser curren
     /// Collector worker'ın topladığı ham dokümanı sisteme bırakması.
     /// İçerik değişmediyse hiçbir iş kuyruğa alınmaz.
     /// </summary>
+    /// <summary>
+    /// Kontrollü manuel içe aktarma: resmî ilan adresinden tek bir kaydı alır.
+    ///
+    /// Otomatik taramaya uygun olmayan kaynaklar içindir (bkz. ManualImportService).
+    /// Bu bir tarama <b>değildir</b>: kaynak doğrulanmış sayılmaz, sağlık durumu
+    /// değişmez, kayıt "elle aktarıldı" olarak işaretlenir.
+    /// </summary>
+    [HttpPost("{id:guid}/manual-import")]
+    [Authorize(Policy = Policies.PlatformReview)]
+    [Audited("Source.ManualImport", "Source", RouteKey = "id")]
+    public async Task<ActionResult<ManualImportResult>> ManualImport(
+        Guid id,
+        [FromBody] ManualImportBody body,
+        CancellationToken cancellationToken) =>
+        Ok(await manualImport.ImportAsync(
+            new ManualImportRequest { SourceId = id, Url = body.Url, Title = body.Title },
+            cancellationToken));
+
     [HttpPost("documents")]
     [Authorize(Policy = Policies.SystemIngest)]
     public async Task<ActionResult<IngestDocumentResult>> IngestDocument(
@@ -123,3 +144,5 @@ public sealed class SourcesController(SourceService service, ICurrentUser curren
         return NoContent();
     }
 }
+
+public sealed record ManualImportBody(string Url, string? Title);

@@ -37,7 +37,9 @@ public sealed record QuarantinedDocumentDto(
     QuarantineReason Reason,
     string? Note,
     DateTimeOffset CollectedAt,
-    int VersionCount);
+    int VersionCount,
+    /// <summary>Belge taranarak mı geldi, elle mi aktarıldı? Ekranda ayrıca gösterilir.</summary>
+    DocumentOrigin Origin);
 
 /// <summary>
 /// Karantina yönetimi (Faz 2).

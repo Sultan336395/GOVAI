@@ -197,6 +197,10 @@ public sealed class SourceDocumentConfiguration : IEntityTypeConfiguration<Sourc
         // Aynı kaynaktan aynı adres tek kayıt olarak tutulur; sürümler Revision ile izlenir.
         builder.Property(d => d.CanonicalUrl).HasMaxLength(2000);
         builder.Property(d => d.QuarantineReason).HasConversion<int>();
+
+        // Belgenin sisteme nasıl girdiği. Varsayılan taramadır; elle aktarılan kayıt
+        // ekranda ayrıca işaretlenir, tarama ürünüymüş gibi gösterilmez.
+        builder.Property(d => d.Origin).HasConversion<int>();
         builder.Property(d => d.QuarantineNote).HasMaxLength(1000);
 
         builder.HasMany(d => d.Versions)

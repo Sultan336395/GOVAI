@@ -120,6 +120,12 @@ public sealed class GovAiApiFactory : WebApplicationFactory<Program>
                 services.Remove(descriptor);
             }
 
+            // Manuel içe aktarma testleri ağa çıkmaz: indirici sahtelenir. Böylece
+            // CI resmî kurum sitelerine bağımlı olmaz ve o siteler gereksiz yüklenmez.
+            services.RemoveAll<IDocumentDownloader>();
+            services.AddSingleton<SahteIndirici>();
+            services.AddScoped<IDocumentDownloader>(sp => sp.GetRequiredService<SahteIndirici>());
+
             if (PostgresHost is null)
             {
                 // Bellek içi sağlayıcı işlem (transaction) desteklemez ve BeginTransaction
@@ -443,3 +449,35 @@ public sealed class TenantFixture(string name, string slug, string email, string
     public Guid NotificationId { get; set; }
     public Guid OpportunityId { get; set; }
 }
+
+/// <summary>
+/// Manuel içe aktarma testleri için sahte indirici.
+///
+/// Gerçek indirici (<c>SafeDocumentDownloader</c>) ağa çıkar ve SSRF denetimi yapar;
+/// testte adres denetimi <c>ManualImportService</c> katmanında sınanır, ağ trafiği
+/// gerekmez.
+/// </summary>
+public sealed class SahteIndirici : IDocumentDownloader
+{
+    private readonly Dictionary<string, DownloadedDocument> _icerikler = new(StringComparer.Ordinal);
+
+    /// <summary>Kaç kez indirme denendi? Adres reddedilmişse hiç artmamalı.</summary>
+    public int CagriSayisi { get; private set; }
+
+    public void Ayarla(string url, DownloadedDocument belge) => _icerikler[url] = belge;
+
+    public void Temizle()
+    {
+        _icerikler.Clear();
+        CagriSayisi = 0;
+    }
+
+    public Task<DownloadedDocument?> DownloadAsync(
+        string url,
+        CancellationToken cancellationToken = default)
+    {
+        CagriSayisi++;
+        return Task.FromResult(_icerikler.GetValueOrDefault(url));
+    }
+}
+

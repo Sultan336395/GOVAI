@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/api/client'
 import type { TriageReport } from '@/api/types'
 import { EmptyState, ErrorBox, InfoBox, Loading, SuccessBox } from '@/components/Common'
-import { quarantineReasonLabels } from '@/lib/regulatoryLabels'
+import { documentOriginLabels, quarantineReasonLabels } from '@/lib/regulatoryLabels'
 import { formatDate } from '@/lib/format'
 
 /**
@@ -16,6 +16,10 @@ export default function QuarantinePage() {
   const queryClient = useQueryClient()
   const [report, setReport] = useState<TriageReport | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+
+  // Kontrollü manuel içe aktarma
+  const [importSourceId, setImportSourceId] = useState('')
+  const [importUrl, setImportUrl] = useState('')
 
   const { data = [], isLoading, error } = useQuery({
     queryKey: ['quarantine'],
@@ -32,6 +36,26 @@ export default function QuarantinePage() {
           : `${result.reviewed} kayıt incelendi, ${result.flagged} tanesi işaretlendi. Hiçbir şey değiştirilmedi.`,
       )
       if (apply) await queryClient.invalidateQueries({ queryKey: ['quarantine'] })
+    },
+  })
+
+  // Otomatik taramaya uygun olmayan kaynaklar için: inceleyici resmî ilan adresini
+  // verir, sistem içeriği kendisi indirir. Kayıt "elle aktarıldı" diye işaretlenir.
+  const { data: sources = [] } = useQuery({
+    queryKey: ['sources'],
+    queryFn: api.listSources,
+    retry: false,
+  })
+
+  const manualImport = useMutation({
+    mutationFn: () => api.manualImport(importSourceId, importUrl.trim()),
+    onSuccess: async (result) => {
+      setNotice(
+        `${result.sourceName}: kayıt alındı (HTTP ${result.httpStatusCode}, ` +
+          `${result.contentLength.toLocaleString('tr-TR')} karakter). ${result.note}`,
+      )
+      setImportUrl('')
+      await queryClient.invalidateQueries({ queryKey: ['quarantine'] })
     },
   })
 
@@ -68,6 +92,55 @@ export default function QuarantinePage() {
 
       {notice ? <SuccessBox>{notice}</SuccessBox> : null}
       {triage.error ? <ErrorBox error={triage.error} /> : null}
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <h2 style={{ marginTop: 0 }}>Resmî adresten elle içe aktarma</h2>
+        <p className="muted" style={{ marginTop: 0 }}>
+          Otomatik taramaya uygun olmayan kaynaklar içindir. Adres kaynağın{' '}
+          <strong>resmî alan adına</strong> ait olmalıdır; içerik yapıştırılmaz, sistem
+          kendisi indirir. <strong>Bu bir tarama değildir:</strong> kaynak doğrulanmış
+          sayılmaz ve kayıt "elle aktarıldı" olarak işaretlenir.
+        </p>
+
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span className="muted" style={{ fontSize: 12 }}>Kaynak</span>
+            <select
+              value={importSourceId}
+              onChange={(e) => setImportSourceId(e.target.value)}
+              style={{ minWidth: 240 }}
+            >
+              <option value="">Kaynak seçin…</option>
+              {sources.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                  {s.officialDomain ? ` (${s.officialDomain})` : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 320 }}>
+            <span className="muted" style={{ fontSize: 12 }}>Resmî ilan/belge adresi</span>
+            <input
+              type="url"
+              value={importUrl}
+              placeholder="https://ekap.kik.gov.tr/EKAP/..."
+              onChange={(e) => setImportUrl(e.target.value)}
+            />
+          </label>
+
+          <button
+            type="button"
+            disabled={!importSourceId || !importUrl.trim() || manualImport.isPending}
+            onClick={() => manualImport.mutate()}
+          >
+            {manualImport.isPending ? 'Alınıyor…' : 'İçe aktar'}
+          </button>
+        </div>
+
+        {manualImport.error ? <ErrorBox error={manualImport.error} /> : null}
+      </div>
 
       {report && report.rows.length > 0 ? (
         <div className="card" style={{ marginBottom: 16 }}>
@@ -124,6 +197,7 @@ export default function QuarantinePage() {
                 <th>Neden</th>
                 <th>Not</th>
                 <th>Sürüm</th>
+                <th>Köken</th>
                 <th>Toplanma</th>
                 <th />
               </tr>
@@ -141,6 +215,11 @@ export default function QuarantinePage() {
                   <td>{quarantineReasonLabels[item.reason]}</td>
                   <td className="muted">{item.note ?? '—'}</td>
                   <td>{item.versionCount}</td>
+                  <td>
+                    <span className={item.origin === 'ManualImport' ? 'badge indeterminate' : 'muted'}>
+                      {documentOriginLabels[item.origin]}
+                    </span>
+                  </td>
                   <td>{formatDate(item.collectedAt)}</td>
                   <td>
                     <button

@@ -576,6 +576,8 @@ export type QuarantineReason =
   | 'None' | 'InvalidSourcePage' | 'Duplicate'
   | 'MissingRequiredFields' | 'ParserFailed' | 'NeedsManualReview'
 
+export type DocumentOrigin = 'Crawl' | 'ManualImport'
+
 export type SourceCategory =
   | 'Uncategorized'
   | 'Regulation' | 'Tax' | 'SocialSecurity' | 'LabourLaw' | 'CommercialLaw'
@@ -638,6 +640,7 @@ export interface QuarantinedDocument {
   note: string | null
   collectedAt: string
   versionCount: number
+  origin: DocumentOrigin
 }
 
 export interface TriageRow {
@@ -661,4 +664,15 @@ export interface TriageReport {
   affectedOpportunities: number
   affectedAssessments: number
   rows: TriageRow[]
+}
+
+export interface ManualImportResult {
+  documentId: string
+  isNew: boolean
+  revision: number
+  finalUrl: string
+  httpStatusCode: number
+  contentLength: number
+  sourceName: string
+  note: string
 }

@@ -105,3 +105,30 @@ public interface IReportRenderer
 
     Task<byte[]> RenderExcelAsync(string sheetName, IReadOnlyList<string> headers, IReadOnlyList<IReadOnlyList<object?>> rows, CancellationToken cancellationToken = default);
 }
+
+/// <summary>
+/// Tek bir resmî belgeyi indirir (Faz 2 — kontrollü manuel içe aktarma).
+///
+/// <para>
+/// Metin kullanıcıdan <b>alınmaz, indirilir</b>: yapıştırılan bir metin resmî belge
+/// sayılamaz. Uygulama katmanı bu arayüzü bilir; HTTP ayrıntısı altyapıdadır.
+/// </para>
+///
+/// <para>
+/// Uygulaması SSRF'e karşı korumalıdır: iç adresler, localhost, özel IP blokları ve
+/// bulut metadata uçları reddedilir; yönlendirmeler her adımda yeniden denetlenir.
+/// </para>
+/// </summary>
+public interface IDocumentDownloader
+{
+    Task<DownloadedDocument?> DownloadAsync(string url, CancellationToken cancellationToken = default);
+}
+
+/// <summary>İndirilmiş belge ve kanıt alanları.</summary>
+public sealed record DownloadedDocument(
+    string Content,
+    string MediaType,
+    string? Charset,
+    string FinalUrl,
+    int HttpStatusCode,
+    string Title);

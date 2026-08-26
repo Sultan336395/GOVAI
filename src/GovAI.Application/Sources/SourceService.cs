@@ -67,6 +67,13 @@ public sealed record IngestDocumentRequest
 
     /// <summary>Kaynağın bildirdiği son güncelleme zamanı.</summary>
     public DateTimeOffset? LastModifiedAt { get; init; }
+
+    /// <summary>
+    /// Belgenin sisteme nasıl girdiği. Varsayılan taramadır; kontrollü manuel içe
+    /// aktarma bunu <see cref="DocumentOrigin.ManualImport"/> yapar ve kayıt ekranda
+    /// "elle aktarıldı" diye görünür.
+    /// </summary>
+    public DocumentOrigin Origin { get; init; } = DocumentOrigin.Crawl;
 }
 
 public sealed record IngestDocumentResult(
@@ -264,6 +271,7 @@ public sealed class SourceService(
         {
             var document = new SourceDocument(request.SourceId, request.Url, request.Title, request.RawContent, request.MediaType, now);
             document.SetCanonicalUrl(request.CanonicalUrl);
+            document.SetOrigin(request.Origin);
 
             // Her yakalanış kalıcı bir sürüm bırakır; belge kaydı yerinde güncellense de
             // geçmiş kaybolmaz (Faz 2 kanıt zinciri).
@@ -309,6 +317,13 @@ public sealed class SourceService(
 
         var changed = existing.TryUpdateContent(request.RawContent, now);
         existing.SetCanonicalUrl(request.CanonicalUrl);
+
+        // Elle aktarılmış bir kayıt sonradan gerçekten taranırsa köken taramaya döner;
+        // tersi olmaz — tarama ürünü bir kayıt "elle aktarıldı" diye işaretlenmez.
+        if (request.Origin == DocumentOrigin.Crawl)
+        {
+            existing.SetOrigin(DocumentOrigin.Crawl);
+        }
 
         SourceDocumentVersion? newVersion = null;
         if (changed)

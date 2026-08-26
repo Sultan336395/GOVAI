@@ -77,8 +77,21 @@ public class SourceDocument : AggregateRoot, IAuditable
     /// <summary>Karantinadaki belge skorlanmaz ve şirketlere fırsat olarak gösterilmez.</summary>
     public bool IsQuarantined => QuarantineReason != QuarantineReason.None;
 
+    /// <summary>
+    /// Belgenin sisteme nasıl girdiği. Elle aktarılan kayıt, otomatik taramanın
+    /// ürünüymüş gibi gösterilmez.
+    /// </summary>
+    public DocumentOrigin Origin { get; private set; } = DocumentOrigin.Crawl;
+
     public void SetCanonicalUrl(string? canonicalUrl) =>
         CanonicalUrl = string.IsNullOrWhiteSpace(canonicalUrl) ? CanonicalUrl : canonicalUrl.Trim();
+
+    /// <summary>
+    /// Kaydın kökenini işaretler. Bir kez elle aktarılmış kayıt, sonradan tarama
+    /// tarafından yakalanırsa <see cref="DocumentOrigin.Crawl"/>'a döner — o noktada
+    /// gerçekten taranmıştır.
+    /// </summary>
+    public void SetOrigin(DocumentOrigin origin) => Origin = origin;
 
     /// <summary>
     /// Bu yakalanışı sürüm zincirine ekler. Sürüm numarası <see cref="Revision"/> ile

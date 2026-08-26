@@ -1,4 +1,5 @@
 import type {
+  DocumentOrigin,
   DocumentParseStatus,
   QuarantineReason,
   RegulationDomain,
@@ -78,4 +79,9 @@ export const parseStatusLabels: Record<DocumentParseStatus, string> = {
   Parsed: 'Ayrıştırıldı',
   Failed: 'Başarısız',
   NeedsOcr: 'OCR gerekiyor',
+}
+
+export const documentOriginLabels: Record<DocumentOrigin, string> = {
+  Crawl: 'Tarama',
+  ManualImport: 'Elle aktarıldı',
 }

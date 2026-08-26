@@ -27,6 +27,7 @@ public static class DependencyInjection
         services.AddScoped<CompanyMembershipService>();
         services.AddScoped<OpportunityService>();
         services.AddScoped<SourceService>();
+        services.AddScoped<ManualImportService>();
         services.AddScoped<QuarantineService>();
         services.AddScoped<Regulatory.RegulatoryChangeService>();
         services.AddScoped<EligibilityService>();
