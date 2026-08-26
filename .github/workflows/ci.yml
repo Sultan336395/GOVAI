@@ -62,6 +62,11 @@ jobs:
           if-no-files-found: ignore
 
       - name: Migration'ların model ile uyumlu olduğunu doğrula
+        # GOVAI_EF_CONNECTION_STRING zorunludur: EF komutları açık bir hedef olmadan
+        # çalışmaz (bkz. EfMigrationTarget). "model-only" veritabanına hiç bağlanmayan,
+        # çözümlenemeyen bir adrese işaret eder — CI'da veritabanı yoktur ve olmamalıdır.
+        env:
+          GOVAI_EF_CONNECTION_STRING: model-only
         run: |
           dotnet tool restore
           dotnet dotnet-ef migrations has-pending-model-changes \

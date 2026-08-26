@@ -149,25 +149,37 @@ cd web && npm ci && npm run lint && npm run typecheck && npm run test && npm run
 
 ### EF Core
 
-`dotnet-ef` yerel araç olarak kurulu (`.config/dotnet-tools.json`), bu yüzden **çift `dotnet`**:
+`dotnet-ef` yerel araç olarak kurulu (`.config/dotnet-tools.json`), bu yüzden **çift `dotnet`**.
+
+**EF komutları açık bir hedef olmadan çalışmaz.** Sebep: `appsettings.Development.json`
+içindeki bağlantı `localhost:5432`'dir ve orası **çalışan 5180 ortamının** Postgres'idir.
+Faz 2'de iki migration bu yüzden istemeden müşterinin veritabanına uygulandı. Artık
+`GovAiDesignTimeDbContextFactory` devrede: hedef yalnızca `GOVAI_EF_CONNECTION_STRING`
+ile verilir, verilmezse komut açıklayıcı bir hatayla durur ve hiçbir varsayılana düşmez.
+
+Hazır betikler bunu senin için kurar:
 
 ```bash
-dotnet tool restore
-dotnet dotnet-ef migrations add <Ad> --project src/GovAI.Persistence --startup-project src/GovAI.Api
-dotnet dotnet-ef migrations has-pending-model-changes --project src/GovAI.Persistence --startup-project src/GovAI.Api
+scripts/ef-migrate.sh model-only migrations add <Ad>
+scripts/ef-migrate.sh model-only migrations has-pending-model-changes
+scripts/ef-migrate.sh preview    database update
+scripts/ef-migrate.sh preview    migrations list
 ```
 
-> **Dikkat — `dotnet-ef` varsayılan olarak ÇALIŞAN ortamın veritabanına bağlanır.**
-> `appsettings.Development.json` içindeki bağlantı dizesi `localhost:5432`'dir; bu,
-> `deploy/docker-compose.yml` ile ayağa kalkan **5180 ortamının** Postgres'idir.
-> `database update` gibi veritabanına yazan komutlar, hiçbir uyarı vermeden o ortamın
-> şemasını değiştirir. Başka bir veritabanına çalışmak istiyorsan bağlantıyı açıkça ver:
->
-> ```bash
-> dotnet dotnet-ef database update --project src/GovAI.Persistence --startup-project src/GovAI.Api --connection "Host=localhost;Port=15437;Database=govai;Username=govai;Password=..."
-> ```
->
-> `migrations add` ve `has-pending-model-changes` veritabanına yazmaz; yalnızca modeli okur.
+Windows'ta `scripts\ef-migrate.ps1` aynı arayüzü sunar.
+
+| Hedef | Ne yapar |
+|---|---|
+| `model-only` | Veritabanına **hiç bağlanmaz** (adres `.invalid`, çözümlenemez). `migrations add`, `has-pending-model-changes`, `migrations script` için. CI bunu kullanır. |
+| `preview` | `deploy/.env.preview`'dan parolayı okuyup **15437** portundaki önizleme veritabanına bağlanır. |
+
+5180'in veritabanı (`localhost:5432`) **korunan hedeftir**. Oraya gitmek için bağlantıya
+ek olarak `GOVAI_EF_ALLOW_PRODUCTION=EVET-5180-VERITABANINI-DEGISTIR` gerekir; betikler bu
+onayı asla vermez. Önce yedek al.
+
+Bağlantı dizesi hiçbir yerde bütün olarak yazılmaz — ne hatada, ne logda. EF komutu
+yalnızca `sunucu:port/veritabanı` satırını basar. Kilit `EfMigrationTargetTests` ile
+korunur (13 test).
 
 Son komut CI'da da koşar: model ile migration'lar ayrışırsa build kırılır.
 
