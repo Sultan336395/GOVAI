@@ -351,7 +351,13 @@ public sealed class SourcePipelineTests(GovAiApiFactory factory)
     private async Task<JsonElement> UpsertOpportunityAsync(Guid sourceId, object payload)
     {
         var response = await _ingest.PostAsJsonAsync("/api/opportunities", payload);
-        response.EnsureSuccessStatusCode();
+
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"Fırsat kaydedilemedi ({(int)response.StatusCode}): "
+                + await response.Content.ReadAsStringAsync());
+        }
         return await response.Content.ReadFromJsonAsync<JsonElement>();
     }
 
@@ -676,6 +682,48 @@ public sealed class SourcePipelineTests(GovAiApiFactory factory)
         var durum = await QueryAsync(db => db.SourceDocuments.SingleAsync(d => d.Id == altBelge));
 
         Assert.Equal(QuarantineReason.None, durum.QuarantineReason);
+    }
+
+    [Fact(DisplayName = "Faz2-X. Mevzuat kaynağından fırsat kaydı açılamaz")]
+    public async Task Mevzuat_kaynagindan_firsat_acilamaz()
+    {
+        var sourceId = await CreateSourceAsync("Mevzuat Ayrımı Sunucu Testi");
+
+        await QueryAsync(async db =>
+        {
+            var source = await db.Sources.SingleAsync(s => s.Id == sourceId);
+            source.Describe(
+                SourceCategory.Regulation,
+                new SourceProfile("Test Kurumu", "TR", "kurum.gov.tr", "tr"));
+
+            await db.SaveChangesAsync();
+            return true;
+        });
+
+        // Worker bu ayrımı zaten gözetiyor; burada SUNUCUNUN da reddettiği doğrulanır.
+        // Mesajda kategori alanı eksik kalırsa ortak katalog kirlenmemeli.
+        var response = await _ingest.PostAsJsonAsync("/api/opportunities", new
+        {
+            sourceId,
+            sourceType = "Ministry",
+            supportCategory = "Grant",
+            title = "Mevzuat kaynağından gelen sahte çağrı",
+            publisher = "Test Kurumu",
+            publishedAt = DateTimeOffset.UtcNow,
+            summary = GercekIcerik,
+            sourceUrl = "https://kurum.gov.tr/teblig/2026-9"
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var govde = await response.Content.ReadAsStringAsync();
+        Assert.Contains("mevzuat kaynağıdır", govde, StringComparison.Ordinal);
+
+        var acildiMi = await QueryAsync(db => db.Opportunities
+            .IgnoreQueryFilters()
+            .AnyAsync(o => o.SourceId == sourceId));
+
+        Assert.False(acildiMi, "Mevzuat kaynağından fırsat kaydı açılmamalı.");
     }
 
     [Fact(DisplayName = "Faz2-Y. Karantina kararı mevzuat kaydını da kapsar")]

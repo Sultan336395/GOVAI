@@ -40,6 +40,14 @@ public enum SourceType
 /// </summary>
 public enum SourceCategory
 {
+    /// <summary>
+    /// Kategori henüz bildirilmedi. Resmî kaynak kataloğu her kaydı açıkça
+    /// sınıflandırır; bu değer yalnızca elle açılmış, künyesi doldurulmamış
+    /// kaynaklarda görülür. <b>Mevzuat sayılmaz</b> — bilinmeyen bir kaynağın
+    /// içeriği hakkında varsayımda bulunulmaz.
+    /// </summary>
+    Uncategorized = 0,
+
     Regulation = 1,
     Tax = 2,
     SocialSecurity = 3,

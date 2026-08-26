@@ -53,7 +53,12 @@ public class Source : AggregateRoot, IAuditable
     // ── Faz 2: RegTech kaynak künyesi ──────────────────────────────────────
 
     /// <summary>Kaynağın beslediği konu (mevzuat, vergi, hibe, ihale…).</summary>
-    public SourceCategory Category { get; private set; } = SourceCategory.Regulation;
+    /// <summary>
+    /// Kaynağın hangi konuyu beslediği. Varsayılan <b>bilinmiyor</b>dur: elle açılmış
+    /// bir kaynağın mevzuat mı destek mi yayımladığı varsayılamaz. Resmî kaynak
+    /// kataloğu her kaydı <see cref="Describe"/> ile açıkça sınıflandırır.
+    /// </summary>
+    public SourceCategory Category { get; private set; } = SourceCategory.Uncategorized;
 
     /// <summary>Yayımlayan kurum, yargı alanı, resmî alan adı, dil.</summary>
     public SourceProfile Profile { get; private set; } = SourceProfile.Empty;

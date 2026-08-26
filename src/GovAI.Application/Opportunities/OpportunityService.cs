@@ -45,8 +45,20 @@ public sealed class OpportunityService(
     /// </summary>
     public async Task<OpportunityDetailDto> UpsertAsync(UpsertOpportunityRequest request, CancellationToken cancellationToken = default)
     {
-        _ = await sources.GetAsync(request.SourceId, cancellationToken)
+        var source = await sources.GetAsync(request.SourceId, cancellationToken)
             ?? throw new NotFoundException("Kaynak", request.SourceId);
+
+        // Mevzuat fırsat değildir: mevzuata başvurulmaz, uyulur. Worker da bu ayrımı
+        // gözetiyor, ama ona GÜVENİLMEZ — mesajda kategori alanı eksik kalırsa ya da
+        // başka bir istemci gelirse ortak katalog kirlenmemeli. Bu kayıt
+        // RegulatoryChange olarak açılır (bkz. SourceService.TryRecordRegulatoryChangeAsync).
+        if (IsRegulationSource(source.Category))
+        {
+            throw new ValidationException(
+                nameof(request.SourceId),
+                $"'{source.Name}' bir mevzuat kaynağıdır; fırsat kataloğuna kayıt açamaz. "
+                + "Bu belge mevzuat değişikliği olarak kaydedilir.");
+        }
 
         Opportunity? opportunity = null;
         if (request.SourceDocumentId is not null)
@@ -244,4 +256,12 @@ public sealed class OpportunityService(
             opportunity.FieldAvailability.Sector.ToString(),
             opportunity.FieldAvailability.ProgrammeType.ToString(),
             opportunity.FieldAvailability.OfficialDocumentUrl.ToString()));
+
+    /// <summary>
+    /// Kaynağın kategorisi mevzuat mı? <see cref="GovAI.Application.Sources.SourceService"/>
+    /// içindeki karşılığıyla aynı listedir; ikisi birlikte değişmelidir.
+    /// </summary>
+    private static bool IsRegulationSource(SourceCategory category) => category is
+        SourceCategory.Regulation or SourceCategory.Tax or SourceCategory.SocialSecurity or
+        SourceCategory.LabourLaw or SourceCategory.CommercialLaw;
 }

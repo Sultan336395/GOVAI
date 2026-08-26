@@ -577,6 +577,7 @@ export type QuarantineReason =
   | 'MissingRequiredFields' | 'ParserFailed' | 'NeedsManualReview'
 
 export type SourceCategory =
+  | 'Uncategorized'
   | 'Regulation' | 'Tax' | 'SocialSecurity' | 'LabourLaw' | 'CommercialLaw'
   | 'Grant' | 'Incentive' | 'Fund' | 'Tender' | 'EuProgramme'
 

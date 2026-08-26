@@ -36,6 +36,7 @@ export const changeTypeLabels: Record<RegulatoryChangeType, string> = {
 }
 
 export const sourceCategoryLabels: Record<SourceCategory, string> = {
+  Uncategorized: 'Sınıflandırılmadı',
   Regulation: 'Mevzuat',
   Tax: 'Vergi',
   SocialSecurity: 'Sosyal güvenlik',

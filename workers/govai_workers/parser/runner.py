@@ -12,6 +12,7 @@ import sys
 from typing import Any
 
 from govai_workers.api_client import GovAiClient
+from govai_workers.collector import eurlex
 from govai_workers.collector.fetcher import PoliteFetcher
 from govai_workers.logging_setup import configure_logging, get_logger
 from govai_workers.messaging import RoutingKeys, consume
@@ -121,20 +122,32 @@ def process_document(client: GovAiClient, document: dict[str, Any]) -> None:
     raw = document.get("rawContent")
     media_type = document.get("mediaType", "text/html")
 
-    # Ham içerik mesajda taşınmıyorsa kaynaktan yeniden indirilir.
-    if raw is None:
-        with PoliteFetcher() as fetcher:
-            fetched = fetcher.fetch(url)
-            if fetched is None:
-                log.warning("parse_skipped_unreachable", url=url)
-                client.record_parse_result(
-                    document_id, status="Failed", error="Kaynak adresine erişilemedi."
-                )
-                return
-            extracted = extract_document(fetched.content, fetched.media_type)
-            media_type = fetched.media_type
-    else:
+    if raw is not None:
         extracted = extract_document(raw.encode("utf-8"), media_type)
+    else:
+        # Ham içerik mesajda taşınmıyorsa kaynaktan yeniden indirilir.
+        #
+        # EUR-Lex tarayıcı adresi otomatik isteklere boş gövdeli HTTP 202 döndürüyor.
+        # Koruma AŞILMAZ; AB Yayın Ofisi'nin resmî CELLAR ucuna geçilir.
+        resmi = eurlex.metin_indir_adresten(url)
+
+        if resmi is not None:
+            icerik, media_type = resmi
+            extracted = extract_document(icerik, media_type)
+            log.info("eurlex_cellar_uzerinden_alindi", document_id=document_id)
+        else:
+            with PoliteFetcher() as fetcher:
+                fetched = fetcher.fetch(url)
+
+                if fetched is None:
+                    log.warning("parse_skipped_unreachable", url=url)
+                    client.record_parse_result(
+                        document_id, status="Failed", error="Kaynak adresine erişilemedi."
+                    )
+                    return
+
+                extracted = extract_document(fetched.content, fetched.media_type)
+                media_type = fetched.media_type
 
     # Taranmış PDF: uydurma metin ÜRETİLMEZ, belge insana bırakılır.
     if extracted.needs_ocr:

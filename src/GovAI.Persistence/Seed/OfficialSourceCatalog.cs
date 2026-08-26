@@ -36,7 +36,14 @@ public static class OfficialSourceCatalog
         int MaxPages,
         string Language,
         string DocumentTypes,
-        string Note);
+        string Note,
+        /// <summary>
+        /// Resmî alan adının dışında da gidilebilecek adresler. Yalnızca aynı kurumun
+        /// makine erişimi için ayrı bir alan adı kullandığı durumlarda doldurulur
+        /// (ör. EUR-Lex içeriği AB Yayın Ofisi'nin CELLAR ucundan gelir).
+        /// Boşsa tarama resmî alan adının dışına çıkamaz.
+        /// </summary>
+        string? AllowedDomains = null);
 
     /// <summary>Türkiye ve AB pilot kaynakları.</summary>
     public static IReadOnlyList<Definition> All { get; } =
@@ -152,8 +159,12 @@ public static class OfficialSourceCatalog
             ListSelector: "a[href*='legal-content']",
             ContentSelector: "#docHtml, .panel-body",
             UrlPattern: "legal-content|TXT", MaxPages: 10, Language: "en",
-            DocumentTypes: "text/html,application/pdf",
-            Note: "AB mevzuatının resmî kaynağı."),
+            DocumentTypes: "text/html,application/xhtml+xml,application/pdf",
+            AllowedDomains: "eur-lex.europa.eu,publications.europa.eu",
+            Note: "AB mevzuatının resmî kaynağı. Tarayıcı arayüzü otomatik isteklere boş "
+                + "gövdeli HTTP 202 döndürüyor; bu koruma AŞILMAZ. Toplama, AB Yayın "
+                + "Ofisi'nin makine erişimi için duyurduğu CELLAR SPARQL ve REST uçlarıyla "
+                + "yapılır: collector/eurlex.py, `--eurlex` seçeneği."),
 
         new("European Innovation Council", SourceType.EuOrInternational, SourceCategory.Fund,
             "European Innovation Council", "EU", "eic.ec.europa.eu",
@@ -195,7 +206,7 @@ public static class OfficialSourceCatalog
             definition.ContentSelector,
             definition.UrlPattern,
             definition.MaxPages,
-            AllowedDomains: definition.OfficialDomain,
+            AllowedDomains: definition.AllowedDomains ?? definition.OfficialDomain,
             DocumentTypes: definition.DocumentTypes));
 
         // Doğrulanana kadar KAPALI. Aktifmiş gibi gösterilmez.
