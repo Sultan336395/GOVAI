@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from typing import Any
 
@@ -37,6 +38,66 @@ _CATEGORY_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
     ("Loan", ("faiz desteği", "kredi", "kefalet")),
     ("Grant", ("hibe", "mali destek programı")),
 ]
+
+
+#: Sayfa başlığı olarak işe yaramayan kalıplar. Resmî Gazete günlük nüshalarında
+#: <title> yalnızca tarihtir ("26 Ağustos 2026 ÇARŞAMBA"), belgenin adı değildir.
+_TARIH_BASLIGI = re.compile(
+    r"^\d{1,2}\s+\w+\s+\d{4}(\s+\w+)?$|^\d{1,2}[./]\d{1,2}[./]\d{4}",
+    re.UNICODE,
+)
+
+
+def belge_basligi(sayfa_basligi: str | None, metin: str) -> str | None:
+    """Belgenin gerçek adı.
+
+    Sayfa başlığı belgeyi tanıtıyorsa aynen kullanılır. Yalnızca tarih ya da
+    anlamsız kadar kısaysa, metnin ilk **gerçek** başlık satırına düşülür.
+    Uydurma yapılmaz: metinde de uygun bir satır yoksa ``None`` döner ve alan
+    ``NotProvided`` olarak işaretlenir.
+    """
+    aday = (sayfa_basligi or "").strip()
+
+    if aday and len(aday) > 12 and not _TARIH_BASLIGI.match(aday):
+        return aday
+
+    # Belge türü satırı (TEBLİĞ, YÖNETMELİK…) tek başına ad değildir; asıl ad
+    # genellikle onu izleyen büyük harfli satırdır.
+    tur_satiri = None
+
+    for ham in metin.splitlines():
+        satir = " ".join(ham.split())
+
+        # Tür satırı kısa olabilir ("TEBLİĞ"); önce o denenir.
+        if satir.upper() in _BELGE_TURLERI:
+            tur_satiri = satir.upper()
+            continue
+
+        if not (12 < len(satir) <= 200):
+            continue
+        if _TARIH_BASLIGI.match(satir):
+            continue
+        if satir.endswith((".", ":", ";")):
+            continue
+
+        harfler = [k for k in satir if k.isalpha()]
+        if not harfler:
+            continue
+
+        # Resmî belge başlıkları büyük harfle yazılır.
+        if sum(1 for k in harfler if k.isupper()) / len(harfler) < 0.8:
+            continue
+
+        return f"{tur_satiri} — {satir}" if tur_satiri else satir
+
+    return tur_satiri or (aday or None)
+
+
+#: Tek başına başlık sayılmayan, belgenin türünü bildiren satırlar.
+_BELGE_TURLERI = frozenset({
+    "TEBLİĞ", "TEBLİĞLER", "YÖNETMELİK", "YÖNETMELİKLER", "GENELGE", "KARAR",
+    "KARARLAR", "KANUN", "KANUNLAR", "TÜZÜK", "YÖNERGE", "ANAYASA MAHKEMESİ KARARLARI",
+})
 
 
 def guess_category(title: str, text: str) -> str:
@@ -105,7 +166,7 @@ def process_document(client: GovAiClient, document: dict[str, Any]) -> None:
         document_id,
         status="Parsed",
         normalized_text=text,
-        title=document.get("title"),
+        title=belge_basligi(document.get("title"), text),
         language=document.get("language") or "tr",
         page_count=extracted.page_count,
         chunks=[chunk.to_payload() for chunk in chunks],

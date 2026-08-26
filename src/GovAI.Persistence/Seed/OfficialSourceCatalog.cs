@@ -45,11 +45,15 @@ public static class OfficialSourceCatalog
         new("Resmî Gazete", SourceType.OfficialGazette, SourceCategory.Regulation,
             "T.C. Cumhurbaşkanlığı", "TR", "resmigazete.gov.tr",
             "https://www.resmigazete.gov.tr", "0 7 * * *",
-            StartUrl: "/", ListSelector: "a.html-doc-button, a[href*='eskiler']",
-            ContentSelector: "#divResmiGazete, .html-content",
-            UrlPattern: @"eskiler|/\d{8}/", MaxPages: 5, Language: "tr",
+            StartUrl: "/", ListSelector: "a[href*='/eskiler/'], a[href*='/ilanlar/eskiilanlar/']",
+            ContentSelector: "body",
+            // Günlük nüsha: /eskiler/2026/08/20260826-4.htm
+            // Resmî ilanlar: /ilanlar/eskiilanlar/2026/08/20260826-3.htm
+            UrlPattern: @"/(?:eskiler|ilanlar/eskiilanlar)/\d{4}/\d{2}/\d{8}(?:-\d+)?\.(?:htm|pdf)$",
+            MaxPages: 12, Language: "tr",
             DocumentTypes: "text/html,application/pdf",
-            Note: "Günlük yayımlanan mevzuatın birincil kaynağı."),
+            Note: "Günlük mevzuatın ve resmî ihale ilanlarının birincil kaynağı. "
+                + "Sunucu ara sertifikayı göndermiyor; TLS uyumu collector/tls.py içinde."),
 
         new("Gelir İdaresi Başkanlığı", SourceType.Ministry, SourceCategory.Tax,
             "Gelir İdaresi Başkanlığı", "TR", "gib.gov.tr",

@@ -559,6 +559,89 @@ public sealed class SourcePipelineTests(GovAiApiFactory factory)
         Assert.Equal("https://kurum.gov.tr", source.BaseUrl);
     }
 
+    [Fact(DisplayName = "Faz2-Z. Karantinadaki çağrının bildirimi gösterilmez ama silinmez")]
+    public async Task Karantinadaki_cagrinin_bildirimi_gosterilmez()
+    {
+        var sourceId = await CreateSourceAsync("Bildirim Karantina Testi");
+
+        var belge = await IngestAsync(
+            sourceId, "https://kurum.gov.tr/ilan/bildirim-1", "Bildirimli Çağrı", GercekIcerik);
+
+        var documentId = belge.GetProperty("documentId").GetGuid();
+
+        var firsat = await UpsertOpportunityAsync(sourceId, new
+        {
+            sourceId,
+            sourceDocumentId = documentId,
+            sourceType = "Ministry",
+            supportCategory = "Grant",
+            title = "Bildirimli Çağrı",
+            publisher = "Test Kurumu",
+            publishedAt = DateTimeOffset.UtcNow,
+            summary = GercekIcerik,
+            sourceUrl = "https://kurum.gov.tr/ilan/bildirim-1",
+            deadline = DateTimeOffset.UtcNow.AddDays(60)
+        });
+
+        var opportunityId = firsat.GetProperty("id").GetGuid();
+
+        // Bu çağrıya ait bir bildirim üretilmiş olsun.
+        await QueryAsync(async db =>
+        {
+            db.Notifications.Add(new GovAI.Domain.Notifications.Notification(
+                _factory.TenantA.TenantId,
+                _factory.TenantA.CompanyId,
+                GovAI.Domain.Common.NotificationKind.NewMatch,
+                "Yeni uygun fırsat: Bildirimli Çağrı",
+                "Test gövdesi.",
+                DateTimeOffset.UtcNow,
+                $"bildirim-karantina-{opportunityId}",
+                opportunityId));
+
+            await db.SaveChangesAsync();
+            return true;
+        });
+
+        var oncesi = await _tenantAdmin.GetFromJsonAsync<JsonElement>("/api/notifications?pageSize=200");
+        var oncekiBasliklar = oncesi.GetProperty("items").EnumerateArray()
+            .Select(x => x.GetProperty("title").GetString()).ToList();
+
+        Assert.Contains("Yeni uygun fırsat: Bildirimli Çağrı", oncekiBasliklar);
+
+        // İnceleyici kaydı karantinaya alır.
+        var reviewer = await _factory.CreateAuthenticatedClientAsync(
+            GovAiApiFactory.PlatformReviewerEmail);
+
+        var reddet = await reviewer.PostAsJsonAsync(
+            $"/api/quarantine/{documentId}/reject",
+            new { reason = "InvalidSourcePage", note = "Bakım duyurusu." });
+
+        Assert.Equal(HttpStatusCode.NoContent, reddet.StatusCode);
+
+        var sonrasi = await _tenantAdmin.GetFromJsonAsync<JsonElement>("/api/notifications?pageSize=200");
+        var sonrakiBasliklar = sonrasi.GetProperty("items").EnumerateArray()
+            .Select(x => x.GetProperty("title").GetString()).ToList();
+
+        Assert.DoesNotContain("Yeni uygun fırsat: Bildirimli Çağrı", sonrakiBasliklar);
+
+        // Bildirim SİLİNMEDİ; yalnızca gösterilmiyor.
+        var kayitDuruyor = await QueryAsync(db => db.Notifications
+            .IgnoreQueryFilters()
+            .AnyAsync(n => n.OpportunityId == opportunityId));
+
+        Assert.True(kayitDuruyor, "Bildirim kaydı silinmemeli.");
+
+        // Karantinadan çıkınca bildirim yerine döner.
+        var onayla = await reviewer.PostAsync($"/api/quarantine/{documentId}/approve", null);
+        onayla.EnsureSuccessStatusCode();
+
+        var geriDonen = await _tenantAdmin.GetFromJsonAsync<JsonElement>("/api/notifications?pageSize=200");
+        var geriBasliklar = geriDonen.GetProperty("items").EnumerateArray()
+            .Select(x => x.GetProperty("title").GetString()).ToList();
+
+        Assert.Contains("Yeni uygun fırsat: Bildirimli Çağrı", geriBasliklar);
+    }
+
     [Fact(DisplayName = "Faz2-V. Bölüm liste sayfası kanıtla karantinaya alınır")]
     public async Task Bolum_liste_sayfasi_karantinaya_alinir()
     {

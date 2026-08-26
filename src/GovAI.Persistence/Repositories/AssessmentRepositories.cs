@@ -1,6 +1,7 @@
 using GovAI.Application.Abstractions.Persistence;
 using GovAI.Domain.Assessments;
 using GovAI.Domain.Auditing;
+using GovAI.Domain.Common;
 using GovAI.Domain.Identity;
 using GovAI.Domain.Notifications;
 using Microsoft.EntityFrameworkCore;
@@ -141,6 +142,15 @@ public sealed class NotificationRepository(GovAiDbContext context) : INotificati
         // yalnızca bu kümenin içinde çalışır. (EF genel sorgu filtresi de ayrıca devrededir.)
         var source = context.Notifications.Where(n => n.TenantId == query.TenantId);
 
+        // Karantinadaki çağrıya ait bildirim GÖSTERİLMEZ. Kayıt silinmez: karantina
+        // kalkarsa bildirim kendiliğinden yerine döner. Bunsuz, katalogdan çıkardığımız
+        // bir kayıt "Yeni uygun fırsat: ..." başlığıyla müşteride durmaya devam ederdi.
+        source = source.Where(n =>
+            n.OpportunityId == null
+            || context.Opportunities
+                .Any(o => o.Id == n.OpportunityId
+                    && o.QuarantineReason == QuarantineReason.None));
+
         if (query.CompanyId is not null)
         {
             source = source.Where(n => n.CompanyId == query.CompanyId);
@@ -169,7 +179,12 @@ public sealed class NotificationRepository(GovAiDbContext context) : INotificati
 
     public async Task<IReadOnlyList<Notification>> ListUnsentAsync(int take, CancellationToken cancellationToken = default) =>
         await context.Notifications
+            // Karantinaya alınmış bir çağrının bildirimi artık GÖNDERİLMEZ.
             .Where(n => n.SentAt == null && n.DeliveryAttemptCount < 3)
+            .Where(n => n.OpportunityId == null
+                || context.Opportunities
+                    .Any(o => o.Id == n.OpportunityId
+                        && o.QuarantineReason == QuarantineReason.None))
             .OrderBy(n => n.CreatedAt)
             .Take(take)
             .ToListAsync(cancellationToken);

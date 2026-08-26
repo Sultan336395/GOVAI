@@ -19,6 +19,7 @@ Faz 2 düzeltmeleri:
 from __future__ import annotations
 
 import re
+import ssl
 import time
 from dataclasses import dataclass
 from urllib.parse import urljoin, urlparse
@@ -27,6 +28,7 @@ from urllib.robotparser import RobotFileParser
 import httpx
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
+from govai_workers.collector import tls
 from govai_workers.collector.safety import (
     DomainPolicy,
     UnsafeUrlError,
@@ -105,15 +107,46 @@ class PoliteFetcher:
     """robots.txt'e uyan, hız sınırlı ve SSRF'e karşı korunmuş HTTP istemcisi."""
 
     def __init__(self, policy: DomainPolicy | None = None) -> None:
-        self._client = httpx.Client(
+        self._client = self._istemci_olustur(None)
+        self._robots: dict[str, RobotFileParser | None] = {}
+        self._last_request_at: float = 0.0
+        self._policy = policy
+
+        # Alan adına özgü TLS bağlamı gerektiren resmî sunucular için ayrı istemci.
+        # Bkz. collector/tls.py — doğrulama hiçbirinde kapatılmaz.
+        self._tls_istemcileri: dict[str, httpx.Client] = {}
+
+    @staticmethod
+    def _istemci_olustur(verify: ssl.SSLContext | None) -> httpx.Client:
+        return httpx.Client(
             # Yönlendirmeler elle izlenir; her adım güvenlik denetiminden geçmelidir.
             follow_redirects=False,
             timeout=settings.api_timeout_seconds,
             headers={"User-Agent": settings.crawl_user_agent},
+            **({} if verify is None else {"verify": verify}),
         )
-        self._robots: dict[str, RobotFileParser | None] = {}
-        self._last_request_at: float = 0.0
-        self._policy = policy
+
+    def _istemci(self, url: str) -> httpx.Client:
+        """Bu adres için kullanılacak istemci.
+
+        Resmî kurum sunucularının bir kısmı Python'un varsayılan TLS ayarlarıyla
+        konuşmuyor (eksik ara sertifika ya da eski şifre takımı). O sunucular için
+        ayrı bir bağlam kurulur; **sertifika doğrulaması aynen açık kalır**.
+        """
+        host = (urlparse(url).hostname or "").lower()
+        eslesme = tls.uyum_bul(host)
+
+        if eslesme is None:
+            return self._client
+
+        alan, _ = eslesme
+        istemci = self._tls_istemcileri.get(alan)
+
+        if istemci is None:
+            istemci = self._istemci_olustur(tls.baglam_olustur(host))
+            self._tls_istemcileri[alan] = istemci
+
+        return istemci
 
     def with_policy(self, policy: DomainPolicy) -> PoliteFetcher:
         """Kaynağa özgü alan adı politikasını bağlar."""
@@ -139,7 +172,7 @@ class PoliteFetcher:
 
     def _load_robots(self, origin: str) -> RobotFileParser | None:
         try:
-            response = self._client.get(urljoin(origin, "/robots.txt"))
+            response = self._istemci(origin).get(urljoin(origin, "/robots.txt"))
             if response.status_code != httpx.codes.OK:
                 return None
 
@@ -174,7 +207,7 @@ class PoliteFetcher:
         for _ in range(MAX_REDIRECTS + 1):
             self._throttle()
 
-            with self._client.stream("GET", current) as response:
+            with self._istemci(current).stream("GET", current) as response:
                 if response.is_redirect:
                     location = response.headers.get("location")
                     if not location:
@@ -227,6 +260,9 @@ class PoliteFetcher:
 
     def close(self) -> None:
         self._client.close()
+
+        for istemci in self._tls_istemcileri.values():
+            istemci.close()
 
     def __enter__(self) -> PoliteFetcher:
         return self
