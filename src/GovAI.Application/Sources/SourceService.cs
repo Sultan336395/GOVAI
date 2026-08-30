@@ -99,8 +99,24 @@ public sealed record RecordVerificationRequest
 {
     public required bool Reachable { get; init; }
 
-    /// <summary>Seçicinin çıkardığı bağlantı sayısı. Sıfırsa yapılandırma çalışmıyordur.</summary>
+    /// <summary>Seçicinin çıkardığı bağlantı sayısı.</summary>
     public int DiscoveredLinkCount { get; init; }
+
+    /// <summary>
+    /// Toplayıcının verdiği sonuç: <c>Verified</c>, <c>NoNewContent</c>,
+    /// <c>SelectorBroken</c>, <c>Unreachable</c>.
+    ///
+    /// "Bugün yayın yok" bir arıza DEĞİLDİR: Resmî Gazete hafta sonu ve resmî
+    /// tatillerde yayımlanmaz. Bunu seçici arızasından ayırmak için toplayıcı
+    /// arşivi geriye tarar; son günlerde yayımlanmış bir sayı bulabiliyorsa
+    /// seçici çalışıyor demektir.
+    ///
+    /// Boş bırakılırsa eski davranış geçerlidir (bağlantı sayısı sıfırsa arıza).
+    /// </summary>
+    public string? Outcome { get; init; }
+
+    /// <summary>Arşivden bulunan en son yayın tarihi.</summary>
+    public string? LastPublishedOn { get; init; }
 
     public int? HttpStatusCode { get; init; }
     public string? FinalUrl { get; init; }
@@ -642,6 +658,25 @@ public sealed class SourceService(
 
             return new RecordVerificationResult(
                 sourceId, false, source.Health, source.IsEnabled, reason);
+        }
+
+        // "Bugün yayın yok" kaynağı arızalı yapmaz: seçici çalışıyor, sadece bugün
+        // yayımlanmış bir sayı yok. Toplayıcı bunu arşivi tarayarak kanıtlar.
+        if (string.Equals(request.Outcome, "NoNewContent", StringComparison.Ordinal))
+        {
+            source.MarkVerified(now);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+
+            var note = request.LastPublishedOn is { Length: > 0 } tarih
+                ? $"Erişim başarılı, yeni belge yok. En son yayın: {tarih}."
+                : "Erişim başarılı, yeni belge yok.";
+
+            logger.LogInformation(
+                "Kaynakta yeni yayın yok. SourceId={SourceId} SonYayin={LastPublished}",
+                sourceId, request.LastPublishedOn);
+
+            return new RecordVerificationResult(
+                sourceId, true, source.Health, source.IsEnabled, note);
         }
 
         if (request.DiscoveredLinkCount <= 0)

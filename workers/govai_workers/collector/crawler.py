@@ -51,6 +51,11 @@ class SourceConfig:
     max_pages: int = 1
     allowed_domains: str = ""
 
+    #: Yayın takvimi olan kaynaklarda arşiv adresi şablonu.
+    #: Örn. "/fihrist?tarih={date}". Boşsa "bugün yayın yok" ayrımı yapılamaz
+    #: ve boş liste eskisi gibi seçici arızası sayılır.
+    archive_url_template: str = ""
+
     @property
     def is_crawlable(self) -> bool:
         """Liste seçicisi veya URL kalıbından en az biri olmadan tarama yapılmaz."""
@@ -72,6 +77,7 @@ class SourceConfig:
             resolved_max = legacy.max_pages
 
         return cls(
+            archive_url_template=pick("archiveUrlTemplate", legacy.archive_url_template),
             list_url=pick("startUrl", legacy.list_url),
             link_selector=pick("listSelector", legacy.link_selector),
             title_selector=pick("titleSelector", legacy.title_selector) or "h1",
@@ -105,6 +111,7 @@ class SourceConfig:
             url_pattern=data.get("urlPattern", ""),
             max_pages=max(1, max_pages),
             allowed_domains=data.get("allowedDomains", ""),
+            archive_url_template=data.get("archiveUrlTemplate", ""),
         )
 
 

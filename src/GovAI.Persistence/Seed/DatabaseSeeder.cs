@@ -85,7 +85,15 @@ public sealed class DatabaseSeeder(
 
             mevcut.PlanCrawl(new Domain.Sources.SourceCrawlPlan(
                 tanim.StartUrl, tanim.ListSelector, tanim.ContentSelector, tanim.UrlPattern,
-                tanim.MaxPages, tanim.OfficialDomain, tanim.DocumentTypes));
+                tanim.MaxPages, tanim.AllowedDomains ?? tanim.OfficialDomain, tanim.DocumentTypes));
+
+            // Arşiv şablonu da güncellenmeli: "bugün yayın yok" ayrımı buna dayanır.
+            if (tanim.ArchiveUrlTemplate is { Length: > 0 } arsiv)
+            {
+                mevcut.Configure(
+                    tanim.CronExpression,
+                    "{\"archiveUrlTemplate\":\"" + arsiv + "\"}");
+            }
 
             // Doğrulanana kadar taranmaz.
             mevcut.Disable();

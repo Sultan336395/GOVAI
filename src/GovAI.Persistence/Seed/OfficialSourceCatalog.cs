@@ -43,7 +43,17 @@ public static class OfficialSourceCatalog
         /// (ör. EUR-Lex içeriği AB Yayın Ofisi'nin CELLAR ucundan gelir).
         /// Boşsa tarama resmî alan adının dışına çıkamaz.
         /// </summary>
-        string? AllowedDomains = null);
+        string? AllowedDomains = null,
+
+        /// <summary>
+        /// Yayın takvimi olan kaynaklarda arşiv adresi şablonu.
+        ///
+        /// Resmî Gazete hafta sonu ve resmî tatillerde yayımlanmaz; o günlerde ana
+        /// sayfa erişilebilir ama günün sayısı yoktur. Toplayıcı bu şablonla arşivi
+        /// geriye tarayıp "bugün yayın yok" ile "seçici bozuldu" durumlarını AYIRIR.
+        /// Boşsa ayrım yapılamaz ve boş liste eskisi gibi arıza sayılır.
+        /// </summary>
+        string? ArchiveUrlTemplate = null);
 
     /// <summary>Türkiye ve AB pilot kaynakları.</summary>
     public static IReadOnlyList<Definition> All { get; } =
@@ -59,6 +69,7 @@ public static class OfficialSourceCatalog
             UrlPattern: @"/(?:eskiler|ilanlar/eskiilanlar)/\d{4}/\d{2}/\d{8}(?:-\d+)?\.(?:htm|pdf)$",
             MaxPages: 12, Language: "tr",
             DocumentTypes: "text/html,application/pdf",
+            ArchiveUrlTemplate: "/fihrist?tarih={date}",
             Note: "Günlük mevzuatın ve resmî ihale ilanlarının birincil kaynağı. "
                 + "Sunucu ara sertifikayı göndermiyor; TLS uyumu collector/tls.py içinde."),
 
@@ -78,6 +89,7 @@ public static class OfficialSourceCatalog
             UrlPattern: @"/ilanlar/eskiilanlar/\d{4}/\d{2}/\d{8}-\d+\.htm$",
             MaxPages: 6, Language: "tr",
             DocumentTypes: "text/html",
+            ArchiveUrlTemplate: "/fihrist?tarih={date}",
             Note: "Artırma, eksiltme ve ihale ilânları. Mevzuat kaynağından AYRIDIR: "
                 + "ilan bir yükümlülük değil, başvurulabilecek bir çağrıdır."),
 
@@ -227,6 +239,14 @@ public static class OfficialSourceCatalog
             definition.MaxPages,
             AllowedDomains: definition.AllowedDomains ?? definition.OfficialDomain,
             DocumentTypes: definition.DocumentTypes));
+        // Arşiv şablonu plan kolonlarında yok; toplayıcının okuduğu serbest gövdede taşınır.
+        if (definition.ArchiveUrlTemplate is { Length: > 0 } arsiv)
+        {
+            source.Configure(
+                definition.CronExpression,
+                "{\"archiveUrlTemplate\":\"" + arsiv + "\"}");
+        }
+
 
         // Doğrulanana kadar KAPALI. Aktifmiş gibi gösterilmez.
         source.Disable();
