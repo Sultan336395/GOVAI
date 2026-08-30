@@ -27,6 +27,8 @@ import sys
 from collections import OrderedDict
 from typing import Any
 
+import httpx
+
 from govai_workers.api_client import ApiError, GovAiClient
 from govai_workers.logging_setup import configure_logging, get_logger
 from govai_workers.messaging import RoutingKeys, consume, publish
@@ -42,6 +44,18 @@ MAX_ATTEMPTS = 3
 
 #: Ölü mektup yönlendirme anahtarı.
 DEAD_LETTER_KEY = "govai.scoring.dead-letter"
+
+#: Yeniden denenebilir sayılan hatalar.
+#:
+#: ``ApiError`` tek başına yetmiyordu: API erişilemez olduğunda (yeniden başlatma,
+#: ağ kesintisi) istemci ``httpx.HTTPError`` fırlatır ve bu, işleyicinin dışına
+#: kaçarak retry/ölü mektup mantığını TAMAMEN ATLIYORDU. Mesaj kaybolmuyordu —
+#: kuyruğun kendi dead-letter exchange'i devreye giriyordu — ama attempt sayacı
+#: işlemiyor ve ölü mektup kaydına hata nedeni yazılmıyordu.
+#:
+#: Canlı doğrulamada görüldü: API kapalıyken gelen mesaj `message_handler_failed`
+#: ile düştü, `scoring_message_retry` hiç loglanmadı.
+RETRYABLE_ERRORS = (ApiError, httpx.HTTPError)
 
 
 class IdempotencyCache:
@@ -148,7 +162,7 @@ def make_handler(client: GovAiClient, cache: IdempotencyCache):  # noqa: ANN201
 
         try:
             _handle(client, payload)
-        except ApiError as exc:
+        except RETRYABLE_ERRORS as exc:
             if attempt >= MAX_ATTEMPTS:
                 # Israrla başarısız mesaj tüketiciyi tıkamaz; ölü mektuba gider.
                 log.error(

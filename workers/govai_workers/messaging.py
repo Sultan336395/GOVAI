@@ -79,6 +79,22 @@ def consume(
     channel.queue_declare(queue=f"{queue_name}.dead", durable=True)
     channel.queue_bind(queue=f"{queue_name}.dead", exchange=dead_letter_exchange, routing_key="#")
 
+    # İşleyicinin KENDİ ölü mektup yayını da aynı kuyruğa düşmeli.
+    #
+    # İki ayrı yol var ve ikisi de gerekli:
+    #   * Kuyruğun DLX'i — işleyici çökerse ya da mesajı reddederse devreye girer,
+    #     ama hatanın nedenini yazamaz.
+    #   * İşleyicinin publish(DEAD_LETTER_KEY, ...) çağrısı — deneme sayacı dolduğunda
+    #     hatanın nedeniyle birlikte bırakır.
+    #
+    # İkincisi ANA exchange'e yayımlanıyor; bu bağlama olmadan hiçbir kuyruğa
+    # ulaşmıyor ve sessizce kayboluyordu.
+    channel.queue_bind(
+        queue=f"{queue_name}.dead",
+        exchange=settings.rabbitmq_exchange,
+        routing_key=f"{queue_name}.dead-letter",
+    )
+
     channel.queue_declare(
         queue=queue_name,
         durable=True,

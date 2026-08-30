@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
+import httpx
 import pytest
 
 from govai_workers.api_client import ApiError
@@ -114,6 +115,53 @@ class TestYonlendirme:
 
         assert istemci.batch_calls == 0
         assert yayinlar == []
+
+
+class TestBaglantiHatasi:
+    """API erişilemezse retry/ölü mektup mantığı ÇALIŞMALI.
+
+    İlk yazımda yalnızca ``ApiError`` yakalanıyordu. API kapalıyken istemci
+    ``httpx.ConnectError`` fırlatıyor ve bu, işleyicinin dışına kaçarak retry
+    sayacını ve ölü mektup kaydını tamamen atlıyordu. Canlı önizlemede görüldü.
+    """
+
+    def test_baglanti_hatasi_yeniden_denenir(self, yayinlar) -> None:
+        istemci = SahteIstemci(hata=httpx.ConnectError("api erisilemedi"))
+        handle = runner.make_handler(istemci, runner.IdempotencyCache())
+
+        handle({"reason": "OpportunityCreated", "opportunityId": "firsat-b1", "attempt": 1})
+
+        assert len(yayinlar) == 1
+        key, payload = yayinlar[0]
+        assert key == runner.RoutingKeys.SCORING_REQUESTED
+        assert payload["attempt"] == 2
+
+    def test_baglanti_hatasi_son_denemede_olu_mektuba_gider(self, yayinlar) -> None:
+        istemci = SahteIstemci(hata=httpx.ConnectError("api erisilemedi"))
+        handle = runner.make_handler(istemci, runner.IdempotencyCache())
+
+        handle({
+            "reason": "OpportunityCreated",
+            "opportunityId": "firsat-b2",
+            "attempt": runner.MAX_ATTEMPTS,
+        })
+
+        assert len(yayinlar) == 1
+        key, payload = yayinlar[0]
+        assert key == runner.DEAD_LETTER_KEY
+
+        # Ölü mektup kaydı hatanın NEDENİNİ taşımalı; kuyruğun kendi DLX'i bunu yazmaz.
+        assert "error" in payload
+        assert "erisilemedi" in payload["error"]
+
+    def test_zaman_asimi_da_yeniden_denenir(self, yayinlar) -> None:
+        istemci = SahteIstemci(hata=httpx.ReadTimeout("zaman asimi"))
+        handle = runner.make_handler(istemci, runner.IdempotencyCache())
+
+        handle({"reason": "OpportunityCreated", "opportunityId": "firsat-b3", "attempt": 1})
+
+        assert len(yayinlar) == 1
+        assert yayinlar[0][0] == runner.RoutingKeys.SCORING_REQUESTED
 
 
 class TestRetryVeDeadLetter:
