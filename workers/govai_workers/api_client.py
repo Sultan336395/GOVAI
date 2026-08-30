@@ -81,6 +81,18 @@ class GovAiClient:
 
     # ---- kaynaklar ----
 
+    def get_source(self, source_id: str) -> dict[str, Any] | None:
+        """Tek bir kaynağın kaydını döner.
+
+        Kaynağın kategorisi mesajdan DEĞİL buradan okunur: mesaj eksik ya da
+        yanlış gelirse mevzuat belgesi fırsat kataloğuna yazılabilirdi.
+        """
+        for source in self.list_sources(only_enabled=False):
+            if source.get("id") == source_id:
+                return source
+
+        return None
+
     def list_sources(self, only_enabled: bool = True) -> list[dict[str, Any]]:
         return self._request("GET", "/api/sources", params={"onlyEnabled": only_enabled}) or []
 

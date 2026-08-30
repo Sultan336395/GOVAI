@@ -44,13 +44,23 @@ public sealed class DatabaseSeeder(
         var eklenen = 0;
         var yukseltilen = 0;
 
+        // Bir satır yalnızca BİR tanıma eşlenir. Aynı kurum birden çok kaynak
+        // tanımlayabilir (Resmî Gazete hem mevzuat hem ihale ilanı yayımlar); alan adı
+        // eşleşmesi tek başına bırakılırsa ikinci tanım birincinin satırını ele geçirir
+        // ve yeni kaynak hiç açılmaz.
+        var eslesenler = new HashSet<Guid>();
+
         foreach (var tanim in OfficialSourceCatalog.All)
         {
             // Önce ada, sonra resmî alan adına bakılır: Faz 0 seed'inden gelen kayıtlar
             // farklı adlarla ("KOSGEB Destek Çağrıları") aynı kurumu gösteriyor olabilir.
             var mevcut =
-                mevcutlar.FirstOrDefault(s => s.Name == tanim.Name)
-                ?? mevcutlar.FirstOrDefault(s => SameHost(s.BaseUrl, tanim.BaseUrl));
+                mevcutlar.FirstOrDefault(s => s.Name == tanim.Name && eslesenler.Add(s.Id))
+                ?? mevcutlar.FirstOrDefault(s =>
+                       SameHost(s.BaseUrl, tanim.BaseUrl)
+                       // Alan adı eşleşmesi, adı katalogda geçen bir satırı ele geçiremez.
+                       && !OfficialSourceCatalog.All.Any(d => d.Name == s.Name)
+                       && eslesenler.Add(s.Id));
 
             if (mevcut is null)
             {

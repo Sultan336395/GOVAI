@@ -62,6 +62,25 @@ public static class OfficialSourceCatalog
             Note: "Günlük mevzuatın ve resmî ihale ilanlarının birincil kaynağı. "
                 + "Sunucu ara sertifikayı göndermiyor; TLS uyumu collector/tls.py içinde."),
 
+        // Aynı kurum hem mevzuat hem ihale yayımlar; SourceCategory tam olarak bunun
+        // içindir. Resmî Gazete'nin "Artırma, Eksiltme ve İhale İlânları" bölümü
+        // Türkiye'de ihale ilanlarının RESMÎ yayın yeridir ve mevzuat değildir —
+        // bu yüzden ayrı bir kaynak olarak, Tender kategorisiyle tanımlanır.
+        //
+        // EKAP'ın kendi arayüzü otomatik erişime uygun değildir (tek sayfa uygulaması
+        // ve ASP.NET postback; GET ile açılabilen tek bir ilan adresi yoktur), bu
+        // yüzden Türkiye ihale ilanlarının makine okunabilir birincil kaynağı burasıdır.
+        new("Resmî Gazete İhale İlanları", SourceType.OfficialGazette, SourceCategory.Tender,
+            "T.C. Cumhurbaşkanlığı", "TR", "resmigazete.gov.tr",
+            "https://www.resmigazete.gov.tr", "0 8 * * *",
+            StartUrl: "/", ListSelector: "a[href*='/ilanlar/eskiilanlar/']",
+            ContentSelector: "body",
+            UrlPattern: @"/ilanlar/eskiilanlar/\d{4}/\d{2}/\d{8}-\d+\.htm$",
+            MaxPages: 6, Language: "tr",
+            DocumentTypes: "text/html",
+            Note: "Artırma, eksiltme ve ihale ilânları. Mevzuat kaynağından AYRIDIR: "
+                + "ilan bir yükümlülük değil, başvurulabilecek bir çağrıdır."),
+
         new("Gelir İdaresi Başkanlığı", SourceType.Ministry, SourceCategory.Tax,
             "Gelir İdaresi Başkanlığı", "TR", "gib.gov.tr",
             "https://www.gib.gov.tr", "0 8 * * *",

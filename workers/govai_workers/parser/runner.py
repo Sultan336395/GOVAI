@@ -111,6 +111,42 @@ def guess_category(title: str, text: str) -> str:
     return "Other"
 
 
+def _kaynak_kategorisi(
+    client: GovAiClient,
+    source_id: str,
+    document: dict[str, Any],
+) -> str | None:
+    """Kaynağın kategorisi — **veritabanındaki kayıttan**.
+
+    Mesajdaki ``sourceCategory`` yalnızca kaynak okunamadığında ve mesajda
+    gerçekten varsa kullanılır; uydurma yapılmaz. İkisi de yoksa ``None`` döner
+    ve çağıran fırsat kaydı açmaz.
+    """
+    try:
+        source = client.get_source(source_id)
+    except Exception:  # noqa: BLE001 — kaynak okunamazsa tahmin edilmez
+        log.exception("source_lookup_failed", source_id=source_id)
+        return document.get("sourceCategory")
+
+    if source is None:
+        log.warning("source_not_found_for_document", source_id=source_id)
+        return document.get("sourceCategory")
+
+    kategori = source.get("category")
+
+    # Mesajla veritabanı ayrışıyorsa bu bir uyarıdır: kuyrukta eski mesaj olabilir.
+    mesajdaki = document.get("sourceCategory")
+    if mesajdaki and kategori and mesajdaki != kategori:
+        log.warning(
+            "source_category_mismatch",
+            source_id=source_id,
+            mesajdaki=mesajdaki,
+            veritabani=kategori,
+        )
+
+    return kategori
+
+
 def process_document(client: GovAiClient, document: dict[str, Any]) -> None:
     """Bir dokümanı ayrıştırır ve fırsat kaydına çevirir."""
     url = document["url"]
@@ -195,11 +231,23 @@ def process_document(client: GovAiClient, document: dict[str, Any]) -> None:
     # Mevzuat kaynağından gelen belge FIRSAT KATALOĞUNA YAZILMAZ.
     # Mevzuata başvurulmaz; uyulur. Kaydı sunucu, kaynağın kategorisine bakarak
     # RegulatoryChange olarak açar (bkz. SourceService.TryRecordRegulatoryChangeAsync).
-    if document.get("sourceCategory") in REGULATION_CATEGORIES:
+    #
+    # Kategori MESAJDAN OKUNMAZ. Mesajdaki alan eksik kalırsa mevzuat belgesi
+    # fırsat kataloğuna yazılmaya çalışılırdı; sunucu bunu reddeder ama ayrıştırma
+    # da hataya düşerdi. Doğru kaynak veritabanındaki Source kaydıdır.
+    kategori = _kaynak_kategorisi(client, source_id, document)
+
+    if kategori is None:
+        # Kaynak okunamadıysa TAHMİN EDİLMEZ. Kanıt parçaları zaten kaydedildi;
+        # fırsat kaydı açmak için kategorinin bilinmesi şarttır.
+        log.warning("source_category_unknown_skipping_opportunity", document_id=document_id)
+        return
+
+    if kategori in REGULATION_CATEGORIES:
         log.info(
             "regulation_document_not_an_opportunity",
             document_id=document_id,
-            category=document.get("sourceCategory"),
+            category=kategori,
         )
         return
 
