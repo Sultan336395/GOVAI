@@ -22,7 +22,9 @@ public sealed class GovAiDesignTimeDbContextFactory : IDesignTimeDbContextFactor
 {
     public GovAiDbContext CreateDbContext(string[] args)
     {
-        var target = EfMigrationTarget.Resolve(Environment.GetEnvironmentVariable);
+        var target = EfMigrationTarget.Resolve(
+            Environment.GetEnvironmentVariable,
+            EfMigrationTarget.SystemResolver);
 
         // Yalnızca sunucu/port/veritabanı yazılır. Kullanıcı adı ve parola YAZILMAZ.
         Console.Error.WriteLine($"[GOVAI] EF hedefi: {target.Description}");

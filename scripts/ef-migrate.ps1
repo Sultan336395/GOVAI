@@ -48,8 +48,10 @@ function Get-EnvDegeri {
 }
 
 if ($Hedef -eq 'model-only') {
-    # Veritabanına hiç bağlanmayan komutlar için.
+    # Veritabanına hiç bağlanmayan komutlar için. Ortam beyanı gerekmez:
+    # bağlantı zaten çözümlenemeyen bir adrese gidiyor.
     $env:GOVAI_EF_CONNECTION_STRING = 'model-only'
+    Remove-Item Env:\GOVAI_EF_ENVIRONMENT -ErrorAction SilentlyContinue
 }
 else {
     $envDosyasi = Join-Path $kok 'deploy\.env.preview'
@@ -74,6 +76,9 @@ else {
 
     $env:GOVAI_EF_CONNECTION_STRING =
         "Host=localhost;Port=$port;Database=govai;Username=govai;Password=$parola"
+
+    # Ortam beyanı: bağlantı gerçekten önizlemeye gitmiyorsa komut durur.
+    $env:GOVAI_EF_ENVIRONMENT = 'Preview'
 }
 
 # Üretim onayı bu betikten asla verilmez.

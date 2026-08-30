@@ -1,4 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Net;
+using System.Net.Sockets;
 using Npgsql;
 
 namespace GovAI.Persistence.Design;
@@ -16,11 +18,18 @@ namespace GovAI.Persistence.Design;
 /// </para>
 ///
 /// <para>
-/// <b>Kural:</b> hedef yalnızca <c>GOVAI_EF_CONNECTION_STRING</c> ile verilir.
-/// Değişken yoksa komut açıklayıcı bir hatayla durur; sessiz bir varsayılana düşmez.
-/// Hedef korunan bir adresse (5180'in Postgres'i) ayrıca <c>GOVAI_EF_ALLOW_PRODUCTION</c>
-/// onayı istenir.
+/// <b>Üç katmanlı denetim:</b>
 /// </para>
+/// <list type="number">
+///   <item><b>Hedef açıkça verilmeli.</b> <see cref="ConnectionVariable"/> yoksa komut durur;
+///         sessiz bir varsayılana düşmez.</item>
+///   <item><b>Ortam kimliği doğrulanmalı.</b> Çağıran <see cref="EnvironmentVariable"/> ile
+///         hangi ortama gittiğini <i>beyan eder</i>; bağlantı dizesinden çözülen gerçek ortam
+///         bununla eşleşmezse komut durur. "Önizlemeye gidiyorum" diyip üretime bağlanmak
+///         mümkün değildir.</item>
+///   <item><b>Üretim ayrıca onay ister.</b> 5180 için <see cref="ProductionConsentVariable"/>
+///         tam değeriyle verilmelidir.</item>
+/// </list>
 ///
 /// <para>
 /// Bağlantı dizesi <b>hiçbir yerde bütün olarak yazılmaz</b>: ne hatada, ne logda.
@@ -31,6 +40,12 @@ public static class EfMigrationTarget
 {
     /// <summary>Hedefi belirleyen zorunlu değişken.</summary>
     public const string ConnectionVariable = "GOVAI_EF_CONNECTION_STRING";
+
+    /// <summary>
+    /// Çağıranın <b>beyan ettiği</b> ortam. Bağlantıdan çözülen gerçek ortamla
+    /// eşleşmek zorundadır; yanlış beyan komutu durdurur.
+    /// </summary>
+    public const string EnvironmentVariable = "GOVAI_EF_ENVIRONMENT";
 
     /// <summary>Korunan hedefe dokunmak için gereken açık onay değişkeni.</summary>
     public const string ProductionConsentVariable = "GOVAI_EF_ALLOW_PRODUCTION";
@@ -53,30 +68,86 @@ public static class EfMigrationTarget
         "Host=govai-ef-model-only.invalid;Port=1;Database=govai_model_only;" +
         "Username=model-only;Password=model-only;Timeout=1;Command Timeout=1";
 
+    /// <summary>5180 (müşterinin canlı ortamı) Postgres portu.</summary>
+    public const int ProductionPort = 5432;
+
+    /// <summary>5181 önizleme ortamının Postgres portu.</summary>
+    public const int PreviewPort = 15437;
+
+    /// <summary>Üretim veritabanının adı. Farklı bir ad, farklı bir veritabanı demektir.</summary>
+    public const string ProductionDatabase = "govai";
+
     /// <summary>
-    /// Korunan hedefler: 5180 ortamının Postgres'i. Sunucu adı ve port çiftiyle
-    /// eşleşir, çünkü ayırt edici olan budur — veritabanı adı her ortamda "govai".
+    /// Aynı makineye / aynı Postgres'e ulaşan sunucu adları.
+    ///
+    /// <para>
+    /// Liste yalnızca metin karşılaştırması değildir: ad çözümlemesi de yapılır
+    /// (bkz. <see cref="ResolvesToLocalMachine"/>), çünkü buraya yazılmamış bir ad da
+    /// aynı hedefe çıkabilir. İkisi birlikte çalışır: liste, çözümleme yapılamayan
+    /// container adlarını (host'ta çözülmez) yakalar; çözümleme ise listede olmayan
+    /// takma adları yakalar.
+    /// </para>
     /// </summary>
-    private static readonly (string Host, int Port)[] ProtectedTargets =
+    private static readonly string[] LocalHostNames =
     [
-        ("localhost", 5432),
-        ("127.0.0.1", 5432),
-        ("::1", 5432),
-        ("[::1]", 5432),
+        "localhost",
+        "127.0.0.1",
+        "::1",
+        "[::1]",
+        "0.0.0.0",
+        // Container içinden host'a çıkan adlar
+        "host.docker.internal",
+        "gateway.docker.internal",
+        "docker.for.win.localhost",
+        "docker.for.mac.localhost",
+        // 5180 compose yığınının Postgres'ine ulaşan adlar
+        "govai-postgres-1",
+        "govai_postgres_1",
+        "govai-postgres",
+        "postgres",
+        "db",
     ];
 
+    /// <summary>Hedef ortamın kimliği.</summary>
+    public enum TargetEnvironment
+    {
+        /// <summary>Veritabanına bağlanılmaz.</summary>
+        ModelOnly,
+
+        /// <summary>5181 önizleme ortamı.</summary>
+        Preview,
+
+        /// <summary>5180 — müşterinin canlı verisi.</summary>
+        Production,
+
+        /// <summary>Bunların dışında bir hedef (ör. geçici test veritabanı).</summary>
+        Other,
+    }
+
     /// <summary>Çözülmüş hedef.</summary>
-    public sealed record Target(string ConnectionString, string Description, bool IsModelOnly);
+    public sealed record Target(
+        string ConnectionString,
+        string Description,
+        TargetEnvironment Environment)
+    {
+        public bool IsModelOnly => Environment == TargetEnvironment.ModelOnly;
+    }
 
     /// <summary>
     /// Ortam değişkenlerinden hedefi çözer.
     /// </summary>
     /// <param name="readVariable">Değişken okuyucu; testte sahtelenir.</param>
+    /// <param name="resolveHost">
+    /// Ad çözümleyici; testte sahtelenir. <c>null</c> dönerse ad çözülemedi demektir
+    /// ve yalnızca <see cref="LocalHostNames"/> listesi geçerli olur.
+    /// </param>
     /// <exception cref="EfMigrationTargetException">
-    /// Bağlantı verilmediğinde, geçersiz olduğunda ya da korunan hedefe onaysız
-    /// gidildiğinde atılır.
+    /// Bağlantı verilmediğinde, geçersiz olduğunda, beyan edilen ortam gerçek hedefle
+    /// uyuşmadığında ya da korunan hedefe onaysız gidildiğinde atılır.
     /// </exception>
-    public static Target Resolve(Func<string, string?> readVariable)
+    public static Target Resolve(
+        Func<string, string?> readVariable,
+        Func<string, IPAddress[]>? resolveHost = null)
     {
         ArgumentNullException.ThrowIfNull(readVariable);
 
@@ -91,7 +162,10 @@ public static class EfMigrationTarget
 
         if (string.Equals(raw, ModelOnlyValue, StringComparison.OrdinalIgnoreCase))
         {
-            return new Target(ModelOnlyConnectionString, "model-only (veritabanına bağlanılmaz)", true);
+            return new Target(
+                ModelOnlyConnectionString,
+                "model-only (veritabanına bağlanılmaz)",
+                TargetEnvironment.ModelOnly);
         }
 
         if (!TryDescribe(raw, out var host, out var port, out var database, out var parseError))
@@ -108,25 +182,84 @@ public static class EfMigrationTarget
                 $"{ConnectionVariable} içinde veritabanı adı yok. Hedef veritabanı açıkça yazılmalıdır.");
         }
 
-        var description = $"{host}:{port}/{database}";
+        var ortam = Classify(host, port, database, resolveHost);
+        var description = $"{host}:{port}/{database} [{Etiket(ortam)}]";
 
-        if (IsProtected(host, port))
+        DogrulaOrtamBeyani(readVariable, ortam, host, port, database);
+
+        if (ortam == TargetEnvironment.Production)
         {
             var consent = readVariable(ProductionConsentVariable)?.Trim();
 
             if (!string.Equals(consent, ProductionConsentValue, StringComparison.Ordinal))
             {
-                throw new EfMigrationTargetException(ProtectedTargetMessage(description));
+                throw new EfMigrationTargetException(ProtectedTargetMessage($"{host}:{port}/{database}"));
             }
         }
 
-        return new Target(raw, description, false);
+        return new Target(raw, description, ortam);
     }
 
-    /// <summary>Hedef, 5180 ortamının veritabanı mı?</summary>
-    public static bool IsProtected(string host, int port) =>
-        ProtectedTargets.Any(t =>
-            t.Port == port && string.Equals(t.Host, host, StringComparison.OrdinalIgnoreCase));
+    /// <summary>
+    /// Bağlantının gerçekte hangi ortama gittiği. Karar <b>yalnızca metne</b> değil,
+    /// ad çözümlemesine de dayanır.
+    /// </summary>
+    public static TargetEnvironment Classify(
+        string host,
+        int port,
+        string database,
+        Func<string, IPAddress[]>? resolveHost = null)
+    {
+        var yerel = IsLocalHostName(host) || ResolvesToLocalMachine(host, resolveHost);
+
+        if (port == ProductionPort && yerel)
+        {
+            // Üretim portu + yerel makine: 5180'in Postgres'i. Veritabanı adı farklı olsa
+            // bile aynı sunucudur; yanlışlıkla oraya şema yazmak istemiyoruz.
+            return TargetEnvironment.Production;
+        }
+
+        if (port == PreviewPort && yerel)
+        {
+            return TargetEnvironment.Preview;
+        }
+
+        return TargetEnvironment.Other;
+    }
+
+    /// <summary>Sunucu adı, bilinen yerel/container adlarından biri mi?</summary>
+    public static bool IsLocalHostName(string host)
+    {
+        host = Normalize(host);
+
+        return LocalHostNames.Any(ad => string.Equals(ad, host, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// Ad, bu makinenin kendisine mi çözülüyor? Listede olmayan bir takma ad
+    /// (<c>db.local</c>, <c>/etc/hosts</c> girdisi…) da aynı Postgres'e çıkabilir.
+    /// Çözümleme başarısız olursa <c>false</c> döner; liste yine devrededir.
+    /// </summary>
+    public static bool ResolvesToLocalMachine(string host, Func<string, IPAddress[]>? resolveHost)
+    {
+        if (resolveHost is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            return resolveHost(Normalize(host)).Any(IPAddress.IsLoopback);
+        }
+        catch (Exception exception) when (exception is SocketException or ArgumentException)
+        {
+            // Ad çözülemedi: liste tabanlı denetim geçerli kalır.
+            return false;
+        }
+    }
+
+    /// <summary>Varsayılan ad çözümleyici.</summary>
+    public static IPAddress[] SystemResolver(string host) => Dns.GetHostAddresses(host);
 
     /// <summary>
     /// Bağlantı dizesini <b>gizli alanları dışarıda bırakarak</b> tanımlar.
@@ -168,19 +301,83 @@ public static class EfMigrationTarget
         }
     }
 
+    private static string Normalize(string host) =>
+        host.Trim().Trim('[', ']').TrimEnd('.').ToLowerInvariant();
+
+    private static string Etiket(TargetEnvironment ortam) => ortam switch
+    {
+        TargetEnvironment.ModelOnly => "model-only",
+        TargetEnvironment.Preview => "önizleme",
+        TargetEnvironment.Production => "ÜRETİM (5180)",
+        _ => "diğer",
+    };
+
+    /// <summary>
+    /// Çağıranın beyan ettiği ortam ile bağlantının gerçek hedefi tutuyor mu?
+    ///
+    /// Bu adım kazayı yakalar: "önizlemeye uyguluyorum" diyen bir komut aslında
+    /// üretime bağlanıyorsa, onay değişkeni olsa bile burada durur.
+    /// </summary>
+    private static void DogrulaOrtamBeyani(
+        Func<string, string?> readVariable,
+        TargetEnvironment gercek,
+        string host,
+        int port,
+        string database)
+    {
+        var beyan = readVariable(EnvironmentVariable)?.Trim();
+
+        if (string.IsNullOrWhiteSpace(beyan))
+        {
+            throw new EfMigrationTargetException(
+                $"""
+                {EnvironmentVariable} tanımlı değil.
+
+                Hangi ortama çalıştığını açıkça beyan etmelisin. Bağlantıdan çözülen
+                gerçek hedef: {host}:{port}/{database} → {Etiket(gercek)}
+
+                  $env:{EnvironmentVariable} = "{Deger(gercek)}"
+
+                Beyan ile gerçek hedef tutmazsa komut durur. Hazır komutlar bunu
+                senin için ayarlar: scripts/ef-migrate.ps1 ve scripts/ef-migrate.sh
+                """);
+        }
+
+        if (!Enum.TryParse<TargetEnvironment>(beyan, ignoreCase: true, out var beyanEdilen)
+            || beyanEdilen != gercek)
+        {
+            throw new EfMigrationTargetException(
+                $"""
+                Ortam beyanı hedefle uyuşmuyor.
+
+                  Beyan edilen : {beyan}
+                  Gerçek hedef : {host}:{port}/{database} → {Etiket(gercek)}
+
+                Bu bir kazadır: bağlantı dizesi beyan ettiğin ortama gitmiyor.
+                Ya bağlantıyı ya beyanı düzelt. Geçerli beyanlar: Preview, Production, Other.
+
+                Veritabanı adının da doğru olduğundan emin ol — üretim veritabanı
+                '{ProductionDatabase}' adını taşır.
+                """);
+        }
+    }
+
+    private static string Deger(TargetEnvironment ortam) => ortam.ToString();
+
     private static string MissingVariableMessage() =>
         $"""
         {ConnectionVariable} tanımlı değil.
 
         EF Core komutları GOVAI'de sessiz bir varsayılana DÜŞMEZ: appsettings içindeki
-        bağlantı localhost:5432'dir ve orası çalışan 5180 ortamının veritabanıdır.
+        bağlantı localhost:{ProductionPort}'dir ve orası çalışan 5180 ortamının veritabanıdır.
         Hedefi her zaman açıkça vermelisin.
 
           # Şemaya dokunmayan komutlar (migrations add, has-pending-model-changes, script)
           $env:{ConnectionVariable} = "{ModelOnlyValue}"
 
           # Önizleme (5181) veritabanına migration uygulamak
-          $env:{ConnectionVariable} = "Host=localhost;Port=15437;Database=govai;Username=govai;Password=<parola>"
+          $env:{ConnectionVariable} = "Host=localhost;Port={PreviewPort};Database=govai;Username=govai;Password=<parola>"
+          $env:{EnvironmentVariable} = "Preview"
 
         Hazır komutlar: scripts/ef-migrate.ps1 ve scripts/ef-migrate.sh
         """;
@@ -196,7 +393,7 @@ public static class EfMigrationTarget
 
           $env:{ProductionConsentVariable} = "{ProductionConsentValue}"
 
-        Önizleme ortamına çalışmak istiyorsan port 15437'dir, 5432 değil.
+        Önizleme ortamına çalışmak istiyorsan port {PreviewPort}'dir, {ProductionPort} değil.
         """;
 }
 

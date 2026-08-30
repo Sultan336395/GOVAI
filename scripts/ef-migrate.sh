@@ -29,8 +29,10 @@ fi
 
 case "$HEDEF" in
   model-only)
-    # Veritabanına hiç bağlanmayan komutlar için.
+    # Veritabanına hiç bağlanmayan komutlar için. Ortam beyanı gerekmez:
+    # bağlantı zaten çözümlenemeyen bir adrese gidiyor.
     export GOVAI_EF_CONNECTION_STRING="model-only"
+    unset GOVAI_EF_ENVIRONMENT
     ;;
 
   preview|onizleme)
@@ -57,6 +59,9 @@ case "$HEDEF" in
     fi
 
     export GOVAI_EF_CONNECTION_STRING="Host=localhost;Port=$PORT;Database=govai;Username=govai;Password=$PAROLA"
+
+    # Ortam beyanı: bağlantı gerçekten önizlemeye gitmiyorsa komut durur.
+    export GOVAI_EF_ENVIRONMENT="Preview"
     ;;
 
   *)
