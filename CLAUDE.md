@@ -125,11 +125,11 @@ Solution dosyası **`GovAI.slnx`**'tir (yeni XML formatı), `.sln` değil.
 
 ```bash
 dotnet build -c Release          # tüm .NET projeleri
-dotnet test                      # 187 test (29 domain + 24 application + 134 API)
+dotnet test                      # 228 test (29 domain + 57 application + 142 API)
 ```
 
 ```bash
-cd workers && .venv/Scripts/python -m pytest -q      # 94 test
+cd workers && .venv/Scripts/python -m pytest -q      # 118 test
 cd workers && .venv/Scripts/python -m ruff check .   # lint (satır sınırı 100)
 ```
 
@@ -179,7 +179,8 @@ onayı asla vermez. Önce yedek al.
 
 Bağlantı dizesi hiçbir yerde bütün olarak yazılmaz — ne hatada, ne logda. EF komutu
 yalnızca `sunucu:port/veritabanı` satırını basar. Kilit `EfMigrationTargetTests` ile
-korunur (13 test).
+korunur (22 test): hedef açıkça verilmeli, beyan edilen ortam gerçek
+hedefle tutmalı, üretim ayrıca tam onay istemeli.
 
 Son komut CI'da da koşar: model ile migration'lar ayrışırsa build kırılır.
 
@@ -264,6 +265,23 @@ sunucu etkilenmez.
 değişmez; kayıt `DocumentOrigin.ManualImport` olur ve ekranda "Elle aktarıldı"
 görünür. Adres kaynağın resmî alan adında olmak zorundadır ve içerik
 yapıştırılmaz — sistem indirir (SSRF korumalı).
+
+**Yayın takvimi.** Resmî Gazete hafta sonu ve tatillerde yayımlanmaz. "Bugün
+yayın yok" bir arıza DEĞİLDİR: `collector/publication.py` kaynağın arşivini geriye
+tarar ve üç durumu ayırır — `NoNewContent` (sağlıklı), `SelectorBroken`,
+`Unreachable`. Hiçbir tarih koda yazılmaz; arşiv adresi kaynağın
+`archiveUrlTemplate` yapılandırmasından gelir.
+
+**Kısa olmak eleme sebebi değildir.** PDF metin çıkarımı bir Cumhurbaşkanı
+kararından yalnızca başlık, karar numarası ve imzayı getirebilir (~150 karakter).
+`Screen()` resmî belge izi taşıyan kısa metinleri geçirir; karar ayrıştırıcıya
+bırakılır. Türkçe karşılaştırma katlanır — `ToUpperInvariant` noktasız `ı` ile
+noktalı `I`'yı eşleştirmez.
+
+**Karakter kümesi.** Resmî Gazete kümeyi HTTP başlığında değil `<meta>` etiketinde
+bildirir (Windows-1254). İndirici meta etiketini de okur, çözülen metni makullük
+denetiminden geçirir ve hiçbir kümeyle temiz çözülemeyen içeriği KAYDETMEZ —
+bozuk metin resmî kanıt olamaz.
 
 **Mevzuat fırsat değildir.** Mevzuat kategorili kaynaktan fırsat kaydı açılamaz;
 `OpportunityService.UpsertAsync` bunu 400 ile reddeder. Worker da aynı ayrımı
