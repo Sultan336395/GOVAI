@@ -30,6 +30,12 @@ public sealed partial class SafeDocumentDownloader(
     /// <summary>Adı geçen istemci; zaman aşımı ve kullanıcı aracısı burada ayarlanır.</summary>
     public const string HttpClientName = "govai-manual-import";
 
+    static SafeDocumentDownloader()
+    {
+        // windows-1254 ve iso-8859-9 .NET Core'da varsayılan olarak YOKTUR.
+        Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+    }
+
     private const int MaxRedirects = 5;
     private const int MaxBytes = 15 * 1024 * 1024;
 
@@ -100,8 +106,22 @@ public sealed partial class SafeDocumentDownloader(
                 return null;
             }
 
-            var charset = response.Content.Headers.ContentType?.CharSet;
+            var charset = response.Content.Headers.ContentType?.CharSet
+                          ?? SniffMetaCharset(bytes);
+
             var content = Decode(bytes, charset);
+
+            if (content is null)
+            {
+                // Metin güvenle çözülemedi. Bozuk metin RESMÎ KANIT OLARAK KULLANILMAZ:
+                // "ARTIRMA, EKS?LTME VE ?HALE ?L?NLARI" gibi bir başlık kaydedilirse
+                // belge sonradan doğru okunamaz ve kanıt zinciri bozulur.
+                logger.LogWarning(
+                    "Belge metni güvenle çözülemedi. Adres={Url} Charset={Charset}",
+                    Redact(current), charset ?? "(bildirilmedi)");
+
+                return null;
+            }
 
             return new DownloadedDocument(
                 content,
@@ -192,22 +212,102 @@ public sealed partial class SafeDocumentDownloader(
         return false;
     }
 
-    private static string Decode(byte[] bytes, string? charset)
+    /// <summary>
+    /// Metni çözer. Güvenle çözülemiyorsa <c>null</c> döner.
+    ///
+    /// Sıra: bildirilen karakter kümesi → UTF-8 → Türkçe eski kümeler. Her adımda
+    /// sonuçta <b>replacement character</b> (U+FFFD) kalıp kalmadığına bakılır;
+    /// kalıyorsa o küme yanlıştır. Resmî Gazete sayfaları kümeyi HTTP başlığında
+    /// değil <c>&lt;meta&gt;</c> etiketinde bildirir (Windows-1254); başlık boş diye
+    /// UTF-8 varsayılınca Türkçe harfler bozuluyordu.
+    /// </summary>
+    /// <summary>Testten erişim; çözümleme kuralı ağ olmadan sınanabilmeli.</summary>
+    internal static string? CozumleTest(byte[] bytes, string? charset) => Decode(bytes, charset);
+
+    /// <summary>Testten erişim; meta tespiti ağ olmadan sınanabilmeli.</summary>
+    internal static string? MetaCharsetTest(byte[] bytes) => SniffMetaCharset(bytes);
+
+    private static string? Decode(byte[] bytes, string? charset)
     {
-        // Karakter kümesi kaybedilirse Türkçe karakterler bozulur.
-        if (!string.IsNullOrWhiteSpace(charset))
+        foreach (var aday in Adaylar(charset))
         {
+            Encoding encoding;
+
             try
             {
-                return Encoding.GetEncoding(charset).GetString(bytes);
+                encoding = Encoding.GetEncoding(aday);
             }
             catch (ArgumentException)
             {
-                // Bilinmeyen küme: UTF-8'e düşülür.
+                continue;
+            }
+
+            var metin = encoding.GetString(bytes);
+
+            if (MakulMetin(metin))
+            {
+                return metin;
             }
         }
 
-        return Encoding.UTF8.GetString(bytes);
+        return null;
+    }
+
+    /// <summary>
+    /// Çözülen metin gerçekten metin mi?
+    ///
+    /// Yalnızca <c>U+FFFD</c> aramak yetmez: <c>windows-1254</c> ve <c>iso-8859-9</c>
+    /// tek baytlıdır ve neredeyse her baytı bir karaktere eşler, bu yüzden yanlış
+    /// kümeyle çözülen ikili içerik hiç replacement character üretmez. UTF-16 bir
+    /// gövde tek baytlı kümede okununca satır satır <c>NUL</c> çıkar — kontrol
+    /// karakterleri bu yüzden ayrıca denetlenir.
+    /// </summary>
+    private static bool MakulMetin(string metin)
+    {
+        if (metin.Contains('\uFFFD'))
+        {
+            return false;
+        }
+
+        foreach (var ch in metin)
+        {
+            // Sekme, satır sonu ve satır başı dışında C0 kontrol karakteri beklenmez.
+            if (char.IsControl(ch)
+                && ch is not ('\t' or '\n' or '\r'))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static IEnumerable<string> Adaylar(string? charset)
+    {
+        if (!string.IsNullOrWhiteSpace(charset))
+        {
+            yield return charset;
+        }
+
+        yield return "utf-8";
+
+        // Türkçe kamu sitelerinde hâlâ yaygın olan eski kümeler.
+        yield return "windows-1254";
+        yield return "iso-8859-9";
+    }
+
+    /// <summary>
+    /// Karakter kümesini <c>&lt;meta&gt;</c> etiketinden okur.
+    ///
+    /// Yalnızca ilk 2 KB taranır ve ASCII olarak yorumlanır: etiketin kendisi her
+    /// zaman ASCII'dir, gövdenin kodlaması henüz bilinmiyor.
+    /// </summary>
+    private static string? SniffMetaCharset(byte[] bytes)
+    {
+        var bas = Encoding.ASCII.GetString(bytes, 0, Math.Min(bytes.Length, 2048));
+        var eslesme = MetaCharsetRegex().Match(bas);
+
+        return eslesme.Success ? eslesme.Groups[1].Value.Trim() : null;
     }
 
     private static string? ExtractTitle(string content)
@@ -231,6 +331,9 @@ public sealed partial class SafeDocumentDownloader(
 
     [GeneratedRegex(@"<title[^>]*>(.*?)</title>", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
     private static partial Regex TitleRegex();
+
+    [GeneratedRegex(@"charset\s*=\s*[""']?([\w\-]+)", RegexOptions.IgnoreCase)]
+    private static partial Regex MetaCharsetRegex();
 
     [GeneratedRegex(@"\s+")]
     private static partial Regex WhitespaceRegex();

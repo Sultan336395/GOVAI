@@ -82,6 +82,23 @@ public class Opportunity : AggregateRoot, IAuditable, ISoftDeletable
     public int? DaysUntilDeadline(DateTimeOffset asOf) =>
         Deadline is null ? null : (int)Math.Ceiling((Deadline.Value - asOf).TotalDays);
 
+    /// <summary>
+    /// Başlığı yeni yakalanıştan tazeler.
+    ///
+    /// Aynı kaynak dokümandan gelen kayıt güncellendiğinde başlık ilk hâlinde
+    /// donuyordu; ilk yakalanışta karakter kümesi yanlış çözülmüşse bozuk başlık
+    /// ("ARTIRMA, EKS?LTME…") katalogda kalıyordu. Boş başlık mevcut başlığı SİLMEZ.
+    /// </summary>
+    public void RefreshTitle(string? title)
+    {
+        var aday = title?.Trim();
+
+        if (!string.IsNullOrWhiteSpace(aday))
+        {
+            Title = aday;
+        }
+    }
+
     public void Describe(string? summary, string? sourceUrl, Guid? sourceDocumentId)
     {
         Summary = summary?.Trim();

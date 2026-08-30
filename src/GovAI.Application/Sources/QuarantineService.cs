@@ -56,6 +56,7 @@ public sealed class QuarantineService(
     ISourceRepository sources,
     IQuarantineQueryRepository query,
     IUnitOfWork unitOfWork,
+    IEventPublisher events,
     ILogger<QuarantineService> logger)
 {
     /// <summary>
@@ -207,8 +208,30 @@ public sealed class QuarantineService(
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
+        // Karantinadan çıkan kayıt YENİDEN AYRIŞTIRILIR. Ekran bunu zaten vaat ediyordu
+        // ama mesaj yayımlanmıyordu: belge karantinadan çıkıyor, hiç işlenmiyordu.
+        // Cumhurbaşkanı kararları bu yüzden serbest bırakıldıktan sonra da
+        // ayrıştırılmamış (parse_status=Pending) kalmıştı.
+        var source = await sources.GetAsync(document.SourceId, cancellationToken);
+
+        if (source is not null)
+        {
+            await events.PublishAsync(
+                QueueNames.DocumentParseRequested,
+                SourceService.ParsePayload(source, document),
+                cancellationToken);
+        }
+        else
+        {
+            logger.LogWarning(
+                "Karantinadan çıkan belgenin kaynağı bulunamadı; yeniden ayrıştırma "
+                + "tetiklenemedi. DocumentId={DocumentId}",
+                documentId);
+        }
+
         logger.LogInformation(
-            "Kayıt karantinadan çıkarıldı. DocumentId={DocumentId} Fırsat={Released}",
+            "Kayıt karantinadan çıkarıldı ve yeniden ayrıştırmaya alındı. "
+            + "DocumentId={DocumentId} Fırsat={Released}",
             documentId, released);
     }
 

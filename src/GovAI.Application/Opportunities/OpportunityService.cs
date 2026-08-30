@@ -80,6 +80,9 @@ public sealed class OpportunityService(
             await opportunities.AddAsync(opportunity, cancellationToken);
         }
 
+        // Başlık da tazelenir: aynı belgenin düzeltilmiş yeni sürümü geldiğinde
+        // katalogdaki bozuk başlık yerinde kalmamalı.
+        opportunity.RefreshTitle(request.Title);
         opportunity.Describe(request.Summary, request.SourceUrl, request.SourceDocumentId);
         opportunity.SetSchedule(request.PublishedAt, request.Deadline);
         opportunity.SetBudget(request.Budget is null

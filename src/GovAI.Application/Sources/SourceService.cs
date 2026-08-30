@@ -344,6 +344,10 @@ public sealed class SourceService(
         SourceDocumentVersion? newVersion = null;
         if (changed)
         {
+            // Başlık da tazelenir: ilk yakalanışta karakter kümesi yanlış çözülmüşse
+            // bozuk başlık sonsuza kadar kalırdı.
+            existing.RefreshTitle(request.Title);
+
             // Aynı adresin değişen içeriği ÜSTÜNE YAZILMAZ: yeni sürüm açılır.
             newVersion = existing.AddVersion(
                 request.Url,
@@ -399,11 +403,83 @@ public sealed class SourceService(
             }
         }
 
-        // Gövdesi bir ilanı taşıyamayacak kadar kısa olan sayfalar insana bırakılır.
-        return request.RawContent.Trim().Length < MinimumContentLength
-            ? QuarantineReason.NeedsManualReview
-            : QuarantineReason.None;
+        if (request.RawContent.Trim().Length >= MinimumContentLength)
+        {
+            return QuarantineReason.None;
+        }
+
+        // Kısa olması TEK BAŞINA eleme sebebi değildir.
+        //
+        // Resmî Gazete'nin Cumhurbaşkanı kararları PDF'tir; metin çıkarımı çoğu zaman
+        // yalnızca başlığı, karar numarasını ve imza bloğunu getirir (140-160 karakter).
+        // Bu kayıtlar gerçek mevzuattır ve karantinaya alındıklarında hiç ayrıştırılmaz;
+        // eksik olan metin çıkarımıdır, belgenin kendisi değil. Ayrıştırıcı OCR ve
+        // ayrıştırma durumunu zaten dürüstçe işaretler — karar oraya bırakılır.
+        return TasiyorMuResmiBelgeIzi(request.RawContent)
+            ? QuarantineReason.None
+            : QuarantineReason.NeedsManualReview;
     }
+
+    /// <summary>
+    /// Metin, resmî bir belge olduğunu gösteren bir iz taşıyor mu?
+    ///
+    /// Liste bilinçli olarak dar ve kanıta dayalıdır: yalnızca resmî yayınlarda geçen,
+    /// menü ya da tanıtım sayfasında bulunmayacak ifadeler. Amaç kısa ama gerçek
+    /// mevzuatı kurtarmaktır; şüpheli içeriği geçirmek değil.
+    /// </summary>
+    private static bool TasiyorMuResmiBelgeIzi(string content)
+    {
+        var metin = TurkceKatla(content);
+
+        return LegislativeMarkers.Any(m => metin.Contains(TurkceKatla(m), StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// Türkçe metni karşılaştırma için katlar.
+    ///
+    /// Gerekli, çünkü ne <c>ToUpperInvariant</c> ne de <c>OrdinalIgnoreCase</c> noktasız
+    /// <c>ı</c> ile noktalı <c>I</c>'yı eşleştirir: "Karar Sayısı" ile "KARAR SAYISI"
+    /// tutmaz ve gerçek mevzuat kaçırılır. Kültüre bağlı <c>ToUpper("tr-TR")</c> ise
+    /// sunucunun yereline göre değişir; deterministik olmaz.
+    /// </summary>
+    private static string TurkceKatla(string value)
+    {
+        var buffer = new System.Text.StringBuilder(value.Length);
+
+        foreach (var ch in value)
+        {
+            buffer.Append(ch switch
+            {
+                'ı' or 'İ' or 'i' or 'I' => 'i',
+                'ş' or 'Ş' => 's',
+                'ğ' or 'Ğ' => 'g',
+                'ü' or 'Ü' => 'u',
+                'ö' or 'Ö' => 'o',
+                'ç' or 'Ç' => 'c',
+                'â' or 'Â' => 'a',
+                'î' or 'Î' => 'i',
+                'û' or 'Û' => 'u',
+                _ => char.ToLowerInvariant(ch),
+            });
+        }
+
+        return buffer.ToString();
+    }
+
+    /// <summary>Resmî mevzuat metinlerinde geçen belge türü ve künye ifadeleri.</summary>
+    private static readonly string[] LegislativeMarkers =
+    [
+        "CUMHURBAŞKANI KARARI",
+        "CUMHURBAŞKANLIĞI KARARNAMESİ",
+        "KARAR SAYISI",
+        "YÖNETMELİK",
+        "TEBLİĞ",
+        "GENELGE",
+        "KANUN HÜKMÜNDE KARARNAME",
+        "ANAYASA MAHKEMESİ KARARI",
+        "RESMÎ GAZETE SAYI",
+        "RESMI GAZETE SAYI",
+    ];
 
     /// <summary>
     /// Kurumsal sitelerde ilan olmayan sayfaların adres ve başlıklarında geçen kalıplar.
@@ -734,7 +810,11 @@ public sealed class SourceService(
     /// Parser worker'ının ihtiyaç duyduğu alanların tamamı mesajda taşınır: worker'ın
     /// veritabanına erişimi yoktur, eksik alan sessizce "Bilinmiyor" kaydına dönüşür.
     /// </summary>
-    private static object ParsePayload(Source source, SourceDocument document) => new
+    /// <summary>
+    /// Ayrıştırma mesajının gövdesi. <see cref="QuarantineService"/> de kullanır:
+    /// karantinadan çıkan belge aynı mesajla yeniden ayrıştırmaya girer.
+    /// </summary>
+    internal static object ParsePayload(Source source, SourceDocument document) => new
     {
         DocumentId = document.Id,
         SourceId = source.Id,

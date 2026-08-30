@@ -684,6 +684,152 @@ public sealed class SourcePipelineTests(GovAiApiFactory factory)
         Assert.Equal(QuarantineReason.None, durum.QuarantineReason);
     }
 
+    [Fact(DisplayName = "Faz2-AF. İçerik değişince belge başlığı da tazelenir")]
+    public async Task Icerik_degisince_baslik_tazelenir()
+    {
+        var sourceId = await CreateSourceAsync("Başlık Tazeleme Testi");
+        const string adres = "https://kurum.gov.tr/ilan/baslik-tazeleme";
+
+        // İlk yakalanış: karakter kümesi yanlış çözülmüş, başlık bozuk.
+        await IngestAsync(sourceId, adres, "ARTIRMA, EKS�LTME VE �HALE", GercekIcerik);
+
+        // İkinci yakalanış: doğru çözülmüş içerik ve başlık.
+        var sonuc = await IngestAsync(
+            sourceId, adres, "ARTIRMA, EKSİLTME VE İHALE İLÂNLARI",
+            GercekIcerik + " Ek paragraf içeriği değiştirir.");
+
+        var belge = await QueryAsync(db => db.SourceDocuments
+            .IgnoreQueryFilters()
+            .SingleAsync(d => d.Id == sonuc.GetProperty("documentId").GetGuid()));
+
+        Assert.Equal("ARTIRMA, EKSİLTME VE İHALE İLÂNLARI", belge.Title);
+        Assert.DoesNotContain('�', belge.Title);
+    }
+
+    // ═══════════════ Kısa ama gerçek mevzuat ═══════════════
+
+    /// <summary>
+    /// Resmî Gazete'nin Cumhurbaşkanı kararları PDF'tir; metin çıkarımı çoğu zaman
+    /// yalnızca başlığı, karar numarasını ve imza bloğunu getirir (~150 karakter).
+    /// Bunlar gerçek mevzuattır. Karantinaya alınırlarsa hiç ayrıştırılmazlar.
+    /// </summary>
+    private const string KisaCumhurbaskaniKarari =
+        "CUMHURBAŞKANI KARARI\n" +
+        "Karar Sayısı: 11643\n" +
+        "26 Ağustos 2026\n" +
+        "Recep Tayyip ERDOĞAN\n" +
+        "CUMHURBAŞKANI\n" +
+        "27 Ağustos 2026 PERŞEMBE Resmî Gazete Sayı : 33353";
+
+    [Fact(DisplayName = "Faz2-AA. Kısa da olsa gerçek Cumhurbaşkanı kararı karantinaya düşmez")]
+    public async Task Gercek_cumhurbaskani_karari_karantinaya_dusmez()
+    {
+        var sourceId = await CreateSourceAsync("Cumhurbaşkanı Kararı Testi");
+
+        Assert.True(KisaCumhurbaskaniKarari.Length < 200, "Test kurgusu: metin kısa olmalı");
+
+        var sonuc = await IngestAsync(
+            sourceId,
+            "https://kurum.gov.tr/eskiler/2026/08/20260827-1.pdf",
+            "CUMHURBAŞKANI KARARI",
+            KisaCumhurbaskaniKarari);
+
+        var documentId = sonuc.GetProperty("documentId").GetGuid();
+
+        var belge = await QueryAsync(db => db.SourceDocuments
+            .IgnoreQueryFilters()
+            .SingleAsync(d => d.Id == documentId));
+
+        Assert.Equal(QuarantineReason.None, belge.QuarantineReason);
+    }
+
+    [Theory(DisplayName = "Faz2-AB. Resmî belge izi taşıyan kısa metinler geçer")]
+    [InlineData("YÖNETMELİK\nMADDE 1- Bu Yönetmeliğin amacı…")]
+    [InlineData("TEBLİĞ\nAdalet Bakanlığından: Konkordato gider avansı.")]
+    [InlineData("Karar Sayısı: 11646\n26 Ağustos 2026")]
+    public async Task Resmi_belge_izi_tasiyan_kisa_metin_gecer(string icerik)
+    {
+        var sourceId = await CreateSourceAsync($"Kısa Mevzuat {icerik.GetHashCode()}");
+
+        var sonuc = await IngestAsync(
+            sourceId, $"https://kurum.gov.tr/eskiler/{icerik.GetHashCode()}.pdf",
+            "Resmî belge", icerik);
+
+        var belge = await QueryAsync(db => db.SourceDocuments
+            .IgnoreQueryFilters()
+            .SingleAsync(d => d.Id == sonuc.GetProperty("documentId").GetGuid()));
+
+        Assert.Equal(QuarantineReason.None, belge.QuarantineReason);
+    }
+
+    [Fact(DisplayName = "Faz2-AC. Resmî izi olmayan kısa içerik hâlâ incelemeye gider")]
+    public async Task Resmi_izi_olmayan_kisa_icerik_incelemeye_gider()
+    {
+        var sourceId = await CreateSourceAsync("Kısa Anlamsız İçerik Testi");
+
+        var sonuc = await IngestAsync(
+            sourceId, "https://kurum.gov.tr/sayfa/bos", "Duyuru", "Sayfa yapım aşamasındadır.");
+
+        var belge = await QueryAsync(db => db.SourceDocuments
+            .IgnoreQueryFilters()
+            .SingleAsync(d => d.Id == sonuc.GetProperty("documentId").GetGuid()));
+
+        Assert.Equal(QuarantineReason.NeedsManualReview, belge.QuarantineReason);
+    }
+
+    [Fact(DisplayName = "Faz2-AD. Genel başlık tek başına karantina sebebi değildir")]
+    public async Task Genel_baslik_tek_basina_karantina_sebebi_degildir()
+    {
+        var sourceId = await CreateSourceAsync("Genel Başlık Testi");
+
+        // Başlık son derece genel; içerik ise gerçek ve uzun.
+        var sonuc = await IngestAsync(
+            sourceId, "https://kurum.gov.tr/eskiler/2026/08/20260827-9.htm", "Duyurular",
+            GercekIcerik);
+
+        var belge = await QueryAsync(db => db.SourceDocuments
+            .IgnoreQueryFilters()
+            .SingleAsync(d => d.Id == sonuc.GetProperty("documentId").GetGuid()));
+
+        Assert.Equal(QuarantineReason.None, belge.QuarantineReason);
+    }
+
+    [Fact(DisplayName = "Faz2-AE. Fihrist/liste sayfası mevzuat üretmez")]
+    public async Task Fihrist_sayfasi_mevzuat_uretmez()
+    {
+        var sourceId = await CreateSourceAsync("Fihrist Testi");
+
+        await QueryAsync(async db =>
+        {
+            var source = await db.Sources.SingleAsync(s => s.Id == sourceId);
+            source.Describe(
+                SourceCategory.Regulation,
+                new SourceProfile("Test Kurumu", "TR", "kurum.gov.tr", "tr"));
+
+            await db.SaveChangesAsync();
+            return true;
+        });
+
+        // Fihrist: kurumsal menü işaretçisi taşıyan bir liste adresi.
+        var sonuc = await IngestAsync(
+            sourceId, "https://kurum.gov.tr/hakkimizda", "Hakkımızda", GercekIcerik);
+
+        var documentId = sonuc.GetProperty("documentId").GetGuid();
+
+        var belge = await QueryAsync(db => db.SourceDocuments
+            .IgnoreQueryFilters()
+            .SingleAsync(d => d.Id == documentId));
+
+        Assert.Equal(QuarantineReason.InvalidSourcePage, belge.QuarantineReason);
+
+        // Karantinadaki belgeden mevzuat kaydı AÇILMAZ.
+        var mevzuatVarMi = await QueryAsync(db => db.RegulatoryChanges
+            .IgnoreQueryFilters()
+            .AnyAsync(r => r.SourceDocumentId == documentId));
+
+        Assert.False(mevzuatVarMi);
+    }
+
     [Fact(DisplayName = "Faz2-X. Mevzuat kaynağından fırsat kaydı açılamaz")]
     public async Task Mevzuat_kaynagindan_firsat_acilamaz()
     {

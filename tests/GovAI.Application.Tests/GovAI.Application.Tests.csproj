@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\GovAI.Application\GovAI.Application.csproj" />
+    <ProjectReference Include="..\..\src\GovAI.Infrastructure\GovAI.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\GovAI.Persistence\GovAI.Persistence.csproj" />
   </ItemGroup>
 

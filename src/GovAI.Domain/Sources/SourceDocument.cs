@@ -94,6 +94,23 @@ public class SourceDocument : AggregateRoot, IAuditable
     public void SetOrigin(DocumentOrigin origin) => Origin = origin;
 
     /// <summary>
+    /// Başlığı yeni yakalanıştan tazeler.
+    ///
+    /// Gerekli, çünkü başlık ilk sürümde donuyordu: karakter kümesi yanlış çözülmüş
+    /// bir ilk yakalanışın bozuk başlığı ("ARTIRMA, EKS?LTME…"), doğru çözülen ikinci
+    /// sürümden sonra da kalıyordu. Boş başlık mevcut başlığı SİLMEZ.
+    /// </summary>
+    public void RefreshTitle(string? title)
+    {
+        var yeni = title?.Trim();
+
+        if (!string.IsNullOrWhiteSpace(yeni))
+        {
+            Title = yeni;
+        }
+    }
+
+    /// <summary>
     /// Bu yakalanışı sürüm zincirine ekler. Sürüm numarası <see cref="Revision"/> ile
     /// hizalıdır; böylece belge kaydı ile kanıt zinciri aynı sayıyı gösterir.
     /// </summary>
