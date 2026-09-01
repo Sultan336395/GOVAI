@@ -95,6 +95,21 @@ public class Source : AggregateRoot, IAuditable
         ConfigurationJson = configurationJson;
     }
 
+    /// <summary>
+    /// Yalnızca serbest yapılandırma gövdesini değiştirir; tarama takvimine
+    /// <b>dokunmaz</b> ve doğrulamayı düşürmez.
+    ///
+    /// <para>
+    /// Gerekçe: arşiv şablonu gibi alanlar tarama seçicisi değildir — hangi sayfanın
+    /// toplanacağını belirlemez, yalnızca "bugün yayın yok" ile "seçici bozuldu"
+    /// ayrımında kullanılır. Bunu <see cref="Configure"/> ile yazmak doğrulanmış bir
+    /// kaynağın operatör tarafından değiştirilmiş takvimini geri alır;
+    /// <see cref="PlanCrawl"/> ile yazmak ise kaynağı taramadan düşürür.
+    /// </para>
+    /// </summary>
+    public void ReplaceConfiguration(string? configurationJson) =>
+        ConfigurationJson = configurationJson;
+
     public void Enable() => IsEnabled = true;
 
     public void Disable() => IsEnabled = false;
@@ -135,6 +150,11 @@ public class Source : AggregateRoot, IAuditable
         ConfigurationVerified = true;
         ConfigurationVerifiedAt = verifiedAt;
         Health = SourceHealth.Healthy;
+
+        // Eski hata mesajı BIRAKILMAZ: kaynak artık sağlıklı ve panelde "Healthy" görünüyor.
+        // Mesaj kalırsa operatör çözülmüş bir arızayı sürekli açık sanır ve gerçek bir arıza
+        // çıktığında eskisiyle karıştırır.
+        LastRunMessage = null;
     }
 
     /// <summary>Doğrulama başarısız: kaynak taranabilir listesinden çıkar.</summary>

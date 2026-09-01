@@ -53,7 +53,16 @@ public static class OfficialSourceCatalog
         /// geriye tarayıp "bugün yayın yok" ile "seçici bozuldu" durumlarını AYIRIR.
         /// Boşsa ayrım yapılamaz ve boş liste eskisi gibi arıza sayılır.
         /// </summary>
-        string? ArchiveUrlTemplate = null);
+        string? ArchiveUrlTemplate = null,
+
+        /// <summary>
+        /// Arşiv şablonunun katalog sürümü.
+        ///
+        /// Şablon düzeltilirse bu sayı bir artırılır; seed yalnızca o zaman kayıtlı değeri
+        /// yeniler. Artırılmadıkça seed hiçbir kaynağın gövdesine dokunmaz — bu, seed'in
+        /// her açılışta güvenle çalışabilmesinin şartıdır.
+        /// </summary>
+        int ArchiveUrlTemplateVersion = 1);
 
     /// <summary>Türkiye ve AB pilot kaynakları.</summary>
     public static IReadOnlyList<Definition> All { get; } =
@@ -242,9 +251,13 @@ public static class OfficialSourceCatalog
         // Arşiv şablonu plan kolonlarında yok; toplayıcının okuduğu serbest gövdede taşınır.
         if (definition.ArchiveUrlTemplate is { Length: > 0 } arsiv)
         {
-            source.Configure(
-                definition.CronExpression,
-                "{\"archiveUrlTemplate\":\"" + arsiv + "\"}");
+            SourceConfigurationJson.ApplyArchiveUrlTemplate(
+                source.ConfigurationJson,
+                arsiv,
+                definition.ArchiveUrlTemplateVersion,
+                out var govde);
+
+            source.Configure(definition.CronExpression, govde);
         }
 
 

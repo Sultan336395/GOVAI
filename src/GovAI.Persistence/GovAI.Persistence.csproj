@@ -5,6 +5,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Arşiv şablonu birleştirme kuralı testlerle korunur; kural dışarıya
+         açık bir API olmadığı için tip internal kalır. -->
+    <InternalsVisibleTo Include="GovAI.Application.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="EFCore.NamingConventions" Version="10.0.1" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
   </ItemGroup>

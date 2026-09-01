@@ -641,6 +641,8 @@ export interface QuarantinedDocument {
   collectedAt: string
   versionCount: number
   origin: DocumentOrigin
+  /** Başlık yanlış karakter kümesiyle kaydedilmişti; ekranda gösterilen metin onarıldı. */
+  titleRepaired: boolean
 }
 
 export interface TriageRow {

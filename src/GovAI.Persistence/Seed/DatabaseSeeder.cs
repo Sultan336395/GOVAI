@@ -43,6 +43,7 @@ public sealed class DatabaseSeeder(
 
         var eklenen = 0;
         var yukseltilen = 0;
+        var arsivGuncellenen = 0;
 
         // Bir satır yalnızca BİR tanıma eşlenir. Aynı kurum birden çok kaynak
         // tanımlayabilir (Resmî Gazete hem mevzuat hem ihale ilanı yayımlar); alan adı
@@ -69,8 +70,18 @@ public sealed class DatabaseSeeder(
                 continue;
             }
 
-            // Doğrulanmış kaynağa DOKUNULMAZ: platform yöneticisinin panelden yaptığı
-            // düzeltmeler her açılışta geri alınmamalıdır.
+            // Arşiv şablonu doğrulanmış kaynağa DA uygulanır ve bu bir istisna değildir:
+            // şablon bir tarama seçicisi değildir, neyin toplanacağını değiştirmez. Yalnızca
+            // "bugün yayın yok" ile "seçici bozuldu" ayrımı için gerekir. Doğrulanmış
+            // kaynaklar bunun dışında bırakılırsa hâlihazırda çalışan kurulumlar bu ayrımı
+            // hiç kazanamaz. Yardımcı sürüme bakar; operatörün elle girdiği değeri ezmez.
+            if (ArsivSablonunuUygula(mevcut, tanim))
+            {
+                arsivGuncellenen++;
+            }
+
+            // Bunun ötesinde doğrulanmış kaynağa DOKUNULMAZ: platform yöneticisinin
+            // panelden yaptığı düzeltmeler her açılışta geri alınmamalıdır.
             if (mevcut.ConfigurationVerified)
             {
                 continue;
@@ -87,20 +98,12 @@ public sealed class DatabaseSeeder(
                 tanim.StartUrl, tanim.ListSelector, tanim.ContentSelector, tanim.UrlPattern,
                 tanim.MaxPages, tanim.AllowedDomains ?? tanim.OfficialDomain, tanim.DocumentTypes));
 
-            // Arşiv şablonu da güncellenmeli: "bugün yayın yok" ayrımı buna dayanır.
-            if (tanim.ArchiveUrlTemplate is { Length: > 0 } arsiv)
-            {
-                mevcut.Configure(
-                    tanim.CronExpression,
-                    "{\"archiveUrlTemplate\":\"" + arsiv + "\"}");
-            }
-
             // Doğrulanana kadar taranmaz.
             mevcut.Disable();
             yukseltilen++;
         }
 
-        if (eklenen == 0 && yukseltilen == 0)
+        if (eklenen == 0 && yukseltilen == 0 && arsivGuncellenen == 0)
         {
             logger.LogInformation("Resmî kaynak kataloğu güncel.");
             return 0;
@@ -109,10 +112,11 @@ public sealed class DatabaseSeeder(
         await context.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation(
-            "Resmî kaynak kataloğu: {Eklenen} eklendi, {Yukseltilen} yükseltildi (doğrulanmamış, kapalı).",
-            eklenen, yukseltilen);
+            "Resmî kaynak kataloğu: {Eklenen} eklendi, {Yukseltilen} yükseltildi "
+            + "(doğrulanmamış, kapalı), {Arsiv} arşiv şablonu güncellendi.",
+            eklenen, yukseltilen, arsivGuncellenen);
 
-        return eklenen + yukseltilen;
+        return eklenen + yukseltilen + arsivGuncellenen;
     }
 
     /// <summary>İki adresin aynı kuruma ait olup olmadığı (alan adı karşılaştırması).</summary>
@@ -391,5 +395,41 @@ public sealed class DatabaseSeeder(
         ]);
 
         return [rndCall, employmentIncentive, exportSupport];
+    }
+
+    /// <summary>
+    /// Katalogdaki arşiv şablonunu kaynağın gövdesine yerleştirir.
+    /// Gövde gerçekten değiştiyse <c>true</c> döner.
+    ///
+    /// <para>
+    /// Yazma <see cref="Domain.Sources.Source.ReplaceConfiguration"/> ile yapılır:
+    /// <c>Configure</c> kullanılsaydı operatörün değiştirdiği tarama takvimi katalog
+    /// değerine geri döner, <c>PlanCrawl</c> kullanılsaydı kaynak doğrulamayı yitirip
+    /// taranmaz olurdu.
+    /// </para>
+    /// </summary>
+    private static bool ArsivSablonunuUygula(
+        Domain.Sources.Source kaynak,
+        OfficialSourceCatalog.Definition tanim)
+    {
+        if (tanim.ArchiveUrlTemplate is not { Length: > 0 } sablon)
+        {
+            return false;
+        }
+
+        var sonuc = SourceConfigurationJson.ApplyArchiveUrlTemplate(
+            kaynak.ConfigurationJson,
+            sablon,
+            tanim.ArchiveUrlTemplateVersion,
+            out var govde);
+
+        if (sonuc is SourceConfigurationJson.Outcome.AlreadyCurrent
+            or SourceConfigurationJson.Outcome.OperatorValueKept)
+        {
+            return false;
+        }
+
+        kaynak.ReplaceConfiguration(govde);
+        return true;
     }
 }

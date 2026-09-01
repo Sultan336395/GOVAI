@@ -39,7 +39,15 @@ public sealed record QuarantinedDocumentDto(
     DateTimeOffset CollectedAt,
     int VersionCount,
     /// <summary>Belge taranarak mı geldi, elle mi aktarıldı? Ekranda ayrıca gösterilir.</summary>
-    DocumentOrigin Origin);
+    DocumentOrigin Origin,
+
+    /// <summary>
+    /// Başlık yanlış karakter kümesiyle kaydedilmiş ve <b>görüntülemek için</b> onarıldı mı?
+    ///
+    /// İnceleyici bunu bilmelidir: gördüğü metin belgede yazanın birebir kopyası değil,
+    /// yeniden çözülmüş hâlidir. Ham belge değiştirilmez.
+    /// </summary>
+    bool TitleRepaired = false);
 
 /// <summary>
 /// Karantina yönetimi (Faz 2).
@@ -131,7 +139,8 @@ public sealed class QuarantineService(
 
             rows.Add(new TriageRow(
                 candidate.DocumentId,
-                candidate.Title,
+                // Rapor okunabilir olmalı; ham belge değişmez.
+                TurkceMojibake.Onar(candidate.Title),
                 candidate.Url,
                 sourceNames.GetValueOrDefault(candidate.SourceId, "(bilinmiyor)"),
                 reason,

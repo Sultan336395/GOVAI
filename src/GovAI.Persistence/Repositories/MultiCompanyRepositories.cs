@@ -1,10 +1,11 @@
 using GovAI.Application.Abstractions.Persistence;
-using GovAI.Application.Sources;
-using GovAI.Domain.Regulatory;
+using GovAI.Application.Common;
 using GovAI.Application.Regulatory;
+using GovAI.Application.Sources;
 using GovAI.Domain.Common;
 using GovAI.Domain.Companies;
 using GovAI.Domain.Identity;
+using GovAI.Domain.Regulatory;
 using Microsoft.EntityFrameworkCore;
 
 namespace GovAI.Persistence.Repositories;
@@ -225,10 +226,20 @@ public sealed class QuarantineQueryRepository(GovAiDbContext context) : IQuarant
             .OrderByDescending(x => x.CollectedAt)
             .ToListAsync(cancellationToken);
 
+        // Başlık YALNIZCA görüntüleme için onarılır. İndirici düzeltilmeden önce
+        // toplanmış kayıtlar "ARTIRMA, EKSÝLTME VE ÝHALE ÝLÂNLARI" gibi okunamaz
+        // başlıklar taşıyor; inceleyici bu hâliyle kaydın ne olduğunu anlayamaz.
+        // Ham belge, sürümleri ve özeti kanıt olarak olduğu gibi kalır.
         return rows
-            .Select(x => new QuarantinedDocumentDto(
-                x.Id, x.Title, x.Url, x.SourceName, x.QuarantineReason,
-                x.QuarantineNote, x.CollectedAt, x.VersionCount, x.Origin))
+            .Select(x =>
+            {
+                var onarilan = TurkceMojibake.Onar(x.Title);
+
+                return new QuarantinedDocumentDto(
+                    x.Id, onarilan, x.Url, x.SourceName, x.QuarantineReason,
+                    x.QuarantineNote, x.CollectedAt, x.VersionCount, x.Origin,
+                    TitleRepaired: !string.Equals(onarilan, x.Title, StringComparison.Ordinal));
+            })
             .ToList();
     }
 

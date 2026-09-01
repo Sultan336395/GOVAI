@@ -207,6 +207,12 @@ export default function QuarantinePage() {
                 <tr key={item.documentId}>
                   <td>
                     <strong>{item.title}</strong>
+                    {item.titleRepaired ? (
+                      <div className="muted" style={{ fontSize: 12 }}>
+                        Başlık bozuk karakter kümesiyle kaydedilmişti; burada onarılmış
+                        hâli gösteriliyor. Ham belge değiştirilmedi.
+                      </div>
+                    ) : null}
                     <div className="muted" style={{ fontSize: 12, overflowWrap: 'anywhere' }}>
                       {item.url}
                     </div>
