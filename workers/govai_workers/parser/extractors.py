@@ -36,10 +36,26 @@ class ExtractedDocument:
     page_count: int | None = None
     needs_ocr: bool = False
     error: str | None = None
+    #: ``needs_ocr`` neden işaretlendi? Rapora ve karantina notuna birebir geçer.
+    ocr_reason: str | None = None
 
     @property
     def succeeded(self) -> bool:
         return bool(self.text.strip()) and not self.needs_ocr and self.error is None
+
+
+#: Sayfa başına bu kadar karakterin altında kalan bir PDF metin katmanı KULLANILAMAZ.
+#:
+#: Gerekçe: Cumhurbaşkanı kararlarının PDF'lerinden yalnızca künye çıkabiliyor —
+#: başlık, karar numarası ve imza; 142-214 karakter. Kararın asıl gövdesi (maddeler,
+#: ekler, tablolar) metin katmanında yok. Eski kural yalnızca TAMAMEN boş metni
+#: taranmış sayıyordu, bu yüzden sistem "tam ayrıştırıldı, OCR gerekmedi" diyordu.
+#: Bu bir yalandır: kanıt parçaları künyeden üretilir, kararın içeriği hiç okunmamıştır.
+#:
+#: Eşik ihtiyatlı seçildi. Resmî Gazete'nin gerçek metin katmanı olan sayfaları binlerce
+#: karakter verir; künye 200 civarındadır. Arada geniş bir boşluk vardır. Yanlış
+#: işaretlenen belge SİLİNMEZ, insana bırakılır — güvenli yön budur.
+MIN_CHARS_PER_PAGE = 250
 
 
 def extract_text(content: bytes, media_type: str) -> str:
@@ -76,12 +92,42 @@ def _extract_pdf_document(content: bytes) -> ExtractedDocument:
         # kanıt parçaları sayfa numarasını kaybederdi.
         text = "\f".join(normalize(page) for page in pages)
 
+        sayfa_sayisi = len(reader.pages)
+        harf_sayisi = len(text.strip())
+
         if not text.strip():
             # Metin katmanı olmayan taranmış PDF. Uydurma metin ÜRETİLMEZ.
-            log.warning("pdf_has_no_text_layer", pages=len(reader.pages))
-            return ExtractedDocument(text="", page_count=len(reader.pages), needs_ocr=True)
+            log.warning("pdf_has_no_text_layer", pages=sayfa_sayisi)
+            return ExtractedDocument(
+                text="",
+                page_count=sayfa_sayisi,
+                needs_ocr=True,
+                ocr_reason="PDF'in metin katmanı yok; taranmış görüntü.",
+            )
 
-        return ExtractedDocument(text=text, page_count=len(reader.pages))
+        # Metin VAR ama gövde yok: künye çıkmış, kararın kendisi çıkmamış.
+        # "Kısa olmak eleme sebebi değildir" kuralı burada geçerli DEĞİLDİR; belge
+        # elenmiyor, eksik ayrıştırıldığı dürüstçe söyleniyor ve insana bırakılıyor.
+        if sayfa_sayisi and harf_sayisi < MIN_CHARS_PER_PAGE * sayfa_sayisi:
+            log.warning(
+                "pdf_text_layer_partial",
+                pages=sayfa_sayisi,
+                chars=harf_sayisi,
+                threshold=MIN_CHARS_PER_PAGE * sayfa_sayisi,
+            )
+            return ExtractedDocument(
+                text=text,
+                page_count=sayfa_sayisi,
+                needs_ocr=True,
+                ocr_reason=(
+                    f"PDF'in metin katmanı eksik: {sayfa_sayisi} sayfadan yalnızca "
+                    f"{harf_sayisi} karakter çıktı (sayfa başına en az "
+                    f"{MIN_CHARS_PER_PAGE} beklenir). Büyük olasılıkla yalnızca künye "
+                    f"okunabildi; belgenin gövdesi için OCR gerekiyor."
+                ),
+            )
+
+        return ExtractedDocument(text=text, page_count=sayfa_sayisi)
     except Exception as exc:  # noqa: BLE001 - ayrıştırma hatası belgeyi silmemeli
         log.exception("pdf_extract_failed")
         return ExtractedDocument(text="", error=f"PDF ayrıştırılamadı: {exc}"[:500])

@@ -574,7 +574,14 @@ public sealed class SourceService(
         }
 
         var requiresOcr = request.Status == DocumentParseStatus.NeedsOcr;
-        var reason = requiresOcr ? "Taranmış PDF; metin katmanı yok." : (request.Error ?? "Ayrıştırma başarısız.");
+
+        // Ayrıştırıcının gerekçesi EZİLMEZ. OCR gereken iki ayrı durum vardır ve bunlar
+        // karıştırılamaz: metin katmanı hiç yok (taranmış görüntü) ya da katman EKSİK
+        // (yalnızca künye okunabildi, kararın gövdesi okunamadı). İkincisine "metin
+        // katmanı yok" demek inceleyiciyi yanıltır — belgede metin vardır, yetersizdir.
+        // Gerekçe yoksa yalnızca o zaman genel bir metne düşülür.
+        var reason = request.Error
+                     ?? (requiresOcr ? "Taranmış PDF; metin katmanı yok." : "Ayrıştırma başarısız.");
 
         version.RecordParseFailure(reason, requiresOcr);
 

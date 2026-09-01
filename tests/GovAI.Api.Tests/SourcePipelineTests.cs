@@ -266,6 +266,42 @@ public sealed class SourcePipelineTests(GovAiApiFactory factory)
         Assert.True(document.IsQuarantined);
     }
 
+    [Fact(DisplayName = "Faz2-D2b. Eksik metin katmanının gerekçesi ezilmez")]
+    public async Task Eksik_metin_katmani_gerekcesi_korunur()
+    {
+        // OCR gereken İKİ ayrı durum vardır: katman hiç yok (taranmış görüntü) ya da
+        // katman EKSİK (yalnızca künye okunabildi). İkincisine "metin katmanı yok"
+        // demek inceleyiciyi yanıltır — belgede metin vardır, yetersizdir.
+        var sourceId = await CreateSourceAsync("Eksik Katman Testi");
+        var sonuc = await IngestAsync(
+            sourceId, "https://kurum.gov.tr/ilan/eksik-katman-1", "Cumhurbaşkanı Kararı",
+            GercekIcerik);
+
+        var documentId = sonuc.GetProperty("documentId").GetGuid();
+
+        const string gerekce =
+            "PDF'in metin katmanı eksik: 1 sayfadan yalnızca 168 karakter çıktı "
+            + "(sayfa başına en az 250 beklenir). Büyük olasılıkla yalnızca künye "
+            + "okunabildi; belgenin gövdesi için OCR gerekiyor.";
+
+        var parse = await _ingest.PostAsJsonAsync(
+            $"/api/sources/documents/{documentId}/parse-result",
+            new { status = "NeedsOcr", pageCount = 1, error = gerekce });
+
+        parse.EnsureSuccessStatusCode();
+
+        var version = await QueryAsync(db => db.SourceDocumentVersions
+            .SingleAsync(v => v.SourceDocumentId == documentId));
+
+        Assert.True(version.RequiresOcr);
+        Assert.Equal(gerekce, version.ParseError);
+
+        // Karantina notu da aynı gerekçeyi taşımalı; inceleyici ekranda bunu görür.
+        var document = await QueryAsync(db => db.SourceDocuments.SingleAsync(d => d.Id == documentId));
+        Assert.True(document.IsQuarantined);
+        Assert.Equal(gerekce, document.QuarantineNote);
+    }
+
     [Fact(DisplayName = "Faz2-D3. Ayrıştırma hatası belgeyi silmez, karantinaya alır")]
     public async Task Ayristirma_hatasi_belgeyi_silmez()
     {

@@ -185,14 +185,23 @@ def process_document(client: GovAiClient, document: dict[str, Any]) -> None:
                 extracted = extract_document(fetched.content, fetched.media_type)
                 media_type = fetched.media_type
 
-    # Taranmış PDF: uydurma metin ÜRETİLMEZ, belge insana bırakılır.
+    # Metin katmanı yok ya da EKSİK: uydurma metin ÜRETİLMEZ, belge insana bırakılır.
+    #
+    # Eksik katman da buraya düşer. Künyesi okunup gövdesi okunamayan bir karar için
+    # "tam ayrıştırıldı" demek, kanıt zincirini künyeden üretilmiş parçalara dayandırır;
+    # kararın içeriği hiç okunmamış olduğu hâlde okunmuş sayılır.
     if extracted.needs_ocr:
-        log.warning("parse_needs_ocr", document_id=document_id, url=url)
+        log.warning(
+            "parse_needs_ocr",
+            document_id=document_id,
+            url=url,
+            reason=extracted.ocr_reason,
+        )
         client.record_parse_result(
             document_id,
             status="NeedsOcr",
             page_count=extracted.page_count,
-            error="Taranmış PDF; metin katmanı yok.",
+            error=extracted.ocr_reason or "Taranmış PDF; metin katmanı yok.",
         )
         return
 
