@@ -1,22 +1,35 @@
 # GOVAI yayın imajları.
 #
 # NEDEN AYRI BİR İŞ AKIŞI: hedef sunucuda 2 çekirdek ve ~4,3 GB kullanılabilir bellek
-# var, üstelik swap YOK. Aynı makinede 23 başka projenin container'ı çalışıyor. .NET ve
-# npm derlemesini orada yapmak, bellek baskısı yaratıp yalnızca GOVAI'yi değil komşu
-# servisleri de OOM riskine sokar. Derleme bu yüzden GitHub runner'ında yapılır;
-# sunucu YALNIZCA hazır imajı çeker.
+# var. Aynı makinede 23 başka projenin container'ı çalışıyor. .NET ve npm derlemesini
+# orada yapmak yalnızca GOVAI'yi değil komşu servisleri de riske atar. Derleme bu
+# yüzden GitHub runner'ında yapılır; sunucu YALNIZCA hazır imajı alır.
 #
-# ETİKETLEME: imajlar commit SHA'sıyla etiketlenir ve bu etiket bir daha ASLA başka bir
-# içeriğe verilmez. "latest" yayına alınmaz — geri dönüşte hangi imajın çalıştığı
-# kesin olarak bilinmelidir.
+# İKİ ÇIKTI ÜRETİLİR ve ikisi de yeterlidir:
+#
+#   1. GHCR'a push — tercih edilen yol. Paket erişimi yoksa bu adım BAŞARISIZ OLABİLİR
+#      ve iş akışını durdurmaz (continue-on-error).
+#   2. OCI tar artifact + SHA-256 manifesti — her koşulda üretilir. GHCR engellenirse
+#      artifact indirilip hash doğrulandıktan sonra `docker load` ile yüklenir.
+#
+# Böylece paket görünürlüğü ya da kimlik bilgisi eksikliği yayını durdurmaz.
+#
+# ETİKETLEME: imajlar commit SHA'sıyla etiketlenir ve bu etiket bir daha ASLA başka
+# bir içeriğe verilmez. "latest" yayın kaynağı olarak KULLANILMAZ — geri dönüşte hangi
+# imajın çalıştığı kesin olarak bilinmelidir.
 
 name: release
 
 on:
+  # Etiket itmek iş akışını başlatır. workflow_dispatch varsayılan dalda bulunmayı
+  # şart koşuyor; etiket tetiği bu kısıtlamaya takılmaz.
+  push:
+    tags:
+      - "release-*"
   workflow_dispatch:
     inputs:
       commit:
-        description: "Derlenecek commit (boşsa mevcut dal ucu)"
+        description: "Derlenecek commit (boşsa mevcut ref)"
         required: false
         type: string
 
@@ -46,43 +59,81 @@ jobs:
             context: web
             dockerfile: web/Dockerfile
 
+    outputs:
+      sha: ${{ steps.sabit.outputs.sha }}
+
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.commit || github.sha }}
+          fetch-depth: 0
 
       - name: Commit'i sabitle
         id: sabit
-        run: echo "sha=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+        run: |
+          # Etiketle tetiklendiyse etiketin gösterdiği commit derlenir.
+          sha="$(git rev-parse --short HEAD)"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "Derlenen commit: $sha"
 
-      - name: GHCR oturumu
+      - name: Derle
+        id: derle
+        run: |
+          yerel="govai-${{ matrix.name }}:${{ steps.sabit.outputs.sha }}"
+          docker build -f "${{ matrix.dockerfile }}" -t "$yerel" "${{ matrix.context }}"
+          echo "yerel=$yerel" >> "$GITHUB_OUTPUT"
+
+      # ── Yol 1: GHCR ────────────────────────────────────────────────────────
+      # Paket erişimi yoksa burada durulur ama iş akışı DEVAM EDER; tar artifact
+      # her koşulda üretilir.
+      - name: GHCR'a gönder (engellenirse atlanır)
+        id: ghcr
+        continue-on-error: true
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" \
             | docker login "$REGISTRY" -u "${{ github.actor }}" --password-stdin
 
-      - name: Derle
-        run: |
-          docker build \
-            -f "${{ matrix.dockerfile }}" \
-            -t "govai-${{ matrix.name }}:${{ steps.sabit.outputs.sha }}" \
-            "${{ matrix.context }}"
-
-      - name: Etiketle ve gönder
-        id: gonder
-        run: |
           depo="$(echo "$REGISTRY/${{ github.repository }}-${{ matrix.name }}" | tr '[:upper:]' '[:lower:]')"
           etiket="$depo:${{ steps.sabit.outputs.sha }}"
 
-          docker tag "govai-${{ matrix.name }}:${{ steps.sabit.outputs.sha }}" "$etiket"
+          docker tag "${{ steps.derle.outputs.yerel }}" "$etiket"
           docker push "$etiket"
 
-          # Digest, sunucunun çekeceği içeriğin değişmediğini kanıtlar.
           digest="$(docker image inspect --format '{{index .RepoDigests 0}}' "$etiket")"
-
           echo "etiket=$etiket" >> "$GITHUB_OUTPUT"
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
 
-      - name: Künyeyi yaz
+      # ── Yol 2: OCI tar artifact ────────────────────────────────────────────
+      - name: Tar arşivi ve SHA-256 manifesti üret
+        id: tar
+        run: |
+          mkdir -p cikti
+          ad="govai-${{ matrix.name }}-${{ steps.sabit.outputs.sha }}.tar"
+
+          # docker save imaj kimliğini ve etiketi arşivin içinde taşır; yüklendiğinde
+          # aynı etiketle geri gelir.
+          docker save -o "cikti/$ad" "${{ steps.derle.outputs.yerel }}"
+          gzip -9 "cikti/$ad"
+
+          ( cd cikti && sha256sum "$ad.gz" > "$ad.gz.sha256" )
+
+          imaj_id="$(docker image inspect --format '{{.Id}}' "${{ steps.derle.outputs.yerel }}")"
+          {
+            echo "dosya=$ad.gz"
+            echo "sha256=$(cut -d' ' -f1 < "cikti/$ad.gz.sha256")"
+            echo "imaj_id=$imaj_id"
+            echo "boyut=$(stat -c%s "cikti/$ad.gz")"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Artifact olarak yükle
+        uses: actions/upload-artifact@v4
+        with:
+          name: govai-${{ matrix.name }}-${{ steps.sabit.outputs.sha }}
+          path: cikti/
+          retention-days: 14
+          compression-level: 0 # zaten gzip'li
+
+      - name: Künye
         run: |
           {
             echo "### govai-${{ matrix.name }}"
@@ -90,7 +141,16 @@ jobs:
             echo "| alan | değer |"
             echo "|---|---|"
             echo "| commit | \`${{ steps.sabit.outputs.sha }}\` |"
-            echo "| etiket | \`${{ steps.gonder.outputs.etiket }}\` |"
-            echo "| digest | \`${{ steps.gonder.outputs.digest }}\` |"
+            echo "| yerel etiket | \`${{ steps.derle.outputs.yerel }}\` |"
+            echo "| imaj kimliği | \`${{ steps.tar.outputs.imaj_id }}\` |"
+            echo "| tar dosyası | \`${{ steps.tar.outputs.dosya }}\` |"
+            echo "| tar SHA-256 | \`${{ steps.tar.outputs.sha256 }}\` |"
+            echo "| tar boyutu | ${{ steps.tar.outputs.boyut }} bayt |"
+            if [ "${{ steps.ghcr.outcome }}" = "success" ]; then
+              echo "| GHCR etiketi | \`${{ steps.ghcr.outputs.etiket }}\` |"
+              echo "| GHCR digest | \`${{ steps.ghcr.outputs.digest }}\` |"
+            else
+              echo "| GHCR | **erişilemedi — tar artifact kullanın** |"
+            fi
             echo ""
           } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,55 @@
+# GOVAI veri servisi kaynak sınırları — BU YAYINDA UYGULANMAZ.
+#
+# UYARI: Bu dosyayı uygulamak PostgreSQL, RabbitMQ ve Redis container'larını YENİDEN
+# OLUŞTURUR. Kaynak sınırı çalışan bir container'ın HostConfig'inde değiştirilemez;
+# compose container'ı silip yeniden yaratmak zorundadır.
+#
+# Bir veri servisinin yeniden oluşturulması kısa bir kesinti ve — yanlış giderse —
+# veri riski demektir. Bu yüzden ayrı bir dosyada tutuluyor ve yalnızca AYRI, açıkça
+# onaylanmış bir bakım penceresinde, güncel yedek doğrulandıktan sonra uygulanır.
+#
+# KULLANIM (yalnızca o pencerede):
+#   docker compose -p govai -f docker-compose.yml -f docker-compose.limits-data.yml #     up -d --no-deps <servis>
+#
+# KENDİ KENDİNİ SINIRLAMA: Container sınırı tek başına yeterli değildir; bir servis
+# sınıra dayandığında kendini sınırlamak yerine öldürülür.
+#   * Redis zaten `--maxmemory 256mb --maxmemory-policy allkeys-lru` ile başlatılıyor;
+#     buradaki container sınırı onun ÜSTÜNDE tutuldu.
+#   * RabbitMQ 4.x cgroup sınırını okur ve yüksek su seviyesini ona göre ayarlar.
+#   * PostgreSQL kendini sınırlamaz; sınır ölçülen tepenin 8,7 katıdır.
+
+services:
+  postgres:
+    # Ölçülen tepe: 118 MB (boş veritabanı). Gerçek veriyle shared_buffers, work_mem
+    # ve bağlantı başına bellek büyür; sınır bu büyümeye yer bırakır.
+    deploy:
+      resources:
+        limits: { memory: 1024M, cpus: "0.75", pids: 100 }
+        reservations: { memory: 256M }
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  rabbitmq:
+    # Ölçülen tepe: 196 MB. Kuyruk birikirse büyür.
+    deploy:
+      resources:
+        limits: { memory: 768M, cpus: "0.50", pids: 200 }
+        reservations: { memory: 192M }
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  redis:
+    # Ölçülen tepe: 17 MB. Ama Redis compose'da `--maxmemory 256mb` ile başlatılıyor:
+    # veri dolduğunda 256 MB'ı KENDİ kullanır, üstüne kopya-yazma ve bağlantı tamponu
+    # gelir. Container sınırı bunun altında kalırsa Redis kendi politikasını
+    # uygulayamadan OOM ile öldürülür. Sınır maxmemory'nin 1,5 katı tutuldu.
+    deploy:
+      resources:
+        limits: { memory: 384M, cpus: "0.25", pids: 50 }
+        reservations: { memory: 64M }
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+

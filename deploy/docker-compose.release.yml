@@ -1,0 +1,44 @@
+# GOVAI yayın katmanı — c46886f.
+#
+# KULLANIM (yalnızca yayın sırasında, servis servis):
+#   docker compose -p govai -f docker-compose.yml -f docker-compose.release.yml \
+#     -f docker-compose.limits.yml up -d --no-deps <servis>
+#
+# NE YAPAR: Derlemeyi devre dışı bırakır ve her uygulama servisini, GitHub Actions'ta
+# üretilip sunucuya doğrulanmış olarak aktarılan DEĞİŞMEZ etikete sabitler.
+# `image:` verildiğinde compose `build:` bölümünü kullanmaz — sunucuda hiçbir şey
+# derlenmez.
+#
+# NEDEN "latest" YOK: `latest` her yeni derlemede başka bir içeriğe işaret eder.
+# Geri dönüşte hangi imajın çalıştığının kesin olarak bilinmesi gerekir; bu yüzden
+# yayın kaynağı daima commit SHA'sıdır.
+#
+# VERİ SERVİSLERİ BURADA YOK: postgres, rabbitmq ve redis yayın kapsamı dışındadır.
+# Yeniden başlatılmaz, yeniden oluşturulmaz, imajları çekilmez. Bu dosyada
+# tanımlanmamaları bilinçlidir — yanlışlıkla kapsama girmelerini önler.
+
+services:
+  api:
+    image: govai-api:c46886f
+    pull_policy: never
+
+  web:
+    image: govai-web:c46886f
+    pull_policy: never
+
+  # Dört worker aynı imajı paylaşır; her biri kendi komutunu compose'dan alır.
+  collector:
+    image: govai-worker:c46886f
+    pull_policy: never
+
+  parser:
+    image: govai-worker:c46886f
+    pull_policy: never
+
+  scoring:
+    image: govai-worker:c46886f
+    pull_policy: never
+
+  scheduler:
+    image: govai-worker:c46886f
+    pull_policy: never
