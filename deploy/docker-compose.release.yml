@@ -23,6 +23,23 @@
 # Yeniden başlatılmaz, yeniden oluşturulmaz, imajları çekilmez. Bu dosyada
 # tanımlanmamaları bilinçlidir — yanlışlıkla kapsama girmelerini önler.
 
+# ⚠ YAYIN ÖNCESİ ZORUNLU DENETİM
+#
+# Compose bir imajı bulamazsa temel dosyadaki `build:` bölümüne DÜŞER ve sunucuda
+# derleme başlatır. `pull_policy: never` bunu engellemez; imajın YEREL OLARAK var
+# olması gerekir. Bu tuzağa bir kez düşüldü: worker'lar `govai-worker:<sha>` adını
+# ister ama yerel etiketler servis adlarıyla (`govai-collector:<sha>` …) verilmişti;
+# ad bulunamayınca sunucu imajı kendisi derledi.
+#
+# Bu yüzden yayından ÖNCE, compose'un çözdüğü ÜÇ adın da yerelde bulunduğu
+# doğrulanmalıdır — servis adları değil, aşağıdaki adlar:
+#
+#   docker image inspect govai-api:$GOVAI_RELEASE_TAG    >/dev/null
+#   docker image inspect govai-web:$GOVAI_RELEASE_TAG    >/dev/null
+#   docker image inspect govai-worker:$GOVAI_RELEASE_TAG >/dev/null
+#
+# Biri eksikse yayın BAŞLATILMAZ.
+
 services:
   api:
     image: govai-api:${GOVAI_RELEASE_TAG:?GOVAI_RELEASE_TAG tanımlı olmalı}
