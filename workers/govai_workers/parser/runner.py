@@ -19,6 +19,7 @@ from govai_workers.messaging import RoutingKeys, consume
 from govai_workers.parser.bolum_basligi import toplu_bolum_basligi
 from govai_workers.parser.chunker import build_chunks
 from govai_workers.parser.extractors import extract_document
+from govai_workers.parser.ihale import IhaleAlanlari, ihale_alanlari
 from govai_workers.parser.rule_extractor import extract_rules, rules_to_payload
 
 log = get_logger(__name__)
@@ -27,6 +28,10 @@ log = get_logger(__name__)
 REGULATION_CATEGORIES = frozenset(
     {"Regulation", "Tax", "SocialSecurity", "LabourLaw", "CommercialLaw"}
 )
+
+#: İhale kaynakları. Bu kategorilerde ilan biçimi düzenlidir ve başlık/idare
+#: belgeden çıkarılabilir (bkz. parser/ihale.py).
+TENDER_CATEGORIES = frozenset({"Tender"})
 
 # Metinde geçen anahtar kelimelerden destek türü tahmini; LLM devre dışıyken de kategori dolar.
 _CATEGORY_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
@@ -270,6 +275,15 @@ def process_document(client: GovAiClient, document: dict[str, Any]) -> None:
         log.info("section_heading_not_an_opportunity", document_id=document_id, title=title)
         return
 
+    # İhale ilanları düzenli bir biçim izler: başlık ilk satırlarda (birden fazla
+    # satıra bölünebilir), ihaleyi açan idare "…den:" ile biten satırdadır. Genel yol
+    # başlığı ilk satırdan alıp kurum olarak KAYNAĞIN adını yazıyordu; oysa bir
+    # danışman için asıl bilgi ihaleyi açan idaredir ve o belgenin içinde yazılıdır.
+    ihale = ihale_alanlari(text) if kategori in TENDER_CATEGORIES else IhaleAlanlari()
+
+    if ihale.baslik:
+        title = ihale.baslik
+
     extraction = extract_rules(title, text)
 
     if not extraction.rules:
@@ -282,11 +296,17 @@ def process_document(client: GovAiClient, document: dict[str, Any]) -> None:
         "sourceType": document.get("sourceType", "Other"),
         "supportCategory": extraction.detected_category or guess_category(title, text),
         "title": title,
-        "publisher": document.get("publisher") or document.get("sourceName") or "Bilinmiyor",
+        # İhaleyi açan idare belgeden gelir; bulunamazsa kaynağın adına düşülür.
+        "publisher": (
+            ihale.kurum
+            or document.get("publisher")
+            or document.get("sourceName")
+            or "Bilinmiyor"
+        ),
         "publishedAt": document.get("collectedAt"),
         "summary": extraction.summary or text[:1500],
         "sourceUrl": url,
-        "deadline": extraction.deadline,
+        "deadline": extraction.deadline or ihale.ihale_tarihi,
         "ruleExtractionConfidence": extraction.confidence,
         "rules": rules_to_payload(extraction.rules),
         "documentChecklist": [
