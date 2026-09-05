@@ -442,3 +442,29 @@ public sealed class RegulatoryChangeRepository(GovAiDbContext context) : IRegula
             evidence);
     }
 }
+
+/// <summary>
+/// Başlık onarım planının okuma sorgusu (Faz 2).
+///
+/// Yalnızca künye kolonları çekilir; belge gövdeleri belleğe alınmaz. Kaynağın resmî
+/// alan adı da aynı sorguda gelir, çünkü bağlantı doğrulaması ona dayanır.
+/// </summary>
+public sealed class TitleRepairQueryRepository(GovAiDbContext context) : ITitleRepairQueryRepository
+{
+    public async Task<IReadOnlyList<DocumentTitleRow>> ListDocumentTitlesAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var rows = await context.SourceDocuments
+            .Join(context.Sources, d => d.SourceId, s => s.Id, (d, s) => new
+            {
+                d.Id, d.SourceId, SourceName = s.Name, d.Title, d.Url, d.CanonicalUrl,
+                OfficialDomain = s.Profile.OfficialDomain,
+            })
+            .ToListAsync(cancellationToken);
+
+        return rows
+            .Select(x => new DocumentTitleRow(
+                x.Id, x.SourceId, x.SourceName, x.Title, x.Url, x.CanonicalUrl, x.OfficialDomain))
+            .ToList();
+    }
+}

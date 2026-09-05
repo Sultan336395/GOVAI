@@ -1,3 +1,4 @@
+using GovAI.Application.Sources;
 using GovAI.Application.Abstractions.Persistence;
 using GovAI.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -29,6 +30,7 @@ public static class DependencyInjection
         services.AddScoped<ISourceRepository, SourceRepository>();
         services.AddScoped<ISourceDocumentRepository, SourceDocumentRepository>();
         services.AddScoped<IQuarantineQueryRepository, QuarantineQueryRepository>();
+        services.AddScoped<ITitleRepairQueryRepository, TitleRepairQueryRepository>();
         services.AddScoped<IRegulatoryChangeRepository, RegulatoryChangeRepository>();
         services.AddScoped<IAssessmentRepository, AssessmentRepository>();
         services.AddScoped<IScenarioSimulationRepository, ScenarioSimulationRepository>();
