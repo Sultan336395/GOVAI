@@ -38,7 +38,19 @@ public sealed record OpportunityDetailDto(
     /// Hangi alanın neden boş olduğu. Arayüz <c>null</c> yerine buna bakarak
     /// "Resmî kaynakta belirtilmemiş" gösterir.
     /// </summary>
-    FieldAvailabilityDto FieldAvailability);
+    FieldAvailabilityDto FieldAvailability,
+
+    /// <summary>
+    /// Çağrı bu an itibarıyla açık mı? Son başvuru tarihi geçmiş bir fırsat
+    /// <b>açık gibi gösterilemez</b>; ekran bunu ayrıca vurgular.
+    /// </summary>
+    bool IsOpen = true,
+
+    /// <summary>
+    /// Kaydın dayandığı resmî belge ve kanıt parçaları. Elle açılmış ya da kaynak
+    /// belgesi olmayan fırsatta <c>null</c>'dır.
+    /// </summary>
+    OpportunityProvenanceDto? Provenance = null);
 
 public sealed record BudgetDto(decimal? MinAmount, decimal? MaxAmount, string Currency, decimal? SupportRate);
 

@@ -201,6 +201,106 @@ export interface FieldAvailability {
 
 export type FieldAvailabilityState = 'Provided' | 'NotProvided' | 'NotApplicable'
 
+/** C# karşılığı: RuleOperator. */
+export type RuleOperator =
+  | 'Equals'
+  | 'NotEquals'
+  | 'GreaterThan'
+  | 'GreaterThanOrEqual'
+  | 'LessThan'
+  | 'LessThanOrEqual'
+  | 'In'
+  | 'NotIn'
+  | 'ContainsAll'
+  | 'ContainsAny'
+  | 'NaceMatch'
+  | 'IsTrue'
+  | 'IsFalse'
+
+/** Fırsatın kural taslağı. C# karşılığı: OpportunityRuleDto. */
+export interface OpportunityRule {
+  id: string
+  field: string
+  operator: RuleOperator
+  value: string
+  dimension: RuleDimension
+  severity: RuleSeverity
+  humanReadable: string
+  sourceExcerpt: string | null
+  confidence: number
+  isManuallyOverridden: boolean
+}
+
+export interface DocumentRequirement {
+  code: string
+  name: string
+  isMandatory: boolean
+  issuingAuthority: string | null
+  notes: string | null
+}
+
+export interface Budget {
+  minAmount: number | null
+  maxAmount: number | null
+  currency: string
+  supportRate: number | null
+}
+
+/**
+ * Fırsatın nereden geldiğinin kanıtı (Faz 2).
+ *
+ * `officialUrl` yalnızca adres kaynağın resmî alan adındaysa dolar; aksi hâlde
+ * `null` gelir ve "Resmî kaynağa git" düğmesi GÖSTERİLMEZ. Sebebi
+ * `officialUrlRejectionReason` alanında durur.
+ */
+export interface OpportunityProvenance {
+  sourceId: string
+  sourceName: string
+  sourceCategory: SourceCategory
+  sourceVerified: boolean
+  sourceVerifiedAt: string | null
+  sourceHealth: SourceHealth
+  officialDomain: string | null
+  officialUrl: string | null
+  officialUrlRejectionReason: string | null
+  documentId: string | null
+  documentVersion: number | null
+  canonicalUrl: string | null
+  contentHash: string | null
+  normalizedTextHash: string | null
+  charset: string | null
+  mediaType: string | null
+  retrievedAt: string | null
+  parseStatus: DocumentParseStatus | null
+  requiresOcr: boolean
+  pageCount: number | null
+  parseError: string | null
+  evidence: EvidenceChunk[]
+}
+
+/** Fırsat detay ekranının verisi. C# karşılığı: OpportunityDetailDto. */
+export interface OpportunityDetail {
+  id: string
+  title: string
+  publisher: string
+  summary: string | null
+  sourceUrl: string | null
+  sourceType: SourceType
+  supportCategory: SupportCategory
+  publishedAt: string
+  deadline: string | null
+  daysUntilDeadline: number | null
+  budget: Budget | null
+  ruleExtractionConfidence: number
+  isReviewedByConsultant: boolean
+  rules: OpportunityRule[]
+  documentChecklist: DocumentRequirement[]
+  fieldAvailability: FieldAvailability
+  /** Son başvuru tarihi geçmişse false; süresi geçmiş çağrı açık gösterilmez. */
+  isOpen: boolean
+  provenance: OpportunityProvenance | null
+}
+
 export interface OpportunityMatch {
   assessmentId: string
   opportunityId: string
@@ -610,6 +710,8 @@ export interface EvidenceChunk {
   text: string
   startOffset: number
   endOffset: number
+  /** Parçanın metninin SHA-256'sı; kanıtın değişmediği bununla gösterilir. */
+  textHash: string
 }
 
 export interface RegulatoryChangeDetail extends RegulatoryChangeSummary {

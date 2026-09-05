@@ -70,19 +70,81 @@ class FetchedDocument:
     def text(self) -> str:
         """Gövdeyi doğru karakter kümesiyle çözer.
 
-        Sıra: sunucunun bildirdiği charset → gövdedeki ``<meta charset>`` → UTF-8.
-        Son çare olarak hatalı baytlar atılır; içeriğin tamamını kaybetmektense
-        birkaç karakteri kaybetmek yeğdir.
+        **Bildirilen küme tek başına yeterli değildir.** ``iso-8859-1`` ve
+        ``windows-1254`` tek baytlıdır: neredeyse her baytı bir karaktere eşlerler ve
+        **asla hata vermezler**. Eski kural "hata verirse sonrakini dene" olduğu için,
+        sunucu yanlışlıkla ``iso-8859-1`` bildirdiğinde UTF-8 gövde sessizce
+        ``Ä°``, ``ÅŸ``, ``ÄŸ`` diye çözülüyordu — karantina ekranındaki bozuk
+        başlıkların kaynağı buydu.
+
+        Bu yüzden önce baytların kendisine bakılır: gövde geçerli UTF-8 ise ve
+        **çok baytlı dizi içeriyorsa** UTF-8'dir. Gerçek bir tek baytlı belgede
+        geçerli çok baytlı UTF-8 dizilerinin rastlantıyla oluşması pratikte
+        imkânsızdır; bildirilen kümeye karşı bu kanıt daha güçlüdür.
+
+        Sonraki adaylar makullük denetiminden geçer: sonuçta replacement karakteri
+        (``U+FFFD``) ya da beklenmeyen kontrol karakteri varsa o küme yanlıştır.
         """
-        for encoding in (self.charset, _sniff_meta_charset(self.content), "utf-8"):
+        if _cok_baytli_utf8(self.content):
+            return self.content.decode("utf-8")
+
+        adaylar = (
+            self.charset,
+            _sniff_meta_charset(self.content),
+            "utf-8",
+            # Türk kamu sitelerinde hâlâ yaygın olan eski kümeler.
+            "windows-1254",
+            "iso-8859-9",
+        )
+
+        for encoding in adaylar:
             if not encoding:
                 continue
             try:
-                return self.content.decode(encoding)
+                cozulen = self.content.decode(encoding)
             except (LookupError, UnicodeDecodeError):
                 continue
 
+            if _makul_metin(cozulen):
+                return cozulen
+
+        # Hiçbiri makul değil: içeriğin tamamını kaybetmektense birkaç karakteri kaybet.
         return self.content.decode("utf-8", errors="replace")
+
+
+def _cok_baytli_utf8(content: bytes) -> bool:
+    """Gövde geçerli UTF-8 mi ve çok baytlı dizi içeriyor mu?
+
+    Yalnızca ASCII olan bir gövde her kümede aynı çözülür; orada bir karar vermeye
+    gerek yoktur ve bu işlev ``False`` döner. Karar, gövdede ASCII dışı bayt
+    olduğunda anlam kazanır.
+    """
+    if not any(bayt > 0x7F for bayt in content):
+        return False
+
+    try:
+        content.decode("utf-8")
+    except UnicodeDecodeError:
+        return False
+
+    return True
+
+
+def _makul_metin(metin: str) -> bool:
+    """Çözülen metin gerçekten metin mi?
+
+    Yalnızca ``U+FFFD`` aramak yetmez; tek baytlı kümeler onu hiç üretmez. UTF-16 bir
+    gövde tek baytlı kümede okununca satır satır ``NUL`` çıkar — kontrol karakterleri
+    bu yüzden ayrıca denetlenir. C# tarafındaki ``MakulMetin`` ile aynı kural.
+    """
+    if "\ufffd" in metin:
+        return False
+
+    # Sekme, satır sonu ve satır başı dışında C0 kontrol karakteri beklenmez.
+    beklenen_kontroller = "\t\n\r"
+    return not any(
+        ord(ch) < 0x20 and ch not in beklenen_kontroller for ch in metin
+    )
 
 
 def _sniff_meta_charset(content: bytes) -> str | None:

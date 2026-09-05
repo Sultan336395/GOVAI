@@ -1,3 +1,4 @@
+using GovAI.Application.Opportunities;
 using GovAI.Application.Abstractions.Persistence;
 using GovAI.Application.Abstractions.Services;
 using GovAI.Domain.Assessments;
@@ -148,6 +149,14 @@ internal sealed class FakeOpportunityRepository : IOpportunityRepository
 
     public Task<Opportunity?> GetBySourceDocumentAsync(Guid sourceDocumentId, CancellationToken cancellationToken = default) =>
         Task.FromResult(_opportunities.FirstOrDefault(o => o.SourceDocumentId == sourceDocumentId));
+
+    /// <summary>Testte kanıt zinciri sunulmaz; sağlanırsa doğrudan döner.</summary>
+    public OpportunityProvenanceDto? Provenance { get; set; }
+
+    public Task<OpportunityProvenanceDto?> GetProvenanceAsync(
+        Guid opportunityId,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(Provenance);
 
     public Task AddAsync(Opportunity opportunity, CancellationToken cancellationToken = default)
     {

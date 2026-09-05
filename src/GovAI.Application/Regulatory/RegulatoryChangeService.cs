@@ -26,7 +26,12 @@ public sealed record EvidenceChunkDto(
     int? ParagraphNumber,
     string Text,
     int StartOffset,
-    int EndOffset);
+    int EndOffset,
+    /// <summary>
+    /// Parçanın metninin SHA-256'sı. Kanıtın sonradan değişmediği bununla gösterilir:
+    /// belge yeniden indirilip aynı aralık çıkarıldığında hash tutmalıdır.
+    /// </summary>
+    string TextHash = "");
 
 /// <summary>Mevzuat detayı: künye, belge sürümü ve kanıt bölümleri.</summary>
 public sealed record RegulatoryChangeDetailDto(

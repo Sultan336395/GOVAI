@@ -1,6 +1,7 @@
 using GovAI.Domain.Assessments;
 using GovAI.Domain.Auditing;
 using GovAI.Domain.Companies;
+using GovAI.Application.Opportunities;
 using GovAI.Domain.Common;
 using GovAI.Domain.Identity;
 using GovAI.Domain.Notifications;
@@ -52,6 +53,16 @@ public interface IOpportunityRepository
     Task<PagedResult<Opportunity>> SearchAsync(OpportunityQuery query, CancellationToken cancellationToken = default);
 
     Task<Opportunity?> GetBySourceDocumentAsync(Guid sourceDocumentId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Fırsatın dayandığı resmî belgenin künyesini ve kanıt parçalarını getirir.
+    ///
+    /// Fırsat elle açılmışsa ya da kaynak belgesi yoksa <c>null</c> döner; bu bir hata
+    /// değildir, arayüz o zaman kanıt bölümünü göstermez.
+    /// </summary>
+    Task<OpportunityProvenanceDto?> GetProvenanceAsync(
+        Guid opportunityId,
+        CancellationToken cancellationToken = default);
 
     Task AddAsync(Opportunity opportunity, CancellationToken cancellationToken = default);
 

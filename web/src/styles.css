@@ -85,6 +85,31 @@ button.primary {
   color: #fff;
 }
 
+/* Dış bağlantıyı düğme gibi gösterir (ör. "Resmî kaynağa git").
+   <button> değil <a> kullanılır: bu bir gezinmedir, eylem değil — ekran okuyucu ve
+   orta tık/yeni sekme davranışı doğru kalsın. */
+a.link-button {
+  display: inline-block;
+  font: inherit;
+  text-decoration: none;
+  border: 1px solid var(--primary);
+  background: var(--primary);
+  color: #fff;
+  border-radius: 8px;
+  padding: 10px 18px;
+  font-weight: 600;
+}
+
+a.link-button:hover {
+  filter: brightness(1.08);
+  text-decoration: none;
+}
+
+a.link-button:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 2px;
+}
+
 input,
 select {
   font: inherit;

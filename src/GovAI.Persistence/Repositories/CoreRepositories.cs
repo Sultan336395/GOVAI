@@ -1,3 +1,5 @@
+using GovAI.Application.Opportunities;
+using GovAI.Application.Regulatory;
 using GovAI.Application.Abstractions.Persistence;
 using GovAI.Domain.Common;
 using GovAI.Domain.Companies;
@@ -148,6 +150,81 @@ public sealed class OpportunityRepository(GovAiDbContext context) : IOpportunity
         await context.Opportunities.AddAsync(opportunity, cancellationToken);
 
     public void Remove(Opportunity opportunity) => context.Opportunities.Remove(opportunity);
+
+    public async Task<OpportunityProvenanceDto?> GetProvenanceAsync(
+        Guid opportunityId,
+        CancellationToken cancellationToken = default)
+    {
+        var opportunity = await context.Opportunities
+            .Where(o => o.Id == opportunityId)
+            .Select(o => new { o.SourceId, o.SourceDocumentId, o.SourceUrl })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (opportunity is null)
+        {
+            return null;
+        }
+
+        var source = await context.Sources
+            .Where(s => s.Id == opportunity.SourceId)
+            .Select(s => new
+            {
+                s.Id, s.Name, s.Category, s.ConfigurationVerified, s.ConfigurationVerifiedAt,
+                s.Health, Domain = s.Profile.OfficialDomain,
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        // Resmî bağlantı DOĞRULANMADAN gösterilmez. Adres kaynağın resmî alan adında
+        // değilse düğme hiç çıkmaz ve sebebi kayıtta durur.
+        var link = OfficialLink.Verify(opportunity.SourceUrl, source?.Domain);
+
+        // Belgenin EN SON sürümü; kanıt parçaları o sürümden gelir.
+        var version = opportunity.SourceDocumentId is null
+            ? null
+            : await context.SourceDocumentVersions
+                .Include(v => v.Chunks)
+                .Where(v => v.SourceDocumentId == opportunity.SourceDocumentId)
+                .OrderByDescending(v => v.VersionNumber)
+                .FirstOrDefaultAsync(cancellationToken);
+
+        var contentHash = opportunity.SourceDocumentId is null
+            ? null
+            : await context.SourceDocuments
+                .Where(d => d.Id == opportunity.SourceDocumentId)
+                .Select(d => d.ContentHash)
+                .FirstOrDefaultAsync(cancellationToken);
+
+        var evidence = version?.Chunks
+            .OrderBy(c => c.SequenceNumber)
+            .Select(c => new EvidenceChunkDto(
+                c.SequenceNumber, c.PageNumber, c.SectionTitle, c.ParagraphNumber,
+                c.Text, c.StartOffset, c.EndOffset, c.TextHash))
+            .ToList() ?? [];
+
+        return new OpportunityProvenanceDto(
+            SourceId: opportunity.SourceId,
+            SourceName: source?.Name ?? "(bilinmiyor)",
+            SourceCategory: source?.Category ?? SourceCategory.Uncategorized,
+            SourceVerified: source?.ConfigurationVerified ?? false,
+            SourceVerifiedAt: source?.ConfigurationVerifiedAt,
+            SourceHealth: source?.Health ?? SourceHealth.Unverified,
+            OfficialDomain: source?.Domain,
+            OfficialUrl: link.Url,
+            OfficialUrlRejectionReason: link.RejectionReason,
+            DocumentId: opportunity.SourceDocumentId,
+            DocumentVersion: version?.VersionNumber,
+            CanonicalUrl: version?.CanonicalUrl,
+            ContentHash: contentHash,
+            NormalizedTextHash: version?.NormalizedTextHash,
+            Charset: version?.Charset,
+            MediaType: version?.MediaType,
+            RetrievedAt: version?.RetrievedAt,
+            ParseStatus: version?.ParseStatus,
+            RequiresOcr: version?.RequiresOcr ?? false,
+            PageCount: version?.PageCount,
+            ParseError: version?.ParseError,
+            Evidence: evidence);
+    }
 }
 
 public sealed class SourceRepository(GovAiDbContext context) : ISourceRepository

@@ -324,6 +324,14 @@ public sealed class QuarantineService(
             return QuarantineReason.InvalidSourcePage;
         }
 
+        // Toplu bölüm başlığı: adres tekil bir ilanmış gibi görünse de başlık birden
+        // çok ilanı barındıran bölümün başlığıdır (ör. Resmî Gazete'nin ilan sayfası).
+        if (Opportunities.SectionHeading.IsCollective(candidate.Title))
+        {
+            evidence = Opportunities.SectionHeading.Explanation(candidate.Title);
+            return QuarantineReason.InvalidSourcePage;
+        }
+
         if (seenHashes.TryGetValue(candidate.ContentHash, out var original))
         {
             evidence = $"İçeriği birebir aynı olan başka kayıt var ({original}).";

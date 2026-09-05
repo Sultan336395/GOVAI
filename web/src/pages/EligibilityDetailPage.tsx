@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { api } from '@/api/client'
 import type { DocumentCheck, RuleEvaluation } from '@/api/types'
 import { EmptyState, ErrorBox, Loading, VerdictBadge } from '@/components/Common'
+import { OpportunityDetailCard } from '@/components/OpportunityDetailCard'
 import { formatDate, formatPercent } from '@/lib/format'
 
 export default function EligibilityDetailPage() {
@@ -13,6 +14,14 @@ export default function EligibilityDetailPage() {
     queryKey: ['eligibility', assessmentId],
     queryFn: () => api.getEligibilityDetail(assessmentId!),
     enabled: Boolean(assessmentId),
+  })
+
+  // Fırsatın kendi künyesi, kanıt zinciri ve resmî bağlantısı ayrı uçtan gelir.
+  // Karantinaya alınmış bir fırsat burada 404 döner ve detay gösterilmez.
+  const firsat = useQuery({
+    queryKey: ['opportunity', data?.opportunityId],
+    queryFn: () => api.getOpportunity(data!.opportunityId),
+    enabled: Boolean(data?.opportunityId),
   })
 
   const generateSummary = useMutation({
@@ -45,6 +54,8 @@ export default function EligibilityDetailPage() {
           </div>
         </div>
       </div>
+
+      {firsat.data ? <OpportunityDetailCard data={firsat.data} /> : null}
 
       <div className="card" style={{ marginBottom: 16 }}>
         <h2>Yönetici özeti</h2>

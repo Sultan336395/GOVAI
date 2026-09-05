@@ -36,7 +36,16 @@ public sealed class OpportunityService(
         var opportunity = await opportunities.GetWithRulesAsync(opportunityId, cancellationToken)
                           ?? throw new NotFoundException("Fırsat", opportunityId);
 
-        return ToDetail(opportunity, clock.UtcNow);
+        // Karantinadaki kayıt detay ekranında da AÇILMAZ. Listeden gizleyip detayını
+        // açık bırakmak korumayı işe yaramaz kılar: bağlantı elden ele dolaşabilir.
+        if (!opportunity.IsPublishable)
+        {
+            throw new NotFoundException("Fırsat", opportunityId);
+        }
+
+        var provenance = await opportunities.GetProvenanceAsync(opportunityId, cancellationToken);
+
+        return ToDetail(opportunity, clock.UtcNow, provenance);
     }
 
     /// <summary>
@@ -58,6 +67,15 @@ public sealed class OpportunityService(
                 nameof(request.SourceId),
                 $"'{source.Name}' bir mevzuat kaynağıdır; fırsat kataloğuna kayıt açamaz. "
                 + "Bu belge mevzuat değişikliği olarak kaydedilir.");
+        }
+
+        // Bölüm başlığı bir ilan DEĞİLDİR. Resmî Gazete'nin ilan sayfası onlarca ayrı
+        // ilanı tek sayfada yayımlar; sayfanın başlığı bunların ortak başlığıdır.
+        // Böyle bir kayıt açılırsa şirkete "size uygun ihale var" denir ve bağlantı bir
+        // liste sayfasına götürür — hangi ihaleden bahsedildiği belli olmaz.
+        if (SectionHeading.IsCollective(request.Title))
+        {
+            throw new ValidationException(nameof(request.Title), SectionHeading.Explanation(request.Title));
         }
 
         Opportunity? opportunity = null;
@@ -231,7 +249,10 @@ public sealed class OpportunityService(
         opportunity.Rules.Count,
         opportunity.DocumentChecklist.Count);
 
-    public static OpportunityDetailDto ToDetail(Opportunity opportunity, DateTimeOffset now) => new(
+    public static OpportunityDetailDto ToDetail(
+        Opportunity opportunity,
+        DateTimeOffset now,
+        OpportunityProvenanceDto? provenance = null) => new(
         opportunity.Id,
         opportunity.Title,
         opportunity.Publisher,
@@ -258,7 +279,10 @@ public sealed class OpportunityService(
             opportunity.FieldAvailability.Geography.ToString(),
             opportunity.FieldAvailability.Sector.ToString(),
             opportunity.FieldAvailability.ProgrammeType.ToString(),
-            opportunity.FieldAvailability.OfficialDocumentUrl.ToString()));
+            opportunity.FieldAvailability.OfficialDocumentUrl.ToString()),
+        // Süresi geçmiş çağrı açık gibi gösterilmez.
+        IsOpen: opportunity.IsOpenOn(now),
+        Provenance: provenance);
 
     /// <summary>
     /// Kaynağın kategorisi mevzuat mı? <see cref="GovAI.Application.Sources.SourceService"/>

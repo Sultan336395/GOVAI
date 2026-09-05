@@ -16,6 +16,7 @@ from govai_workers.collector import eurlex
 from govai_workers.collector.fetcher import PoliteFetcher
 from govai_workers.logging_setup import configure_logging, get_logger
 from govai_workers.messaging import RoutingKeys, consume
+from govai_workers.parser.bolum_basligi import toplu_bolum_basligi
 from govai_workers.parser.chunker import build_chunks
 from govai_workers.parser.extractors import extract_document
 from govai_workers.parser.rule_extractor import extract_rules, rules_to_payload
@@ -261,6 +262,14 @@ def process_document(client: GovAiClient, document: dict[str, Any]) -> None:
         return
 
     title = document.get("title") or text.splitlines()[0][:300]
+
+    # Toplu bölüm başlığı bir ilan DEĞİLDİR: o sayfada onlarca ayrı ilan vardır.
+    # Sunucu da reddediyor (SectionHeading) ve kaynak doğru odur; buradaki denetim
+    # yalnızca gereksiz bir tur atmayı önler. Kanıt parçaları zaten kaydedildi.
+    if toplu_bolum_basligi(title):
+        log.info("section_heading_not_an_opportunity", document_id=document_id, title=title)
+        return
+
     extraction = extract_rules(title, text)
 
     if not extraction.rules:

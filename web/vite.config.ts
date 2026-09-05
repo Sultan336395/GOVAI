@@ -25,8 +25,9 @@ export default defineConfig({
     sourcemap: true,
   },
   test: {
-    // Menü kuralları saf TypeScript'tir; DOM ortamı gerekmez.
-    environment: 'node',
-    include: ['src/**/*.test.ts'],
+    // Menü kuralları saf TypeScript'tir ama ekran testleri DOM ister; ikisi de
+    // aynı koşuda çalışsın diye ortam jsdom'a alındı.
+    environment: 'jsdom',
+    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
   },
 })

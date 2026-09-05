@@ -429,42 +429,11 @@ public sealed class SourceService(
     /// </summary>
     private static bool TasiyorMuResmiBelgeIzi(string content)
     {
-        var metin = TurkceKatla(content);
+        var metin = TurkceMetin.Katla(content);
 
-        return LegislativeMarkers.Any(m => metin.Contains(TurkceKatla(m), StringComparison.Ordinal));
+        return LegislativeMarkers.Any(m => metin.Contains(TurkceMetin.Katla(m), StringComparison.Ordinal));
     }
 
-    /// <summary>
-    /// Türkçe metni karşılaştırma için katlar.
-    ///
-    /// Gerekli, çünkü ne <c>ToUpperInvariant</c> ne de <c>OrdinalIgnoreCase</c> noktasız
-    /// <c>ı</c> ile noktalı <c>I</c>'yı eşleştirir: "Karar Sayısı" ile "KARAR SAYISI"
-    /// tutmaz ve gerçek mevzuat kaçırılır. Kültüre bağlı <c>ToUpper("tr-TR")</c> ise
-    /// sunucunun yereline göre değişir; deterministik olmaz.
-    /// </summary>
-    private static string TurkceKatla(string value)
-    {
-        var buffer = new System.Text.StringBuilder(value.Length);
-
-        foreach (var ch in value)
-        {
-            buffer.Append(ch switch
-            {
-                'ı' or 'İ' or 'i' or 'I' => 'i',
-                'ş' or 'Ş' => 's',
-                'ğ' or 'Ğ' => 'g',
-                'ü' or 'Ü' => 'u',
-                'ö' or 'Ö' => 'o',
-                'ç' or 'Ç' => 'c',
-                'â' or 'Â' => 'a',
-                'î' or 'Î' => 'i',
-                'û' or 'Û' => 'u',
-                _ => char.ToLowerInvariant(ch),
-            });
-        }
-
-        return buffer.ToString();
-    }
 
     /// <summary>Resmî mevzuat metinlerinde geçen belge türü ve künye ifadeleri.</summary>
     private static readonly string[] LegislativeMarkers =

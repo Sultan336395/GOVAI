@@ -13,6 +13,7 @@ import type {
   EligibilityDetail,
   LoginResponse,
   Notification,
+  OpportunityDetail,
   OpportunityMatch,
   OpportunitySummary,
   PagedResult,
@@ -164,6 +165,10 @@ export const api = {
 
   getEligibilityDetail: (assessmentId: string) =>
     request<EligibilityDetail>(`/api/eligibility/${assessmentId}`),
+
+  /** Fırsatın kendi künyesi, kanıt zinciri ve resmî bağlantısı. */
+  getOpportunity: (opportunityId: string) =>
+    request<OpportunityDetail>(`/api/opportunities/${opportunityId}`),
 
   rescore: (companyId: string) =>
     request<{ evaluatedOpportunityCount: number; eligibleCount: number; averageScore: number }>(
