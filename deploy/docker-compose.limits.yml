@@ -1,0 +1,121 @@
+# GOVAI kaynak sınırları — ölçüme dayalı.
+#
+# KULLANIM (yalnızca açıkça istendiğinde):
+#   docker compose -p govai -f docker-compose.yml -f docker-compose.limits.yml up -d
+#
+# ÖLÇÜM: Değerler 05.09.2026'da stg-api sunucusunda cgroup `memory.peak` okunarak
+# belirlendi. Sunucuda 7,8 GB RAM, 2 çekirdek ve **SWAP YOK** — bellek baskısında
+# zarif bozulma olmaz, doğrudan OOM gelir. Bu yüzden sınırlar ölçülen tepenin çok
+# üstünde tutuldu; amaç kaçak bir sürecin komşu 23 container'ı düşürmesini önlemek,
+# normal çalışmayı kısmak değil.
+#
+# VERİ SERVİSLERİ: PostgreSQL, RabbitMQ ve Redis'e dar sınır KONULMADI. Bir veri
+# servisinin OOM ile kapanması veri kaybı riski taşır; buradaki sınırlar ölçülen
+# tepenin 4-9 katıdır ve yalnızca üst tavan görevi görür.
+#
+# UYARI: Redis'in kendi `maxmemory` ayarı ve RabbitMQ'nun `vm_memory_high_watermark`
+# değeri ayrıca yapılandırılmalıdır. Container sınırı tek başına yeterli değildir:
+# ikisi de sınıra dayandığında kendi kendini sınırlamak yerine öldürülür.
+
+services:
+  postgres:
+    # Ölçülen tepe: 118 MB (boş veritabanı). Gerçek veriyle shared_buffers, work_mem
+    # ve bağlantı başına bellek büyür; sınır bu büyümeye yer bırakır.
+    deploy:
+      resources:
+        limits: { memory: 1024M, cpus: "0.75" }
+        reservations: { memory: 256M }
+    pids_limit: 100
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  rabbitmq:
+    # Ölçülen tepe: 196 MB. Kuyruk birikirse büyür.
+    deploy:
+      resources:
+        limits: { memory: 768M, cpus: "0.50" }
+        reservations: { memory: 192M }
+    pids_limit: 200
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  redis:
+    # Ölçülen tepe: 17 MB. Önbellek olduğu için sınırsız büyüyebilir.
+    deploy:
+      resources:
+        limits: { memory: 192M, cpus: "0.25" }
+        reservations: { memory: 48M }
+    pids_limit: 50
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  api:
+    # Ölçülen tepe: 250 MB. .NET çöp toplayıcısı cgroup sınırını okur ve ona göre
+    # davranır, bu yüzden sınır koymak burada faydalıdır — bellek baskısında GC daha
+    # erken devreye girer.
+    deploy:
+      resources:
+        limits: { memory: 768M, cpus: "0.75" }
+        reservations: { memory: 256M }
+    pids_limit: 200
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  web:
+    # Ölçülen tepe: 18 MB (nginx, statik dosyalar).
+    deploy:
+      resources:
+        limits: { memory: 96M, cpus: "0.25" }
+        reservations: { memory: 16M }
+    pids_limit: 50
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  # ── Python worker'ları ──
+  # Ölçülen tepeler: collector 41 MB, parser 38 MB, scheduler 34 MB, scoring 33 MB.
+  # Ayrıştırma sırasında büyük PDF'ler belleğe alınır; sınır buna yer bırakır.
+
+  collector:
+    deploy:
+      resources:
+        limits: { memory: 192M, cpus: "0.25" }
+        reservations: { memory: 48M }
+    pids_limit: 50
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  parser:
+    deploy:
+      resources:
+        limits: { memory: 192M, cpus: "0.25" }
+        reservations: { memory: 48M }
+    pids_limit: 50
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  scoring:
+    deploy:
+      resources:
+        limits: { memory: 192M, cpus: "0.25" }
+        reservations: { memory: 48M }
+    pids_limit: 50
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  scheduler:
+    deploy:
+      resources:
+        limits: { memory: 192M, cpus: "0.25" }
+        reservations: { memory: 48M }
+    pids_limit: 50
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }

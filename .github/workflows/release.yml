@@ -1,0 +1,96 @@
+# GOVAI yayın imajları.
+#
+# NEDEN AYRI BİR İŞ AKIŞI: hedef sunucuda 2 çekirdek ve ~4,3 GB kullanılabilir bellek
+# var, üstelik swap YOK. Aynı makinede 23 başka projenin container'ı çalışıyor. .NET ve
+# npm derlemesini orada yapmak, bellek baskısı yaratıp yalnızca GOVAI'yi değil komşu
+# servisleri de OOM riskine sokar. Derleme bu yüzden GitHub runner'ında yapılır;
+# sunucu YALNIZCA hazır imajı çeker.
+#
+# ETİKETLEME: imajlar commit SHA'sıyla etiketlenir ve bu etiket bir daha ASLA başka bir
+# içeriğe verilmez. "latest" yayına alınmaz — geri dönüşte hangi imajın çalıştığı
+# kesin olarak bilinmelidir.
+
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: "Derlenecek commit (boşsa mevcut dal ucu)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  images:
+    runs-on: ubuntu-latest
+
+    strategy:
+      # Biri kırılırsa diğerleri de durur: yarım bir yayın kümesi üretilmemeli.
+      fail-fast: true
+      matrix:
+        include:
+          - name: api
+            context: .
+            dockerfile: src/GovAI.Api/Dockerfile
+          - name: worker
+            context: workers
+            dockerfile: workers/Dockerfile
+          - name: web
+            context: web
+            dockerfile: web/Dockerfile
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.commit || github.sha }}
+
+      - name: Commit'i sabitle
+        id: sabit
+        run: echo "sha=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: GHCR oturumu
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" \
+            | docker login "$REGISTRY" -u "${{ github.actor }}" --password-stdin
+
+      - name: Derle
+        run: |
+          docker build \
+            -f "${{ matrix.dockerfile }}" \
+            -t "govai-${{ matrix.name }}:${{ steps.sabit.outputs.sha }}" \
+            "${{ matrix.context }}"
+
+      - name: Etiketle ve gönder
+        id: gonder
+        run: |
+          depo="$(echo "$REGISTRY/${{ github.repository }}-${{ matrix.name }}" | tr '[:upper:]' '[:lower:]')"
+          etiket="$depo:${{ steps.sabit.outputs.sha }}"
+
+          docker tag "govai-${{ matrix.name }}:${{ steps.sabit.outputs.sha }}" "$etiket"
+          docker push "$etiket"
+
+          # Digest, sunucunun çekeceği içeriğin değişmediğini kanıtlar.
+          digest="$(docker image inspect --format '{{index .RepoDigests 0}}' "$etiket")"
+
+          echo "etiket=$etiket" >> "$GITHUB_OUTPUT"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Künyeyi yaz
+        run: |
+          {
+            echo "### govai-${{ matrix.name }}"
+            echo ""
+            echo "| alan | değer |"
+            echo "|---|---|"
+            echo "| commit | \`${{ steps.sabit.outputs.sha }}\` |"
+            echo "| etiket | \`${{ steps.gonder.outputs.etiket }}\` |"
+            echo "| digest | \`${{ steps.gonder.outputs.digest }}\` |"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
