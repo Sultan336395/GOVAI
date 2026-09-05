@@ -44,6 +44,9 @@ public sealed class GovAiApiFactory : WebApplicationFactory<Program>
     /// <summary>En az 32 karakter, yer tutucu iz taşımayan geçerli bir imza anahtarı.</summary>
     public const string ValidSigningKey = "govai-test-imza-anahtari-yeterince-uzun-2026";
 
+    /// <summary>Platform hesabı açma ucunu koruyan bootstrap sırrı (yalnızca testte).</summary>
+    public const string BootstrapSecret = "test-bootstrap-sirri-2026";
+
     /// <summary>Ortak katalog tanımını yönetebilen platform hesabı.</summary>
     public const string PlatformCatalogEmail = "platform-katalog@govai.test";
 
@@ -92,7 +95,8 @@ public sealed class GovAiApiFactory : WebApplicationFactory<Program>
             ["Jwt:AccessTokenMinutes"] = "60",
             ["Redis:Enabled"] = "false",
             ["RabbitMq:Enabled"] = "false",
-            ["OpenAI:ApiKey"] = string.Empty
+            ["OpenAI:ApiKey"] = string.Empty,
+            ["GOVAI_PLATFORM_BOOTSTRAP_SECRET"] = BootstrapSecret
         };
 
         foreach (var (key, value) in settings)
@@ -393,11 +397,12 @@ public sealed class GovAiApiFactory : WebApplicationFactory<Program>
         CreateAuthenticatedClientAsync(fixture.Email);
 
     /// <summary>Belirli bir kullanıcı hesabıyla giriş yapar (rol bazlı yetki testleri için).</summary>
-    public async Task<HttpClient> CreateAuthenticatedClientAsync(string email)
+    public async Task<HttpClient> CreateAuthenticatedClientAsync(string email, string? password = null)
     {
         var client = CreateClient();
 
-        var response = await client.PostAsJsonAsync("/api/auth/login", new { email, password = Password });
+        var response = await client.PostAsJsonAsync(
+            "/api/auth/login", new { email, password = password ?? Password });
         response.EnsureSuccessStatusCode();
 
         var payload = await response.Content.ReadFromJsonAsync<LoginPayload>()

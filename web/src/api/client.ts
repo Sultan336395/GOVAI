@@ -13,7 +13,9 @@ import type {
   EligibilityDetail,
   LoginResponse,
   Notification,
+  CompleteActivationRequest,
   OpportunityDetail,
+  PlatformActivationStatus,
   OpportunityMatch,
   OpportunitySummary,
   PagedResult,
@@ -162,6 +164,17 @@ export const api = {
     request<PagedResult<OpportunityMatch>>(
       `/api/eligibility/companies/${companyId}/matches${query(params)}`,
     ),
+
+  // ---- platform hesabı aktivasyonu (oturum gerektirmez) ----
+
+  getActivationStatus: (token: string) =>
+    request<PlatformActivationStatus>(`/api/platform/activations/${encodeURIComponent(token)}`),
+
+  completeActivation: (body: CompleteActivationRequest) =>
+    request<PlatformActivationStatus>('/api/platform/activations/complete', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
 
   getEligibilityDetail: (assessmentId: string) =>
     request<EligibilityDetail>(`/api/eligibility/${assessmentId}`),

@@ -1,3 +1,4 @@
+using GovAI.Domain.Identity;
 using GovAI.Application.Opportunities;
 using GovAI.Application.Regulatory;
 using GovAI.Application.Abstractions.Persistence;
@@ -275,4 +276,28 @@ public sealed class SourceDocumentRepository(GovAiDbContext context) : ISourceDo
 
     public async Task AddAsync(SourceDocument document, CancellationToken cancellationToken = default) =>
         await context.SourceDocuments.AddAsync(document, cancellationToken);
+}
+
+/// <summary>
+/// Platform aktivasyon kayıtları.
+///
+/// <c>IgnoreQueryFilters</c> kullanılmaz çünkü <c>PlatformActivation</c> kiracı
+/// kapsamlı bir tip DEĞİLDİR: bağlantıyı açan kişinin henüz oturumu ve kiracısı yoktur.
+/// </summary>
+public sealed class PlatformActivationRepository(GovAiDbContext context) : IPlatformActivationRepository
+{
+    public async Task AddAsync(PlatformActivation activation, CancellationToken cancellationToken = default) =>
+        await context.PlatformActivations.AddAsync(activation, cancellationToken);
+
+    public Task<PlatformActivation?> GetByTokenHashAsync(
+        string tokenHash,
+        CancellationToken cancellationToken = default) =>
+        context.PlatformActivations.FirstOrDefaultAsync(a => a.TokenHash == tokenHash, cancellationToken);
+
+    public async Task<IReadOnlyList<PlatformActivation>> ListActiveForUserAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default) =>
+        await context.PlatformActivations
+            .Where(a => a.UserId == userId && a.ActivatedAt == null && a.RevokedAt == null)
+            .ToListAsync(cancellationToken);
 }

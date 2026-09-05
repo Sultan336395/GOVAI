@@ -195,8 +195,21 @@ public sealed class NotificationRepository(GovAiDbContext context) : INotificati
 
 public sealed class UserRepository(GovAiDbContext context) : IUserRepository
 {
+    public Task<Guid?> GetAnyTenantIdAsync(CancellationToken cancellationToken = default) =>
+        context.Tenants
+            .OrderBy(t => t.CreatedAt)
+            .Select(t => (Guid?)t.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
     public Task<AppUser?> GetAsync(Guid userId, CancellationToken cancellationToken = default) =>
         context.Users.FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
+
+    public Task<AppUser?> GetForActivationAsync(Guid userId, CancellationToken cancellationToken = default) =>
+        // Aktivasyon isteği anonimdir: kiracı bağlamı yoktur ve normal okuma hiçbir
+        // kullanıcı bulamaz. Yumuşak silme koşulu ELLE geri konur.
+        context.Users
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(u => u.Id == userId && !u.IsDeleted, cancellationToken);
 
     public Task<AppUser?> GetByEmailAsync(string email, CancellationToken cancellationToken = default)
     {

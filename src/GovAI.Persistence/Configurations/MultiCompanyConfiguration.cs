@@ -111,3 +111,32 @@ public sealed class CompanyVerificationRequestConfiguration : IEntityTypeConfigu
         // talebin varlığı bile başka bir kiracının verisini işaret etmemelidir.
     }
 }
+
+/// <summary>
+/// Platform hesabı aktivasyonu (Faz 2).
+///
+/// Kiracı sınırına tabi değildir: bağlantı henüz oturum açmamış bir kişi tarafından
+/// açılır. Jetonun kendisi değil, yalnızca SHA-256 özeti saklanır.
+/// </summary>
+public sealed class PlatformActivationConfiguration : IEntityTypeConfiguration<PlatformActivation>
+{
+    public void Configure(EntityTypeBuilder<PlatformActivation> builder)
+    {
+        builder.ToTable("platform_activations");
+        builder.HasKey(a => a.Id);
+        builder.Ignore(a => a.DomainEvents);
+
+        builder.Property(a => a.Email).HasMaxLength(320).IsRequired();
+        builder.Property(a => a.Role).HasConversion<int>();
+
+        builder.Property(a => a.TokenHash).HasMaxLength(128).IsRequired();
+        builder.HasIndex(a => a.TokenHash).IsUnique();
+
+        builder.HasIndex(a => a.UserId);
+
+        builder.HasOne<AppUser>()
+            .WithMany()
+            .HasForeignKey(a => a.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}

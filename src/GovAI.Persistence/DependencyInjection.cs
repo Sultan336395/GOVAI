@@ -31,6 +31,7 @@ public static class DependencyInjection
         services.AddScoped<ISourceDocumentRepository, SourceDocumentRepository>();
         services.AddScoped<IQuarantineQueryRepository, QuarantineQueryRepository>();
         services.AddScoped<ITitleRepairQueryRepository, TitleRepairQueryRepository>();
+        services.AddScoped<IPlatformActivationRepository, PlatformActivationRepository>();
         services.AddScoped<IRegulatoryChangeRepository, RegulatoryChangeRepository>();
         services.AddScoped<IAssessmentRepository, AssessmentRepository>();
         services.AddScoped<IScenarioSimulationRepository, ScenarioSimulationRepository>();

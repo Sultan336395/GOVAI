@@ -133,7 +133,13 @@ class SourceCrawler:
         self._fetcher = fetcher
         self._ingest = ingest
 
-    def crawl(self, source: dict) -> CrawlResult:
+    def crawl(self, source: dict, list_url_override: str | None = None) -> CrawlResult:
+        """Kaynağı tarar.
+
+        ``list_url_override`` verilirse yapılandırmadaki başlangıç adresi yerine o
+        kullanılır. İhale ilanları günlük adreslerde yayımlanır ve adres tarihten
+        üretilir; kaynağa sabit bir adres yazılamaz (bkz. ``ihale_takvimi``).
+        """
         config = SourceConfig.from_source(source)
         base_url = source["baseUrl"]
 
@@ -154,7 +160,10 @@ class SourceCrawler:
         policy = DomainPolicy.build(base_url, source.get("officialDomain"), config.allowed_domains)
         self._fetcher.with_policy(policy)
 
-        list_url = urljoin(base_url, config.list_url) if config.list_url else base_url
+        list_url = (
+            list_url_override
+            or (urljoin(base_url, config.list_url) if config.list_url else base_url)
+        )
 
         listing = self._safe_fetch(list_url, result)
         if listing is None:

@@ -45,6 +45,8 @@ public class GovAiDbContext(
     public DbSet<CompanyGroup> CompanyGroups => Set<CompanyGroup>();
     public DbSet<UserCompany> UserCompanies => Set<UserCompany>();
     public DbSet<CompanyInvitation> CompanyInvitations => Set<CompanyInvitation>();
+
+    public DbSet<PlatformActivation> PlatformActivations => Set<PlatformActivation>();
     public DbSet<CompanyVerificationRequest> CompanyVerificationRequests => Set<CompanyVerificationRequest>();
     public DbSet<Source> Sources => Set<Source>();
     public DbSet<SourceDocument> SourceDocuments => Set<SourceDocument>();

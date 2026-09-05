@@ -171,6 +171,19 @@ export interface CompanyDetail {
   profileCompleteness: number
 }
 
+/** Platform hesabı aktivasyon bağlantısının durumu. */
+export interface PlatformActivationStatus {
+  isRedeemable: boolean
+  email: string | null
+  reason: string | null
+}
+
+export interface CompleteActivationRequest {
+  token: string
+  password: string
+  passwordConfirmation: string
+}
+
 export interface OpportunitySummary {
   id: string
   title: string

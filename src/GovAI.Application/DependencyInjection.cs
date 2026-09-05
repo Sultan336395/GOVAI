@@ -30,6 +30,7 @@ public static class DependencyInjection
         services.AddScoped<ManualImportService>();
         services.AddScoped<QuarantineService>();
         services.AddScoped<TitleRepairService>();
+        services.AddScoped<PlatformActivationService>();
         services.AddScoped<Regulatory.RegulatoryChangeService>();
         services.AddScoped<EligibilityService>();
         services.AddScoped<ScenarioSimulationService>();

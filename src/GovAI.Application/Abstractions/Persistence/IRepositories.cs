@@ -222,9 +222,46 @@ public interface INotificationRepository
     Task AddAsync(Notification notification, CancellationToken cancellationToken = default);
 }
 
+/// <summary>
+/// Platform hesabı aktivasyon kayıtları.
+///
+/// Kiracı sınırına tabi DEĞİLDİR: aktivasyon bağlantısı henüz oturum açmamış bir
+/// kişi tarafından, kiracı bağlamı olmadan açılır.
+/// </summary>
+public interface IPlatformActivationRepository
+{
+    Task AddAsync(PlatformActivation activation, CancellationToken cancellationToken = default);
+
+    /// <summary>Jeton özetiyle arar. Açık jeton hiçbir zaman sorguya girmez.</summary>
+    Task<PlatformActivation?> GetByTokenHashAsync(
+        string tokenHash,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Kullanıcının hâlâ kullanılabilir bağlantıları; yenisi üretilince iptal edilir.</summary>
+    Task<IReadOnlyList<PlatformActivation>> ListActiveForUserAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default);
+}
+
 public interface IUserRepository
 {
     Task<AppUser?> GetAsync(Guid userId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Herhangi bir kiracının kimliği. Platform hesabı açarken kullanılır: platform
+    /// kullanıcıları bir kiracıya ait değildir ama şema kiracı kimliği ister.
+    /// </summary>
+    Task<Guid?> GetAnyTenantIdAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Kimliğiyle kullanıcı arar, <b>kiracı sınırını aşarak</b>.
+    ///
+    /// Yalnızca platform hesabı aktivasyonunda kullanılır: aktivasyon bağlantısını
+    /// açan kişinin henüz oturumu ve kiracı bağlamı yoktur, bu yüzden normal okuma
+    /// hiçbir kullanıcı bulamaz. Yumuşak silme koşulu yine uygulanır — silinmiş bir
+    /// hesap aktive edilemez.
+    /// </summary>
+    Task<AppUser?> GetForActivationAsync(Guid userId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// E-posta ile kullanıcı arar. <b>Kiracı sınırını bilinçli olarak aşan tek sorgudur.</b>

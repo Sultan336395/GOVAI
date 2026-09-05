@@ -11,6 +11,7 @@ import RegulatoryChangeDetailPage from '@/pages/RegulatoryChangeDetailPage'
 import RegulatoryChangesPage from '@/pages/RegulatoryChangesPage'
 import DashboardPage from '@/pages/DashboardPage'
 import EligibilityDetailPage from '@/pages/EligibilityDetailPage'
+import ActivatePage from '@/pages/ActivatePage'
 import LoginPage from '@/pages/LoginPage'
 import MatchesPage from '@/pages/MatchesPage'
 import MyCompaniesPage from '@/pages/MyCompaniesPage'
@@ -38,6 +39,8 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      {/* Aktivasyon oturum gerektirmez: hesap henüz parolasızdır. */}
+      <Route path="/activate/:token" element={<ActivatePage />} />
       <Route element={<ProtectedRoutes />}>
         <Route path="/" element={<DashboardPage />} />
         <Route path="/matches" element={<MatchesPage />} />

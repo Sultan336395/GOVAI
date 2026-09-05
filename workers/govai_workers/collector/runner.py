@@ -7,12 +7,14 @@ tüm etkin kaynakları taramak için `--once` modu zamanlayıcıdan da çağrıl
 from __future__ import annotations
 
 import argparse
+import json
 import sys
+from datetime import date, datetime
 from typing import Any
 
 from govai_workers.api_client import GovAiClient
-from govai_workers.collector import eurlex
-from govai_workers.collector.crawler import SourceCrawler
+from govai_workers.collector import eurlex, ihale_takvimi
+from govai_workers.collector.crawler import CrawlResult, SourceCrawler
 from govai_workers.collector.fetcher import PoliteFetcher
 from govai_workers.collector.verifier import verify_source
 from govai_workers.logging_setup import configure_logging, get_logger
@@ -21,29 +23,128 @@ from govai_workers.messaging import RoutingKeys, consume
 log = get_logger(__name__)
 
 
-def crawl_source(client: GovAiClient, source: dict[str, Any]) -> None:
-    log.info("crawl_started", source=source["name"], url=source["baseUrl"])
+def _ihale_sablonu(source: dict[str, Any]) -> str | None:
+    """Kaynak tarihe bağlı ihale adresi kullanıyor mu?
+
+    Şablon kaynağın yapılandırmasında ``tenderUrlTemplate`` anahtarıyla durur.
+    Yoksa kaynak normal (sabit adresli) yolla taranır.
+    """
+    ham = source.get("configurationJson")
+
+    if not ham:
+        return None
+
+    try:
+        veri = json.loads(ham)
+    except (TypeError, ValueError):
+        return None
+
+    sablon = veri.get("tenderUrlTemplate")
+
+    return sablon if isinstance(sablon, str) and sablon.strip() else None
+
+
+def _son_basarili_gun(source: dict[str, Any]) -> date | None:
+    """Kaynağın son başarılı taramasının Türkiye saatine göre günü."""
+    ham = source.get("lastSuccessfulRunAt")
+
+    if not ham:
+        return None
+
+    try:
+        an = datetime.fromisoformat(str(ham).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+    return ihale_takvimi.bugun_istanbul(an)
+
+
+def _ihale_tara(
+    client: GovAiClient,
+    source: dict[str, Any],
+    sablon: str,
+    simdi: datetime | None = None,
+) -> tuple[str, str, int]:
+    """Tarihe bağlı ihale kaynağını tarar.
+
+    Her gün için ilan bölümü adresi şablondan üretilir. İlan bulunmayan gün
+    **arıza değildir**: Resmî Gazete hafta sonu ve tatillerde ilan yayımlamaz.
+    """
+    bugun = ihale_takvimi.bugun_istanbul(simdi)
+    gunler = ihale_takvimi.taranacak_gunler(_son_basarili_gun(source), bugun)
+
+    toplam = CrawlResult()
+    islenen: list[str] = []
 
     with PoliteFetcher() as fetcher:
         crawler = SourceCrawler(fetcher, client.ingest_document)
-        result = crawler.crawl(source)
 
-    # Kısmi başarı da "başarılı" sayılır; hiçbir doküman alınamadıysa kaynak hatalı işaretlenir.
-    status = "Failed" if result.collected == 0 and result.failed > 0 else "Succeeded"
-    message = result.summary()
+        for gun in gunler:
+            adres = ihale_takvimi.ihale_adresi(sablon, source["baseUrl"], gun)
+            sonuc = crawler.crawl(source, list_url_override=adres)
 
-    if result.errors:
-        message += " | ilk hata: " + result.errors[0][:400]
+            toplam.collected += sonuc.collected
+            toplam.skipped += sonuc.skipped
+            toplam.failed += sonuc.failed
+            toplam.errors.extend(sonuc.errors)
 
-    client.record_run(source["id"], status, message, result.collected)
+            islenen.append(f"{gun.isoformat()}:{sonuc.collected}")
 
-    log.info(
-        "crawl_finished",
-        source=source["name"],
-        collected=result.collected,
-        skipped=result.skipped,
-        failed=result.failed,
+            log.info(
+                "tender_day_crawled",
+                source=source["name"],
+                day=gun.isoformat(),
+                url=adres,
+                collected=sonuc.collected,
+                skipped=sonuc.skipped,
+                failed=sonuc.failed,
+            )
+
+    # İlan bulunmayan gün ARIZA DEĞİLDİR: Resmî Gazete hafta sonu ve resmî
+    # tatillerde ilan yayımlamaz. Sayfaya erişilebildiği hâlde ilan çıkmaması
+    # sağlıklı bir sonuçtur.
+    status = "Failed" if toplam.collected == 0 and toplam.failed > 0 else "Succeeded"
+
+    mesaj = (
+        f"son kontrol {bugun.isoformat()} | taranan gün {len(gunler)} "
+        f"({', '.join(islenen) if islenen else '-'}) | "
+        f"kabul edilen {toplam.collected}, atlanan {toplam.skipped}, "
+        f"başarısız {toplam.failed}"
     )
+
+    if toplam.collected == 0 and toplam.failed == 0:
+        mesaj = "başarılı, kayıt bulunamadı | " + mesaj
+
+    if toplam.errors:
+        mesaj += " | ilk hata: " + toplam.errors[0][:300]
+
+    return status, mesaj, toplam.collected
+
+
+def crawl_source(client: GovAiClient, source: dict[str, Any]) -> None:
+    log.info("crawl_started", source=source["name"], url=source["baseUrl"])
+
+    sablon = _ihale_sablonu(source)
+
+    if sablon:
+        status, message, collected = _ihale_tara(client, source, sablon)
+    else:
+        with PoliteFetcher() as fetcher:
+            crawler = SourceCrawler(fetcher, client.ingest_document)
+            result = crawler.crawl(source)
+
+        # Kısmi başarı da "başarılı" sayılır; hiçbir doküman alınamadıysa kaynak
+        # hatalı işaretlenir.
+        status = "Failed" if result.collected == 0 and result.failed > 0 else "Succeeded"
+        message = result.summary()
+        collected = result.collected
+
+        if result.errors:
+            message += " | ilk hata: " + result.errors[0][:400]
+
+    client.record_run(source["id"], status, message, collected)
+
+    log.info("crawl_finished", source=source["name"], status=status, collected=collected)
 
 
 def crawl_all(client: GovAiClient) -> int:
