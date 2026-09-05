@@ -30,5 +30,13 @@ RUN if [ -n "$PIP_INDEX_URL" ]; then pip config set global.index-url "$PIP_INDEX
 RUN useradd --uid 10001 --create-home --shell /usr/sbin/nologin govai
 USER govai
 
+# Sağlık, sürecin varlığına DEĞİL nabza bakar. Nabız yalnızca kuyruk tüketicisinin
+# (ya da scheduler'da zamanlayıcının) kendi olay döngüsünden atar; bağlantı koparsa
+# süreç yaşasa bile nabız eskir ve container sağlıksız işaretlenir.
+#
+# start-period: worker'ın RabbitMQ'ya bağlanması birkaç saniye sürebilir; o sürede
+# başarısız denemeler sağlıksız SAYILMAZ.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3     CMD govai-health
+
 # Varsayılan olarak collector çalışır; compose içinde her servis kendi komutunu verir.
 CMD ["govai-collector"]

@@ -18,6 +18,7 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
+from govai_workers import health
 from govai_workers.api_client import ApiError, GovAiClient
 from govai_workers.logging_setup import configure_logging, get_logger
 
@@ -107,6 +108,16 @@ def main() -> int:
         coalesce=True,
     )
 
+    # Scheduler kuyruk tüketmez; sağlığı ZAMANLAYICININ yaşadığına bağlıdır.
+    # İş çalışmıyorsa nabız eskir ve container sağlıksız işaretlenir.
+    scheduler.add_job(
+        lambda: health.isaretle("scheduler", baglanti_var=True),
+        IntervalTrigger(seconds=int(health.NABIZ_ARALIGI)),
+        id="heartbeat",
+        max_instances=1,
+        coalesce=True,
+    )
+
     def _shutdown(_signum: int, _frame: FrameType | None) -> None:
         log.info("scheduler_stopping")
         scheduler.shutdown(wait=False)
@@ -114,6 +125,10 @@ def main() -> int:
 
     signal.signal(signal.SIGINT, _shutdown)
     signal.signal(signal.SIGTERM, _shutdown)
+
+    # İlk nabız hemen atılır ki container "başlatılıyor" aşamasında sağlıksız görünsün
+    # değil, hazır olduğu an sağlıklı olsun.
+    health.isaretle("scheduler", baglanti_var=True)
 
     log.info("scheduler_started", jobs=[job.id for job in scheduler.get_jobs()])
     scheduler.start()

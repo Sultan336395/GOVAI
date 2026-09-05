@@ -12,6 +12,7 @@ from typing import Any
 import pika
 from pika.adapters.blocking_connection import BlockingChannel
 
+from govai_workers import health
 from govai_workers.config import settings
 from govai_workers.logging_setup import get_logger
 
@@ -124,6 +125,15 @@ def consume(
             ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
 
     channel.basic_consume(queue=queue_name, on_message_callback=_on_message)
+
+    # Nabız, bağlantının KENDİ olay döngüsünden atar. Bağlantı koparsa döngü durur ve
+    # nabız eskir; süreç yaşamaya devam etse bile container sağlıksız işaretlenir.
+    # Süreç varlığına bakan bir kontrol bu durumu göremezdi.
+    def _nabiz() -> None:
+        health.isaretle(queue_name, baglanti_var=True)
+        connection.call_later(health.NABIZ_ARALIGI, _nabiz)
+
+    _nabiz()
 
     log.info("consumer_started", queue=queue_name, routing_keys=routing_keys)
     try:
