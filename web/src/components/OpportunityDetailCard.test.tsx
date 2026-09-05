@@ -113,6 +113,17 @@ describe('Fırsat detay ekranı', () => {
     expect(screen.getByText('Son başvuru tarihi')).toBeTruthy()
   })
 
+  it('W1b. Kaynak türü Türkçe gösterilir, ham enum sızmaz', () => {
+    render(<OpportunityDetailCard data={FIRSAT} />)
+
+    const govde = document.body.textContent ?? ''
+
+    // Bir danışman "TenderPortal" ifadesinden ne anlaması gerektiğini bilemez.
+    expect(govde).toContain('İhale portalı')
+    expect(govde).not.toContain('TenderPortal')
+    expect(govde).not.toContain('OfficialGazette')
+  })
+
   it('W2. Türkçe karakterler bozulmadan görüntülenir', () => {
     render(<OpportunityDetailCard data={FIRSAT} />)
 

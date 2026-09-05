@@ -12,6 +12,7 @@ import {
   formatCurrency,
   formatDate,
   formatPercent,
+  sourceTypeLabels,
 } from '@/lib/format'
 
 /**
@@ -43,7 +44,7 @@ export function OpportunityDetailCard({ data }: { data: OpportunityDetail }) {
 
         <div className="grid two">
           <Alan ad="Fırsat türü" deger={categoryLabels[data.supportCategory]} />
-          <Alan ad="Program türü" deger={data.sourceType} durum={durum.programmeType} />
+          <Alan ad="Program türü" deger={sourceTypeLabels[data.sourceType]} durum={durum.programmeType} />
           <Alan ad="Yayımlayan resmî kurum" deger={data.publisher} />
           <Alan ad="Yayın tarihi" deger={formatDate(data.publishedAt)} />
           <Alan

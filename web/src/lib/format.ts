@@ -1,4 +1,4 @@
-import type { EligibilityVerdict, SupportCategory } from '@/api/types'
+import type { EligibilityVerdict, SourceType, SupportCategory } from '@/api/types'
 
 const currencyFormatter = new Intl.NumberFormat('tr-TR', {
   style: 'currency',
@@ -35,6 +35,23 @@ export const verdictClass: Record<EligibilityVerdict, string> = {
   ConditionallyEligible: 'conditional',
   NotEligible: 'not-eligible',
   Indeterminate: 'indeterminate',
+}
+
+/**
+ * Kaynak türünün Türkçe karşılığı.
+ *
+ * Ham enum değeri ("OfficialGazette") kullanıcıya gösterilmez: arayüz metinleri
+ * Türkçedir ve bir danışman "OfficialGazette" ifadesinden ne anlaması gerektiğini
+ * bilemez.
+ */
+export const sourceTypeLabels: Record<SourceType, string> = {
+  OfficialGazette: 'Resmî Gazete',
+  Ministry: 'Bakanlık',
+  DevelopmentAgency: 'Kalkınma ajansı',
+  KosgebOrSimilar: 'KOSGEB ve benzeri kurum',
+  TenderPortal: 'İhale portalı',
+  EuOrInternational: 'AB / uluslararası kurum',
+  Other: 'Diğer',
 }
 
 export const categoryLabels: Record<SupportCategory, string> = {
