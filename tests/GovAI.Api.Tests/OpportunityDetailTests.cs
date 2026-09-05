@@ -450,6 +450,65 @@ public sealed class OpportunityDetailTests(GovAiApiFactory factory)
         Assert.Equal(1, sayi);
     }
 
+    [Fact(DisplayName = "FD12. Düzelen kurum adı katalogda güncellenir")]
+    public async Task Kurum_adi_tazelenir()
+    {
+        // İhaleyi açan idare belgenin içinde yazılıdır ve ayrıştırıcı onu sonradan
+        // çıkarabilir hâle gelebilir. Kurum yalnızca kayıt AÇILIRKEN yazılsaydı,
+        // düzelme kullanıcıya hiç ulaşmazdı.
+        var sourceId = await IhaleKaynagiAsync("Kurum Tazeleme Testi");
+        const string adres = "https://www.resmigazete.gov.tr/ilanlar/eskiilanlar/2026/09/20260906-3-9.pdf";
+
+        var belge = await _ingest.PostAsJsonAsync("/api/sources/documents", new
+        {
+            sourceId,
+            url = adres,
+            title = "TAŞINMAZ SATILACAKTIR",
+            rawContent =
+                "TAŞINMAZ SATILACAKTIR. Çay İşletmeleri Genel Müdürlüğünden: İhale "
+                + "18/09/2026 tarihinde yapılacaktır. Şartname İdareden temin edilir.",
+            mediaType = "text/html",
+            canonicalUrl = adres,
+            charset = "utf-8",
+            httpStatusCode = 200
+        });
+
+        belge.EnsureSuccessStatusCode();
+        var documentId = (await belge.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("documentId").GetGuid();
+
+        object Payload(string kurum) => new
+        {
+            sourceId,
+            sourceDocumentId = documentId,
+            sourceType = "TenderPortal",
+            supportCategory = "Tender",
+            title = "TAŞINMAZ SATILACAKTIR",
+            publisher = kurum,
+            summary = "Taşınmaz satış ihalesi.",
+            sourceUrl = adres,
+            publishedAt = DateTimeOffset.UtcNow.AddDays(-1),
+            rules = Array.Empty<object>(),
+            documentChecklist = Array.Empty<object>()
+        };
+
+        // İlk yakalanış: idare çıkarılamadı, kaynağın adı yazıldı.
+        var ilk = await _catalog.PostAsJsonAsync("/api/opportunities", Payload("Resmî Gazete İhale İlanları"));
+        ilk.EnsureSuccessStatusCode();
+        var id = (await ilk.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        // Yeniden ayrıştırma: gerçek idare çıkarıldı.
+        var ikinci = await _catalog.PostAsJsonAsync(
+            "/api/opportunities", Payload("Çay İşletmeleri Genel Müdürlüğünden"));
+        ikinci.EnsureSuccessStatusCode();
+
+        // Aynı kayıt güncellendi, mükerrer açılmadı.
+        Assert.Equal(id, (await ikinci.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid());
+
+        var detay = await _tenantA.GetFromJsonAsync<JsonElement>($"/api/opportunities/{id}");
+        Assert.Equal("Çay İşletmeleri Genel Müdürlüğünden", detay.GetProperty("publisher").GetString());
+    }
+
     [Fact(DisplayName = "FD11. İhale kaydı mevzuat listesine karışmaz")]
     public async Task Ihale_mevzuata_karismaz()
     {

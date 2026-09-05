@@ -99,6 +99,27 @@ public class Opportunity : AggregateRoot, IAuditable, ISoftDeletable
         }
     }
 
+    /// <summary>
+    /// Yayımlayan kurumu yeni yakalanıştan tazeler.
+    ///
+    /// Kurum yalnızca kayıt AÇILIRKEN yazılıyordu. İhale ilanlarında ihaleyi açan
+    /// idare belgenin içinde yazılıdır; ayrıştırıcı onu sonradan çıkarabilir hâle
+    /// geldiğinde katalogdaki eski değer ("Resmî Gazete İhale İlanları" gibi kaynak
+    /// adı) yerinde kalıyor ve düzelme kullanıcıya hiç ulaşmıyordu.
+    ///
+    /// Boş değer mevcut kurumu SİLMEZ: bir sonraki yakalanışta alan çıkarılamadıysa
+    /// bilinen doğru değer kaybedilmemelidir.
+    /// </summary>
+    public void RefreshPublisher(string? publisher)
+    {
+        var aday = publisher?.Trim();
+
+        if (!string.IsNullOrWhiteSpace(aday))
+        {
+            Publisher = aday;
+        }
+    }
+
     public void Describe(string? summary, string? sourceUrl, Guid? sourceDocumentId)
     {
         Summary = summary?.Trim();
