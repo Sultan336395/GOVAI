@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 import { api } from '@/api/client'
 import type { EligibilityVerdict } from '@/api/types'
 import { useCompanies } from '@/app/contexts'
-import { EmptyState, ErrorBox, Loading, ScoreCell, VerdictBadge } from '@/components/Common'
+import { EmptyState, ErrorBox, Loading, ScoreCell, SectorFitBadge, VerdictBadge } from '@/components/Common'
 import { categoryLabels, formatCurrency, formatDeadline, formatPercent } from '@/lib/format'
 
 const VERDICT_OPTIONS: { value: EligibilityVerdict | ''; label: string }[] = [
@@ -43,7 +43,11 @@ export default function MatchesPage() {
       <div className="page-header">
         <div>
           <h1>Fırsat eşleşmeleri</h1>
-          <p>Firma profiliniz ile eşleşen çağrılar, uygunluk skoruna göre sıralanır.</p>
+          <p>
+            Firma profiliniz ile eşleşen çağrılar <strong>önce sektör uyumuna</strong>, sonra
+            uygunluk skoruna göre sıralanır. Sektörü doğrulanamayan veya tutmayan çağrılar
+            listeden çıkarılmaz; en altta etiketli olarak kalır.
+          </p>
         </div>
       </div>
 
@@ -103,6 +107,7 @@ export default function MatchesPage() {
                 <tr>
                   <th>Fırsat</th>
                   <th>Destek türü</th>
+                  <th>Sektör uyumu</th>
                   <th>Skor</th>
                   <th>Güven</th>
                   <th>Karar</th>
@@ -121,6 +126,9 @@ export default function MatchesPage() {
                       </div>
                     </td>
                     <td>{categoryLabels[match.supportCategory]}</td>
+                    <td>
+                      <SectorFitBadge fit={match.sectorFit} />
+                    </td>
                     <td>
                       <ScoreCell score={match.finalScore} />
                     </td>

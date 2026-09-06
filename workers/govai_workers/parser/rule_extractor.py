@@ -22,6 +22,7 @@ from typing import Any
 
 from govai_workers.config import settings
 from govai_workers.logging_setup import get_logger
+from govai_workers.parser.sektor import sektor_bul
 
 log = get_logger(__name__)
 
@@ -115,8 +116,12 @@ _NUTS2 = re.compile(r"\bTR[0-9]{1,2}[0-9A-Z]?\b")
 _ISO_CERT = re.compile(r"\bISO\s*[-]?\s*(?P<number>9001|14001|27001|45001|50001)\b", re.IGNORECASE)
 
 
-def extract_deterministic(text: str) -> list[ExtractedRule]:
-    """Metinde birebir yazan sayısal/kategorik koşulları çıkarır."""
+def extract_deterministic(text: str, title: str = "") -> list[ExtractedRule]:
+    """Metinde birebir yazan sayısal/kategorik koşulları çıkarır.
+
+    ``title`` sektör çıkarımı için gerekir: ilanın konusu başlıkta yazar, gövdede geçen
+    aynı kelime çoğu zaman adres veya idarenin adıdır.
+    """
     rules: list[ExtractedRule] = []
 
     if match := _MIN_EMPLOYEE.search(text):
@@ -180,6 +185,25 @@ def extract_deterministic(text: str) -> list[ExtractedRule]:
             humanReadable=f"Şu belgeler puanlamada dikkate alınır: {', '.join(certs)}.",
             sourceExcerpt=_excerpt(text, *_first_span(_ISO_CERT, text)),
             confidence=0.8,
+        ))
+
+    # Sektör kuralı en sona eklenir; diğer kalıplar metinde birebir yazan koşullardır,
+    # bu ise ilanın KONUSUNDAN çıkarımdır. Ayrımı severity ve confidence taşır:
+    # engelleyici değil "Major", güven 1.0 değil 0.7. Sektör tanınmazsa kural üretilmez —
+    # motor o hâlde boyutu "doğrulanamadı" sayar, tam puan vermez.
+    if sektor := sektor_bul(title, text):
+        rules.append(ExtractedRule(
+            field="Company.NaceCodes",
+            operator="NaceMatch",
+            value=",".join(sektor.nace),
+            dimension="Sector",
+            severity="Major",
+            humanReadable=(
+                f"İlanın konusu {sektor.ad.lower()} alanındadır; "
+                "firmanın NACE kodları bu alanla uyumlu olmalıdır."
+            ),
+            sourceExcerpt=title.strip() or None,
+            confidence=0.7,
         ))
 
     return rules
@@ -318,7 +342,7 @@ def _is_valid_rule(raw: dict[str, Any]) -> bool:
 
 def extract_rules(title: str, text: str) -> ExtractionResult:
     """Deterministik ve LLM kurallarını birleştirir; çakışmada deterministik kural kazanır."""
-    deterministic = extract_deterministic(text)
+    deterministic = extract_deterministic(text, title)
     llm = extract_with_llm(title, text)
 
     taken = {(rule.field, rule.operator) for rule in deterministic}

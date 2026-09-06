@@ -61,6 +61,25 @@ Sertifika istisnası bilinçlidir; onu da `Unknown` yaparsan "ISO 9001 eksik, te
 aksiyonu kaybolur. Gerekçe: `docs/adr/0003`. Koruyan test:
 `Eksik_firma_verisi_karari_belirsiz_yapar_ve_veri_boslugu_raporlanir`.
 
+### 2.2.1 Sektör uyumu sıralamanın birincil ölçütüdür
+
+Eşleştirme önce sektöre bakar, sonra alt ölçütlere (personel, ciro, işletme yaşı,
+personel yapısı). Bunu üç parça birlikte sağlar; birini bozmak diğerlerini işlevsiz
+bırakır:
+
+| Parça | Nerede | Ne yapar |
+|---|---|---|
+| `UnverifiedSectorScore = 0.5` | `EligibilityEngine` | Sektör kuralı olmayan çağrıya tam puan VERMEZ |
+| `SectorFit` (Matched / Unverified / NotMatched) | `EligibilityAssessment` kolonu | Sıralamanın birincil anahtarı |
+| `parser/sektor.py` | worker | İlanın konusundan NACE kuralı üretir |
+
+`UnconstrainedDimensionScore = 1.0` yalnızca **diğer** boyutlar içindir; sektöre
+uygulanırsa kuralsız her ilan listenin başına çıkar. Gerekçe ve tablo: `docs/scoring.md` §2.1–2.2.
+Koruyan testler: `SectorFitTests` (13), `SectorRankingTests` (9), `test_sektor.py` (26).
+
+Sektör uyumsuzluğu **eleme değildir**: kayıt gizlenmez, kararı `NotEligible` yapılmaz;
+listenin sonuna iner ve "sektör uyumu doğrulanamadı"/"sektör uyumsuz" etiketiyle görünür.
+
 ### 2.3 Skor ağırlıklarının toplamı 1.0'dır
 
 `ScoreWeights` yapıcısı bunu doğrular ve ihlalde `DomainException` atar.
@@ -125,11 +144,11 @@ Solution dosyası **`GovAI.slnx`**'tir (yeni XML formatı), `.sln` değil.
 
 ```bash
 dotnet build -c Release          # tüm .NET projeleri
-dotnet test                      # 228 test (29 domain + 57 application + 142 API)
+dotnet test                      # 394 test (58 domain + 146 application + 190 API)
 ```
 
 ```bash
-cd workers && .venv/Scripts/python -m pytest -q      # 118 test
+cd workers && .venv/Scripts/python -m pytest -q      # 222 test
 cd workers && .venv/Scripts/python -m ruff check .   # lint (satır sınırı 100)
 ```
 
@@ -144,8 +163,9 @@ cd web && npm ci && npm run lint && npm run typecheck && npm run test && npm run
 ```
 
 `npm run lint` **`--max-warnings 0`** ile çalışır; uyarı da hatadır.
-`npm run test` vitest'i tek seferlik koşturur (11 test); şu an yalnızca
-`navigation.ts` (sol menünün rol görünürlüğü) kapsanır — ekran testleri hâlâ yok.
+`npm run test` vitest'i tek seferlik koşturur (39 test); şu an yalnızca `lib/`
+altındaki saf fonksiyonlar kapsanır (menü görünürlüğü, parola kuralı, etiket
+haritaları) — ekran testleri hâlâ yok.
 
 ### EF Core
 

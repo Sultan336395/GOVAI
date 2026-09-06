@@ -70,11 +70,21 @@ public sealed class AssessmentRepository(GovAiDbContext context) : IAssessmentRe
 
         var total = await joined.CountAsync(cancellationToken);
 
+        // Sektör uyumu her sıralama seçeneğinde BİRİNCİL ölçüttür; kullanıcının seçtiği
+        // ölçüt (skor, son tarih, tarih) yalnızca aynı sektör grubunun içinde konuşur.
+        // Sıralama burada, veritabanında yapılır: sayfalanmış listeyi bellekte sıralamak
+        // ilk sayfayı doğru, ikinci sayfayı yanlış gösterirdi.
         joined = query.Sort switch
         {
-            AssessmentSort.DeadlineAscending => joined.OrderBy(x => x.opportunity.Deadline ?? DateTimeOffset.MaxValue),
-            AssessmentSort.EvaluatedAtDescending => joined.OrderByDescending(x => x.assessment.EvaluatedAt),
-            _ => joined.OrderByDescending(x => x.assessment.FinalScore)
+            AssessmentSort.DeadlineAscending => joined
+                .OrderBy(x => x.assessment.SectorFit)
+                .ThenBy(x => x.opportunity.Deadline ?? DateTimeOffset.MaxValue),
+            AssessmentSort.EvaluatedAtDescending => joined
+                .OrderBy(x => x.assessment.SectorFit)
+                .ThenByDescending(x => x.assessment.EvaluatedAt),
+            _ => joined
+                .OrderBy(x => x.assessment.SectorFit)
+                .ThenByDescending(x => x.assessment.FinalScore)
         };
 
         var items = await joined
@@ -92,7 +102,8 @@ public sealed class AssessmentRepository(GovAiDbContext context) : IAssessmentRe
         await context.Assessments
             .Include(a => a.Dimensions)
             .Where(a => a.CompanyId == companyId && a.IsLatest)
-            .OrderByDescending(a => a.FinalScore)
+            .OrderBy(a => a.SectorFit)
+            .ThenByDescending(a => a.FinalScore)
             .ToListAsync(cancellationToken);
 
     public async Task AddAsync(EligibilityAssessment assessment, CancellationToken cancellationToken = default) =>

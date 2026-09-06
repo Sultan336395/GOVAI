@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '@/api/client'
 import type { DocumentCheck, RuleEvaluation } from '@/api/types'
-import { EmptyState, ErrorBox, Loading, VerdictBadge } from '@/components/Common'
+import { EmptyState, ErrorBox, Loading, SectorFitBadge, VerdictBadge } from '@/components/Common'
 import { OpportunityDetailCard } from '@/components/OpportunityDetailCard'
 import { formatDate, formatPercent } from '@/lib/format'
 
@@ -49,6 +49,9 @@ export default function EligibilityDetailPage() {
         <div style={{ textAlign: 'right' }}>
           <div style={{ fontSize: 34, fontWeight: 700 }}>{data.finalScore.toFixed(1)}</div>
           <VerdictBadge verdict={data.verdict} />
+          <div style={{ marginTop: 6 }}>
+            <SectorFitBadge fit={data.sectorFit} />
+          </div>
           <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
             Skor güveni {formatPercent(data.confidence)}
           </div>

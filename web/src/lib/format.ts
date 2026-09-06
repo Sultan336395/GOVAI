@@ -1,4 +1,4 @@
-import type { EligibilityVerdict, SourceType, SupportCategory } from '@/api/types'
+import type { EligibilityVerdict, SectorFit, SourceType, SupportCategory } from '@/api/types'
 
 const currencyFormatter = new Intl.NumberFormat('tr-TR', {
   style: 'currency',
@@ -35,6 +35,26 @@ export const verdictClass: Record<EligibilityVerdict, string> = {
   ConditionallyEligible: 'conditional',
   NotEligible: 'not-eligible',
   Indeterminate: 'indeterminate',
+}
+
+/**
+ * Sektör uyumunun Türkçe karşılığı.
+ *
+ * "Doğrulanamadı" ile "uyumsuz" bilerek ayrı yazılır: birincisi bilgi eksikliğidir
+ * (çağrı metninden sektör çıkarılamadı ya da firmanın NACE kodu girilmemiş), ikincisi
+ * verilmiş bir karardır. Kullanıcı ikisine farklı tepki verir — biri veri tamamlamayı,
+ * diğeri listeyi kapatmayı gerektirir.
+ */
+export const sectorFitLabels: Record<SectorFit, string> = {
+  Matched: 'Sektör uyumlu',
+  Unverified: 'Sektör uyumu doğrulanamadı',
+  NotMatched: 'Sektör uyumsuz',
+}
+
+export const sectorFitClass: Record<SectorFit, string> = {
+  Matched: 'eligible',
+  Unverified: 'indeterminate',
+  NotMatched: 'not-eligible',
 }
 
 /**

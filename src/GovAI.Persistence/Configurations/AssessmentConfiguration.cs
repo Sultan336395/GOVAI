@@ -18,6 +18,7 @@ public sealed class EligibilityAssessmentConfiguration : IEntityTypeConfiguratio
         builder.Ignore(a => a.DomainEvents);
 
         builder.Property(a => a.Verdict).HasConversion<int>();
+        builder.Property(a => a.SectorFit).HasConversion<int>();
         builder.Property(a => a.FinalScore).HasPrecision(6, 2);
         builder.Property(a => a.Confidence).HasPrecision(5, 4);
         builder.Property(a => a.DetailJson).HasColumnType("jsonb").IsRequired();
@@ -41,7 +42,10 @@ public sealed class EligibilityAssessmentConfiguration : IEntityTypeConfiguratio
 
         CompanyConfiguration.UseBackingFields(builder, "Dimensions");
 
-        // Dashboard sorgusu: "bu firmanın güncel değerlendirmeleri, skora göre".
+        // Dashboard sorgusu: "bu firmanın güncel değerlendirmeleri, önce sektör uyumuna,
+        // sonra skora göre". Sektör kolonu indeksin içinde olmazsa sıralama her sayfada
+        // tüm satırları taramak zorunda kalır.
+        builder.HasIndex(a => new { a.CompanyId, a.IsLatest, a.SectorFit, a.FinalScore });
         builder.HasIndex(a => new { a.CompanyId, a.IsLatest, a.FinalScore });
         builder.HasIndex(a => new { a.CompanyId, a.OpportunityId, a.IsLatest });
         builder.HasIndex(a => a.EvaluatedAt);

@@ -42,6 +42,14 @@ export type EligibilityVerdict =
   | 'NotEligible'
   | 'Indeterminate'
 
+/**
+ * Sektör uyumu — listedeki sıralamanın birincil ölçütü.
+ *
+ * 'Unverified' ile 'NotMatched' ayrı tutulur: birincisi "bilmiyoruz", ikincisi
+ * "biliyoruz ve tutmuyor". İkisi de listeden ÇIKARILMAZ, yalnızca sona iner.
+ */
+export type SectorFit = 'Matched' | 'Unverified' | 'NotMatched'
+
 export type RuleDimension =
   | 'Sector'
   | 'Financial'
@@ -325,6 +333,7 @@ export interface OpportunityMatch {
   finalScore: number
   confidence: number
   verdict: EligibilityVerdict
+  sectorFit: SectorFit
   missingConditionCount: number
   missingMandatoryDocumentCount: number
   dataGapCount: number
@@ -377,6 +386,7 @@ export interface EligibilityDetail {
   sourceUrl: string | null
   deadline: string | null
   verdict: EligibilityVerdict
+  sectorFit: SectorFit
   finalScore: number
   confidence: number
   hasBlockingFailure: boolean

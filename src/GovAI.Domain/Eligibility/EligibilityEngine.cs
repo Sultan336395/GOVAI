@@ -25,6 +25,12 @@ public sealed record EligibilityOutcome
 
     public required IReadOnlyList<DocumentCheckResult> DocumentChecklist { get; init; }
 
+    /// <summary>
+    /// Firmanın sektörünün çağrıyla uyumu. Listeleme bu değere göre birincil sıralanır;
+    /// alt ölçütler (personel, ciro, işletme yaşı, personel yapısı) ancak bunun içinde konuşur.
+    /// </summary>
+    public required SectorFit SectorFit { get; init; }
+
     /// <summary>Firmayı doğrudan eleyen koşullar.</summary>
     public IReadOnlyList<RuleEvaluation> BlockingFailures =>
         RuleEvaluations.Where(r => r.IsBlockingFailure).ToList();
@@ -52,6 +58,18 @@ public static class EligibilityEngine
 
     /// <summary>Kuralı olmayan bir boyutta çağrı kısıt koymuyor demektir; bu firma lehinedir.</summary>
     private const decimal UnconstrainedDimensionScore = 1.0m;
+
+    /// <summary>
+    /// Sektör boyutunda kural yoksa verilen puan. Diğer boyutların aksine tam puan DEĞİLDİR.
+    ///
+    /// Belge veya bölge koşulu içermeyen bir çağrı gerçekten "o boyutta kısıt koymuyor"
+    /// demektir. Sektörde ise kural yokluğu "her sektör kabul" anlamına gelmez; yalnızca
+    /// çağrı metninden sektörün çıkarılamadığını gösterir. Tam puan verilirse sektörsüz
+    /// her ilan listenin başına çıkar — bir inşaat firmasına çay nakliye ihalesi
+    /// önerilmesinin sebebi buydu. <see cref="UnknownRuleCredit"/> ile aynı mantık:
+    /// ne tam ödül ne tam ceza.
+    /// </summary>
+    private const decimal UnverifiedSectorScore = 0.5m;
 
     /// <summary>Bu orandan fazla kural veri eksikliğinden değerlendirilemezse karar "belirsiz" olur.</summary>
     private const decimal IndeterminateDataGapThreshold = 0.40m;
@@ -90,6 +108,7 @@ public static class EligibilityEngine
             OpportunityId = opportunity.Id,
             EvaluatedAt = asOf,
             Verdict = verdict,
+            SectorFit = DecideSectorFit(evaluations),
             RuleEvaluations = evaluations,
             DocumentChecklist = documentResults,
             Score = new ScoreBreakdown
@@ -120,6 +139,7 @@ public static class EligibilityEngine
             {
                 RuleDimension.Timing => CombineTiming(relevant, opportunity, asOf),
                 RuleDimension.Documentation => CombineDocumentation(relevant, documentResults),
+                RuleDimension.Sector => ScoreSector(relevant),
                 _ => ScoreFromRules(relevant)
             };
 
@@ -135,6 +155,69 @@ public static class EligibilityEngine
         }
 
         return dimensions;
+    }
+
+    /// <summary>
+    /// Sektör boyutunun puanı — kural yokluğunda tam puan vermemesiyle diğerlerinden ayrılır.
+    /// Gerekçe <see cref="UnverifiedSectorScore"/> üzerinde yazılıdır.
+    /// </summary>
+    private static (decimal Value, string Rationale) ScoreSector(IReadOnlyList<RuleEvaluation> evaluations)
+    {
+        var applicable = evaluations.Where(e => e.Outcome != RuleOutcome.NotApplicable).ToList();
+        var scored = applicable.Where(e => e.Severity != RuleSeverity.Bonus).ToList();
+
+        if (scored.Count == 0)
+        {
+            return (UnverifiedSectorScore, "Çağrı metninden sektör koşulu çıkarılamadı; sektör uyumu doğrulanamadı.");
+        }
+
+        return ScoreFromRules(evaluations);
+    }
+
+    /// <summary>
+    /// Sektör uyumunun üç değerli kararı. "Bilmiyorum" ile "hayır" ayrı tutulur:
+    /// doğrulanamayan kayıt elenmez, yalnızca listenin sonuna iner.
+    /// </summary>
+    private static SectorFit DecideSectorFit(IReadOnlyList<RuleEvaluation> evaluations)
+    {
+        var applicable = evaluations
+            .Where(e => e.Dimension == RuleDimension.Sector && e.Outcome != RuleOutcome.NotApplicable)
+            .ToList();
+
+        if (applicable.Count == 0)
+        {
+            return SectorFit.Unverified;
+        }
+
+        var decisive = applicable.Where(e => e.Severity != RuleSeverity.Bonus).ToList();
+        if (decisive.Count == 0)
+        {
+            // Yalnızca avantaj kuralı var: sağlanıyorsa uyum sayılır, sağlanmıyorsa
+            // bu tek başına "sektör tutmuyor" demek değildir.
+            return applicable.Any(e => e.Outcome == RuleOutcome.Satisfied)
+                ? SectorFit.Matched
+                : SectorFit.Unverified;
+        }
+
+        // Karşılanmayan bir engelleyici/ana sektör koşulu, sağlanan bir başkasıyla
+        // telafi edilemez: sektör uyuşmazlığı ciro veya personel sayısıyla kapanmaz.
+        if (decisive.Any(e => e.Outcome == RuleOutcome.NotSatisfied && e.Severity != RuleSeverity.Minor))
+        {
+            return SectorFit.NotMatched;
+        }
+
+        if (decisive.Any(e => e.Outcome == RuleOutcome.Satisfied))
+        {
+            return SectorFit.Matched;
+        }
+
+        if (decisive.Any(e => e.Outcome == RuleOutcome.NotSatisfied))
+        {
+            return SectorFit.NotMatched;
+        }
+
+        // Geriye yalnızca firma verisi eksik olduğu için karar verilemeyen kurallar kalır.
+        return SectorFit.Unverified;
     }
 
     /// <summary>

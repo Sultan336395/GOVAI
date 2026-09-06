@@ -116,6 +116,11 @@ POST /api/company-profile/erp-sync
 | POST | `/api/eligibility/companies/{companyId}/rescore` | Operate |
 | POST | `/api/eligibility/{assessmentId}/summary` | Operate |
 
+`GET /companies/{companyId}/matches` listesi **önce sektör uyumuna**, sonra
+`sort` parametresine göre sıralanır. Her satır bir `sectorFit` alanı taşır:
+`Matched` → `Unverified` → `NotMatched`. Sektörü tutmayan kayıt listeden çıkarılmaz,
+en altta kalır (gerekçe: `docs/scoring.md` §2.2).
+
 `GET /{assessmentId}` ürünün açıklanabilirlik vaadinin karşılığıdır:
 
 ```json
@@ -123,6 +128,7 @@ POST /api/company-profile/erp-sync
   "finalScore": 78.4,
   "confidence": 0.86,
   "verdict": "ConditionallyEligible",
+  "sectorFit": "Matched",
   "dimensions": [
     {
       "dimension": "Employment",

@@ -55,6 +55,49 @@ Kural sonucunun değeri:
 | `NotApplicable` | Hesaba katılmaz |
 
 **Kuralı olmayan boyut 1.0 alır**: çağrı o boyutta kısıt koymuyorsa bu firma lehinedir.
+**Tek istisna `sectorMatch`'tir** — gerekçesi §2.1'de.
+
+### 2.1 sectorMatch neden istisna
+
+Diğer boyutlarda "kural yok" gerçekten *"çağrı bu boyutta kısıt koymuyor"* demektir:
+belge istemeyen bir çağrıda belge hazırlığı sorun değildir. Sektörde ise kural yokluğu
+"her sektör kabul" anlamına **gelmez**; yalnızca çağrı metninden sektörün
+çıkarılamadığını gösterir.
+
+Fark ürünü bozdu: ihale ilanlarından hiç sektör kuralı çıkmadığı için makine imalatı
+yapan bir firmaya "Didi soğuk çay nakliye", inşaat firmasına "Sivas YHT Garı buz çözme"
+ihalesi 88 puanla "uygun" olarak önerildi. Bu yüzden **kuralsız sektör boyutu 0.5 alır**
+(`UnverifiedSectorScore`) — `Unknown` kural kredisiyle aynı mantık: ne tam ödül ne tam ceza.
+
+### 2.2 Sektör uyumu ve liste sıralaması
+
+Her değerlendirme üç değerli bir `SectorFit` taşır ve kayıtla birlikte saklanır:
+
+| Değer | Ne zaman | Listedeki yeri |
+|---|---|---|
+| `Matched` | Çağrının sektör koşulu var ve firma karşılıyor | En üstte |
+| `Unverified` | Çağrıda sektör koşulu yok **ya da** firmanın NACE verisi eksik | Ortada, "sektör uyumu doğrulanamadı" etiketiyle |
+| `NotMatched` | Çağrının sektör koşulu var ve firma karşılamıyor | En altta |
+
+Liste **önce bu değere**, sonra kullanıcının seçtiği ölçüte (skor / son başvuru / tarih)
+göre sıralanır. Alt ölçütler — personel sayısı, ciro, işletme yaşı, kadın ve genç çalışan
+yapısı — zaten `FinalScore` içinde ağırlıklarıyla toplanmıştır; sektör grubunun *içinde*
+konuşurlar.
+
+İki kural bunu dengeler:
+
+- **Uyumsuzluk eleme değildir.** Kayıt gizlenmez, kararı `NotEligible` yapılmaz; en alta
+  iner ve etiketlenir. Firma hukuken teklif verebilir, kararı kullanıcı verir.
+- **"Bilmiyorum" ile "hayır" ayrıdır.** Firmanın NACE kodu girilmemişse sonuç
+  `NotMatched` değil `Unverified`'dır (CLAUDE.md §2.2).
+
+Sıralama veritabanında, sayfalamadan **önce** yapılır (`AssessmentRepository`); bellekte
+sıralansaydı ilk sayfa doğru, sonraki sayfalar yanlış görünürdü.
+
+İlan tarafındaki eksik `workers/govai_workers/parser/sektor.py` ile kapatılır: ilanın
+konusu Türkçe anahtar kelimelerle tanınır ve NACE kuralı üretilir. Üretilen kural
+`Blocking` değil `Major`dır — sektör ilanın *konusundan* çıkarımdır, metinde yazan bir
+yeterlilik şartı değil.
 
 ### İki özel boyut
 
@@ -132,7 +175,8 @@ Eşleşme bu yüzden dereceli önek karşılaştırmasıdır:
 | 2562 | 62 | 0.00 | Eşleşme yok |
 
 0.6 ve üzeri "sağlandı" sayılır; altındakiler sektörel uyumsuzluk olarak raporlanır.
-Çağrı hiç NACE kısıtı koymuyorsa güç 1.0'dır.
+Çağrı hiç NACE kısıtı koymuyorsa güç 1.0'dır — ancak çağrının hiç sektör **kuralı**
+olmaması ayrı bir durumdur ve boyut puanı 1.0 değil 0.5 olur (§2.1).
 
 ## 7. Senaryo simülasyonu
 

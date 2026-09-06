@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
-import type { EligibilityVerdict } from '@/api/types'
-import { verdictClass, verdictLabels } from '@/lib/format'
+import type { EligibilityVerdict, SectorFit } from '@/api/types'
+import { sectorFitClass, sectorFitLabels, verdictClass, verdictLabels } from '@/lib/format'
 
 export function Loading({ label = 'Yükleniyor…' }: { label?: string }) {
   return <div className="state">{label}</div>
@@ -17,6 +17,14 @@ export function EmptyState({ children }: { children: ReactNode }) {
 
 export function VerdictBadge({ verdict }: { verdict: EligibilityVerdict }) {
   return <span className={`badge ${verdictClass[verdict]}`}>{verdictLabels[verdict]}</span>
+}
+
+/**
+ * Sektör uyumu rozeti. Liste sektöre göre sıralandığı için kullanıcının satırın neden
+ * o sırada durduğunu görebilmesi gerekir; sıralama açıklanmadan "saçma" görünür.
+ */
+export function SectorFitBadge({ fit }: { fit: SectorFit }) {
+  return <span className={`badge ${sectorFitClass[fit]}`}>{sectorFitLabels[fit]}</span>
 }
 
 export function Kpi({

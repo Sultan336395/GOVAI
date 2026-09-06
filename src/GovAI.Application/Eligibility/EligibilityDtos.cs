@@ -16,6 +16,8 @@ public sealed record OpportunityMatchDto(
     decimal FinalScore,
     decimal Confidence,
     EligibilityVerdict Verdict,
+    /// <summary>Sıralamanın birincil ölçütü; skordan önce gelir.</summary>
+    SectorFit SectorFit,
     int MissingConditionCount,
     int MissingMandatoryDocumentCount,
     int DataGapCount,
@@ -34,6 +36,7 @@ public sealed record EligibilityDetailDto(
     string? SourceUrl,
     DateTimeOffset? Deadline,
     EligibilityVerdict Verdict,
+    SectorFit SectorFit,
     decimal FinalScore,
     decimal Confidence,
     bool HasBlockingFailure,

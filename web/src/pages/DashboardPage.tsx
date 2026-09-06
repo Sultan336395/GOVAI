@@ -15,7 +15,7 @@ import {
 } from 'recharts'
 import { api } from '@/api/client'
 import { useCompanies } from '@/app/contexts'
-import { EmptyState, ErrorBox, Kpi, Loading, ScoreCell, VerdictBadge } from '@/components/Common'
+import { EmptyState, ErrorBox, Kpi, Loading, ScoreCell, SectorFitBadge, VerdictBadge } from '@/components/Common'
 import { formatCurrency, formatDeadline, formatPercent } from '@/lib/format'
 
 const VERDICT_COLORS = ['#15803d', '#b45309', '#b91c1c', '#64748b']
@@ -172,6 +172,7 @@ function MatchTable({ matches }: { matches: import('@/api/types').OpportunityMat
         <thead>
           <tr>
             <th>Fırsat</th>
+            <th>Sektör uyumu</th>
             <th>Skor</th>
             <th>Karar</th>
             <th>Son başvuru</th>
@@ -187,6 +188,9 @@ function MatchTable({ matches }: { matches: import('@/api/types').OpportunityMat
                 <div className="muted" style={{ fontSize: 12 }}>
                   {match.publisher}
                 </div>
+              </td>
+              <td>
+                <SectorFitBadge fit={match.sectorFit} />
               </td>
               <td>
                 <ScoreCell score={match.finalScore} />

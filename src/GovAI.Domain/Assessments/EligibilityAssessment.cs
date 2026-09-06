@@ -25,6 +25,7 @@ public class EligibilityAssessment : AggregateRoot, IAuditable, ITenantScoped
         OpportunityId = outcome.OpportunityId;
         EvaluatedAt = outcome.EvaluatedAt;
         Verdict = outcome.Verdict;
+        SectorFit = outcome.SectorFit;
         FinalScore = outcome.Score.FinalScore;
         Confidence = outcome.Score.Confidence;
         HasBlockingFailure = outcome.Score.HasBlockingFailure;
@@ -48,6 +49,13 @@ public class EligibilityAssessment : AggregateRoot, IAuditable, ITenantScoped
     public DateTimeOffset EvaluatedAt { get; private set; }
 
     public EligibilityVerdict Verdict { get; private set; }
+
+    /// <summary>
+    /// Sektör uyumu. Listeleme sırasının <b>birincil</b> ölçütüdür; skor değil.
+    /// Kolon olarak saklanır çünkü sıralama veritabanında yapılır — sayfalama
+    /// doğru çalışsın diye sıralama belleğe alınmış sayfada yapılamaz.
+    /// </summary>
+    public SectorFit SectorFit { get; private set; } = SectorFit.Unverified;
 
     /// <summary>0..100 nihai fırsat skoru.</summary>
     public decimal FinalScore { get; private set; }

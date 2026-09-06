@@ -249,6 +249,30 @@ public enum EligibilityVerdict
     Indeterminate = 4       // Veri yetersiz
 }
 
+/// <summary>
+/// Firmanın faaliyet sektörünün çağrının sektörüyle uyuşup uyuşmadığı.
+///
+/// Eşleştirmenin <b>birincil</b> ölçütüdür: bir inşaat firmasına çay nakliye ihalesi
+/// önerilmesi, personel sayısı veya ciro ne kadar tutarsa tutsun hatalı bir sonuçtur.
+/// Sayısal sıra listeleme sırasıdır — küçük değer önce gösterilir.
+///
+/// <see cref="Unverified"/> ile <see cref="NotMatched"/> ayrı tutulur: birincisi
+/// "bilmiyoruz", ikincisi "biliyoruz ve tutmuyor". Eksik veri firmayı elemez
+/// (CLAUDE.md §2.2), bu yüzden doğrulanamayan kayıt gizlenmez; yalnızca listenin
+/// altına iner ve etiketlenir.
+/// </summary>
+public enum SectorFit
+{
+    /// <summary>Çağrının sektör koşulu var ve firma karşılıyor.</summary>
+    Matched = 0,
+
+    /// <summary>Çağrıda sektör koşulu yok ya da firmanın sektör verisi eksik.</summary>
+    Unverified = 1,
+
+    /// <summary>Çağrının sektör koşulu var ve firma karşılamıyor.</summary>
+    NotMatched = 2
+}
+
 /// <summary>Belge kontrol listesindeki bir kalemin durumu.</summary>
 public enum DocumentStatus
 {

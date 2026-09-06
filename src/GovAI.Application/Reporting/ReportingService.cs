@@ -87,6 +87,7 @@ public sealed class ReportingService(
                 assessment.FinalScore,
                 assessment.Confidence,
                 assessment.Verdict,
+                assessment.SectorFit,
                 assessment.MissingConditionCount,
                 assessment.MissingMandatoryDocumentCount,
                 assessment.DataGapCount,
@@ -148,8 +149,8 @@ public sealed class ReportingService(
             all.Sum(a => a.DataGapCount),
             categoryRows,
             dimensionAverages,
-            top.OrderByDescending(t => t.FinalScore).Take(10).ToList(),
-            closingSoon.OrderBy(t => t.DaysUntilDeadline).Take(10).ToList());
+            top.OrderBy(t => t.SectorFit).ThenByDescending(t => t.FinalScore).Take(10).ToList(),
+            closingSoon.OrderBy(t => t.SectorFit).ThenBy(t => t.DaysUntilDeadline).Take(10).ToList());
     }
 
     /// <summary>Önceliklendirilmiş fırsat listesini Excel olarak dışa aktarır.</summary>
@@ -159,7 +160,7 @@ public sealed class ReportingService(
 
         string[] headers =
         [
-            "Fırsat", "Yayınlayan", "Destek Türü", "Skor", "Güven", "Karar",
+            "Fırsat", "Yayınlayan", "Destek Türü", "Sektör Uyumu", "Skor", "Güven", "Karar",
             "Son Başvuru", "Kalan Gün", "Eksik Koşul", "Eksik Zorunlu Belge", "Veri Boşluğu", "Azami Tutar"
         ];
 
@@ -169,6 +170,7 @@ public sealed class ReportingService(
                 m.OpportunityTitle,
                 m.Publisher,
                 CategoryLabels.Of(m.SupportCategory),
+                SectorFitLabels.Of(m.SectorFit),
                 m.FinalScore,
                 m.Confidence,
                 VerdictLabels.Of(m.Verdict),
@@ -299,6 +301,20 @@ public static class CategoryLabels
 }
 
 /// <summary>Karar etiketleri.</summary>
+/// <summary>
+/// Sektör uyumunun Türkçe karşılığı. Ham enum ("Unverified") kullanıcıya gösterilmez.
+/// "Doğrulanamadı" ile "uyumsuz" ayrı yazılır: birincisi bilgi eksikliği, ikincisi karar.
+/// </summary>
+public static class SectorFitLabels
+{
+    public static string Of(SectorFit fit) => fit switch
+    {
+        SectorFit.Matched => "Sektör uyumlu",
+        SectorFit.NotMatched => "Sektör uyumsuz",
+        _ => "Sektör uyumu doğrulanamadı"
+    };
+}
+
 public static class VerdictLabels
 {
     public static string Of(EligibilityVerdict verdict) => verdict switch
