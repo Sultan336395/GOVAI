@@ -68,7 +68,7 @@ export default function SimulationPage() {
 
           <div className="field">
             <FieldLabel htmlFor="scenario-name" field="scenarioName">Senaryo adı</FieldLabel>
-            <div className="field-hint">{fieldHelp.scenarioName.short}</div>
+            <div className="field-hint">{fieldHelp.scenarioName}</div>
             <input
               id="scenario-name"
               value={name}
@@ -79,7 +79,7 @@ export default function SimulationPage() {
 
           <div className="field">
             <FieldLabel htmlFor="employee-count" field="scenarioEmployeeCount">Toplam çalışan sayısı</FieldLabel>
-            <div className="field-hint">{fieldHelp.scenarioEmployeeCount.short}</div>
+            <div className="field-hint">{fieldHelp.scenarioEmployeeCount}</div>
             <input
               id="employee-count"
               type="number"
@@ -92,7 +92,7 @@ export default function SimulationPage() {
 
           <div className="field">
             <FieldLabel htmlFor="women-count" field="scenarioWomenCount">Kadın çalışan sayısı</FieldLabel>
-            <div className="field-hint">{fieldHelp.scenarioWomenCount.short}</div>
+            <div className="field-hint">{fieldHelp.scenarioWomenCount}</div>
             <input
               id="women-count"
               type="number"
@@ -104,7 +104,7 @@ export default function SimulationPage() {
 
           <div className="field">
             <FieldLabel htmlFor="rnd-count" field="scenarioRndCount">Ar-Ge personeli sayısı</FieldLabel>
-            <div className="field-hint">{fieldHelp.scenarioRndCount.short}</div>
+            <div className="field-hint">{fieldHelp.scenarioRndCount}</div>
             <input
               id="rnd-count"
               type="number"
@@ -116,7 +116,7 @@ export default function SimulationPage() {
 
           <div className="field">
             <FieldLabel htmlFor="revenue" field="scenarioRevenue">Yıllık ciro (TL)</FieldLabel>
-            <div className="field-hint">{fieldHelp.scenarioRevenue.short}</div>
+            <div className="field-hint">{fieldHelp.scenarioRevenue}</div>
             <input
               id="revenue"
               type="number"
@@ -128,7 +128,7 @@ export default function SimulationPage() {
 
           <div className="field">
             <FieldLabel htmlFor="certs" field="scenarioCertificates">Alınacak belgeler</FieldLabel>
-            <div className="field-hint">{fieldHelp.scenarioCertificates.short}</div>
+            <div className="field-hint">{fieldHelp.scenarioCertificates}</div>
             <input
               id="certs"
               placeholder="ISO9001, ISO14001"

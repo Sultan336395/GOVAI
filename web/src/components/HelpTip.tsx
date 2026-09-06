@@ -9,6 +9,10 @@ import type { FieldHelpKey } from '@/lib/fieldHelp'
  * alandan ne anladığı kısa addan çıkmıyor. Yanlış doldurulan alan yanlış skora, yanlış
  * skor yanlış fırsat listesine yol açıyor.
  *
+ * Balonda terimin **sözlük anlamı** durur, sistemin o alanla ne yaptığı değil: uzun
+ * davranış açıklamaları ipucunu okunmaz hâle getiriyor ve kullanıcının sorduğu soruyu
+ * cevaplamıyordu.
+ *
  * Fare ile üzerine gelince açılır; dokunmatik cihazda fare olayı olmadığı için TIKLAMA
  * da açar. Klavye ile sekmelenebilir ve odaklanınca açılır — açıklamayı yalnızca fare
  * kullananlara sunmak, alanı dolduramayan bir kullanıcı grubu bırakırdı.
@@ -32,7 +36,7 @@ export function HelpTip({ field }: { field: FieldHelpKey }) {
     return () => document.removeEventListener('mousedown', disariTiklandi)
   }, [open])
 
-  const { detail } = fieldHelp[field]
+  const tanim = fieldHelp[field]
 
   return (
     <span
@@ -59,7 +63,7 @@ export function HelpTip({ field }: { field: FieldHelpKey }) {
 
       {open ? (
         <span className="helptip-bubble" id={tipId} role="tooltip">
-          {detail}
+          {tanim}
         </span>
       ) : null}
     </span>
