@@ -30,7 +30,13 @@ interface TypeaheadProps {
   value: string
   onChange: (value: string) => void
   search: (q: string) => Promise<TypeaheadOption[]>
-  /** Öneri listesinin açılması için gereken en az karakter. */
+  /**
+   * Öneri listesinin açılması için gereken en az karakter.
+   *
+   * `0` verilirse alana tıklanır tıklanmaz liste açılır. NACE alanlarında böyledir:
+   * liste zaten seçilen sektörle sınırlıdır, kullanıcıdan ayrıca aranacak kelimeyi
+   * bilmesini beklemek sınırlamanın kazandırdığı kolaylığı geri alırdı.
+   */
   minChars?: number
   placeholder?: string
   /** Seçili değeri listede bulmak için; NACE'de "2562" ile "25.62" aynı koddur. */
@@ -62,6 +68,11 @@ export function Typeahead({
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(0)
   const [loading, setLoading] = useState(false)
+
+  // Kullanıcı odaklandıktan sonra yazdı mı? Yazmadıysa alandaki metin daha önce
+  // seçtiği kaydın etiketidir; onu sorgu olarak göndermek listeyi tek satıra düşürür.
+  // Oysa beklenen davranış, tıklayınca sektörün TÜM kodlarını görmektir.
+  const [yazildi, setYazildi] = useState(false)
 
   /** Dışarıdan gelen değerin listede karşılığı bulunamadı — kullanıcı yeniden seçmeli. */
   const [unresolved, setUnresolved] = useState(false)
@@ -122,7 +133,7 @@ export function Typeahead({
   useEffect(() => {
     if (!open) return
 
-    const q = text.trim()
+    const q = yazildi ? text.trim() : ''
 
     if (q.length < minChars) {
       setOptions([])
@@ -153,7 +164,7 @@ export function Typeahead({
       window.clearTimeout(zamanlayici)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [text, open, minChars])
+  }, [text, open, minChars, yazildi])
 
   // Dışarı tıklanınca kapan. Açık kalan liste altındaki alanları örter.
   useEffect(() => {
@@ -172,6 +183,7 @@ export function Typeahead({
   const sec = (option: TypeaheadOption) => {
     resolvedFor.current = option.value
     setUnresolved(false)
+    setYazildi(false)
     setOpen(false)
     setOptions([])
     setText(clearOnSelect ? '' : option.label)
@@ -195,7 +207,7 @@ export function Typeahead({
     }
   }
 
-  const yaziliyor = text.trim().length
+  const yaziliyor = yazildi ? text.trim().length : 0
   const azKarakter = open && yaziliyor > 0 && yaziliyor < minChars
   const sonucYok = open && !loading && yaziliyor >= minChars && options.length === 0
 
@@ -214,6 +226,7 @@ export function Typeahead({
         value={text}
         onChange={(e) => {
           setText(e.target.value)
+          setYazildi(true)
           setOpen(true)
           // Yazmaya başlayınca önceki seçim düşer: alanda görünen metnin forma giden
           // değerle uyuşmadığı bir an olmamalı.
@@ -222,7 +235,13 @@ export function Typeahead({
             onChange('')
           }
         }}
-        onFocus={() => setOpen(true)}
+        onFocus={(e) => {
+          // Seçili bir kayıt varsa metni işaretleriz: kullanıcı yazmaya başlarsa
+          // eskisini silmekle uğraşmaz, yazmazsa da listenin tamamını görür.
+          setYazildi(false)
+          setOpen(true)
+          e.target.select()
+        }}
         onKeyDown={tusaBasildi}
       />
 

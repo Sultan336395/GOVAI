@@ -125,6 +125,10 @@ takılmaz.
 (sıralanmaz, filtrelenir). Sektör ile NACE kodunun çelişmesi böyle önlenir: kullanıcı
 sektörüne ait olmayan bir kodu göremez, `POST /api/companies` de aynı kısıtı doğrular.
 
+`sector` verilip `q` verilmezse (ya da `q` üç karakterden kısaysa) o sektörün **tüm**
+kodları koda göre sıralı döner ve kırpılmaz. Arayüz alana tıklandığı anda bu listeyi
+gösterir. `sector` da yoksa boş döner — tüm katalog tek listede sunulmaz.
+
 ```json
 [{ "code": "25.62", "title": "Metallerin makinede işlenmesi ve şekil verilmesi", "sector": "Metal sanayi ve fabrikasyon" }]
 ```

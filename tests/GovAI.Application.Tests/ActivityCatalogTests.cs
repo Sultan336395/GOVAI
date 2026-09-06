@@ -164,6 +164,49 @@ public sealed class ActivityCatalogTests
         Assert.Empty(sonuc);
     }
 
+    [Fact(DisplayName = "AC11h. Sektör verilince arama yapmadan tüm kodları listelenir")]
+    public void Sektorun_tum_kodlari_listelenir()
+    {
+        // Kullanıcı alana tıkladığı anda listeyi görmeli; aranacak kelimeyi bilmek
+        // zorunda kalmak, listeyi sektörle sınırlamanın kolaylığını geri alırdı.
+        var liste = ActivityCatalog.ListNace(["İnşaat ve taahhüt"]);
+
+        Assert.NotEmpty(liste);
+        Assert.All(liste, n => Assert.Equal("İnşaat ve taahhüt", n.Sector));
+        Assert.Contains(liste, n => n.Code == "41.20");
+        Assert.Contains(liste, n => n.Code == "43.21");
+    }
+
+    [Fact(DisplayName = "AC11i. Liste koda göre sıralıdır ve kırpılmaz")]
+    public void Liste_sirali_ve_kirpilmaz()
+    {
+        var liste = ActivityCatalog.ListNace(["İnşaat ve taahhüt"]);
+
+        // Üst sınır uygulanmaz: bir sektörün kodları zaten sınırlı sayıdadır ve
+        // kullanıcı tamamını görmelidir.
+        var beklenen = ActivityCatalog.NaceCodes.Count(n => n.Sector == "İnşaat ve taahhüt");
+
+        Assert.Equal(beklenen, liste.Count);
+        Assert.Equal(liste.Select(n => n.Code).Order(StringComparer.Ordinal), liste.Select(n => n.Code));
+    }
+
+    [Fact(DisplayName = "AC11j. Sektör verilmezse tüm katalog dökülmez")]
+    public void Sektorsuz_liste_bostur()
+    {
+        Assert.Empty(ActivityCatalog.ListNace(null));
+        Assert.Empty(ActivityCatalog.ListNace([]));
+    }
+
+    [Fact(DisplayName = "AC11k. Birden çok sektörün kodları birleşir")]
+    public void Listede_sektorler_birlesir()
+    {
+        var liste = ActivityCatalog.ListNace(["İnşaat ve taahhüt", "Bilişim ve yazılım"]);
+
+        Assert.Contains(liste, n => n.Sector == "İnşaat ve taahhüt");
+        Assert.Contains(liste, n => n.Sector == "Bilişim ve yazılım");
+        Assert.DoesNotContain(liste, n => n.Sector == "Taşımacılık ve lojistik");
+    }
+
     [Theory(DisplayName = "AC11e. Kod sektöre ait mi sorusu doğru cevaplanır")]
     [InlineData("23.61", "İnşaat ve taahhüt", false)]
     [InlineData("23.61", "Yapı malzemeleri ve cam", true)]

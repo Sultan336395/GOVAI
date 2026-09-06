@@ -107,6 +107,36 @@ public sealed class SectorConsistencyTests : IAsyncLifetime
         Assert.DoesNotContain("Bilişim ve yazılım", sektorler);
     }
 
+    [Fact(DisplayName = "SC3b. Sorgu olmadan sektörün tüm kodları listelenir")]
+    public async Task Sorgusuz_sektor_listesi_doner()
+    {
+        // Kullanıcı alana tıkladığı anda listeyi görmeli; üç harf yazmak zorunda
+        // bırakmak, listeyi sektörle sınırlamanın kazandırdığı kolaylığı geri alırdı.
+        var liste = await ListeAsync(
+            $"/api/reference/nace?sector={Uri.EscapeDataString("İnşaat ve taahhüt")}");
+
+        Assert.NotEmpty(liste);
+        Assert.All(liste, n => Assert.Equal("İnşaat ve taahhüt", n.GetProperty("sector").GetString()));
+        Assert.Contains(liste, n => n.GetProperty("code").GetString() == "41.20");
+    }
+
+    [Fact(DisplayName = "SC3c. Sektörsüz ve sorgusuz istek tüm kataloğu dökmez")]
+    public async Task Sektorsuz_sorgusuz_istek_bos_doner()
+    {
+        Assert.Empty(await ListeAsync("/api/reference/nace"));
+    }
+
+    [Fact(DisplayName = "SC3d. Bir iki harf yazılınca da sektör listesi kaybolmaz")]
+    public async Task Kisa_yazimda_liste_kaybolmaz()
+    {
+        // Üç harfin altında arama yapılmaz ama liste boşalmamalı: kullanıcı yazmaya
+        // başlayınca ekranın boşalması "sonuç yok" gibi görünürdü.
+        var liste = await ListeAsync(
+            $"/api/reference/nace?q=in&sector={Uri.EscapeDataString("İnşaat ve taahhüt")}");
+
+        Assert.NotEmpty(liste);
+    }
+
     // ═══════════════════ 2. Kayıt doğrulaması ═══════════════════
 
     [Fact(DisplayName = "SC4. Sektörle tutmayan ana NACE kodu reddedilir")]

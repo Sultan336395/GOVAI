@@ -42,14 +42,27 @@ public sealed class ReferenceController : ControllerBase
     /// gönderir; böylece kullanıcı sektörüne ait olmayan bir kodu görmez ve seçemez.
     /// Kayıt doğrulaması da aynı kısıtı uygular.
     /// </para>
+    ///
+    /// <para>
+    /// Sektör verilip <c>q</c> verilmezse o sektörün <b>tüm</b> kodları döner: kullanıcı
+    /// alana tıkladığı anda listeyi görür, ayrıca arama yapması gerekmez. Sektör de
+    /// verilmezse boş döner — tüm katalog tek listede sunulmaz.
+    /// </para>
     /// </summary>
     [HttpGet("nace")]
     public ActionResult<IReadOnlyList<NaceOptionDto>> Nace(
         [FromQuery] string? q,
-        [FromQuery] string[]? sector) =>
-        Ok(ActivityCatalog.SearchNace(q, sector)
-            .Select(n => new NaceOptionDto(n.Code, n.Title, n.Sector))
-            .ToList());
+        [FromQuery] string[]? sector)
+    {
+        var yeterliSorgu = (q ?? string.Empty).Trim().Length >= ActivityCatalog.MinimumQueryLength
+                           || (q ?? string.Empty).Count(char.IsDigit) >= 2;
+
+        var sonuc = yeterliSorgu
+            ? ActivityCatalog.SearchNace(q, sector)
+            : ActivityCatalog.ListNace(sector);
+
+        return Ok(sonuc.Select(n => new NaceOptionDto(n.Code, n.Title, n.Sector)).ToList());
+    }
 }
 
 public sealed record SectorOptionDto(string Name, IReadOnlyList<string> Divisions);

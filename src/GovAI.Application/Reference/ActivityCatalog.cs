@@ -524,6 +524,38 @@ public static class ActivityCatalog
     }
 
     /// <summary>
+    /// Bir sektörün kodlarının tamamı, koda göre sıralı.
+    ///
+    /// <para>
+    /// Sektör seçildikten sonra kullanıcıdan ayrıca arama yapması beklenmez: alana
+    /// tıkladığı anda o sektörün kodlarını görür ve seçer. Aranacak kelimeyi bilmek
+    /// zorunda kalmak, listeyi sektörle sınırlamanın kazandırdığı kolaylığı geri alırdı.
+    /// </para>
+    ///
+    /// <para>
+    /// Liste bir sektörün kodlarıyla sınırlı olduğu için üst sınır uygulanmaz — en
+    /// kalabalık sektör bile birkaç düzine satırdır ve kullanıcı tamamını görmelidir.
+    /// Sektör verilmezse boş döner: tüm katalog tek listede sunulmaz.
+    /// </para>
+    /// </summary>
+    public static IReadOnlyList<NaceOption> ListNace(IEnumerable<string>? sectors)
+    {
+        var izinli = AllowedDivisions(sectors);
+
+        if (izinli is null)
+        {
+            return [];
+        }
+
+        return
+        [
+            .. NaceOptions
+                .Where(option => izinli.Contains(option.Code[..2]))
+                .OrderBy(option => option.Code, StringComparer.Ordinal)
+        ];
+    }
+
+    /// <summary>
     /// Verilen sektörlerin kapsadığı NACE bölümleri. Sektör verilmediyse <c>null</c> —
     /// yani kısıt yok. Tanınmayan sektör adı sessizce atlanır; doğrulama ayrı yerde yapılır.
     /// </summary>

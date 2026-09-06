@@ -266,13 +266,14 @@ export default function CompanyForm({
               search={anaSektorAramasi}
               matches={naceEsleser}
               disabled={!sektorSecildi}
+              minChars={0}
               placeholder={
-                sektorSecildi ? 'Kod ya da tanım yazın (ör. 412 veya tesisat)' : 'Önce ana sektörü seçin'
+                sektorSecildi ? 'Tıklayın ve listeden seçin' : 'Önce ana sektörü seçin'
               }
             />
             <div className="field-hint">
               {sektorSecildi
-                ? `Yalnızca "${values.mainSector}" sektörünün kodları listelenir.`
+                ? `Tıklayınca "${values.mainSector}" sektörünün kodları listelenir; daraltmak için yazabilirsiniz.`
                 : 'Ana sektör seçilince o sektöre ait kodlar listelenir.'}
             </div>
             <FieldError message={fieldError('primaryNaceCode')} />
@@ -286,7 +287,8 @@ export default function CompanyForm({
               onChange={(list) => set('secondaryNaceCodes', list)}
               search={tumSektorlerAramasi}
               disabled={!sektorSecildi}
-              placeholder={sektorSecildi ? 'Ekleyeceğiniz kodu arayın' : 'Önce ana sektörü seçin'}
+              minChars={0}
+              placeholder={sektorSecildi ? 'Tıklayın ve listeden seçin' : 'Önce ana sektörü seçin'}
             />
             <div className="field-hint">
               Ana sektörün ve eklediğiniz alt sektörlerin kodları listelenir. Başka bir

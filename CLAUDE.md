@@ -102,7 +102,8 @@ katalogdaydı ama farklı faaliyetleri anlatıyordu ve firma kendi sektöründek
 "uyumsuz" göründü. İki hat birlikte korur:
 
 1. `/api/reference/nace` **yalnızca** verilen sektörlerin kodlarını döner — kullanıcı
-   tutmayan kodu göremez, dolayısıyla seçemez.
+   tutmayan kodu göremez, dolayısıyla seçemez. Sorgu verilmezse o sektörün tamamı döner:
+   alana tıklamak yeter, ayrıca arama yapmak gerekmez (`minChars={0}`).
 2. `ValidateSectorConsistency` ana kodu ana sektöre, diğer kodları ana sektör veya beyan
    edilen alt sektörlere karşı doğrular.
 
@@ -181,7 +182,7 @@ Solution dosyası **`GovAI.slnx`**'tir (yeni XML formatı), `.sln` değil.
 
 ```bash
 dotnet build -c Release          # tüm .NET projeleri
-dotnet test                      # 482 test (58 domain + 203 application + 221 API)
+dotnet test                      # 489 test (58 domain + 207 application + 224 API)
 ```
 
 ```bash
