@@ -211,6 +211,79 @@ public sealed class PlatformRoleTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Forbidden, ranking.StatusCode);
     }
 
+    [Fact(DisplayName = "T5. Platform hesapları mevzuat ekranını AÇABİLİR")]
+    public async Task Platform_hesaplari_mevzuati_okuyabilir()
+    {
+        // Sol menü mevzuat ekranını platform rollerine gösteriyor ve mevzuatı asıl
+        // inceleyecek kişi platform inceleyicisidir. Uç yanlışlıkla CompanyData
+        // politikasındaydı; o politika platform rollerini dışarıda bıraktığı için
+        // ekran 403 veriyordu. Mevzuat kaydı ortak kataloğa aittir ve içinde hiçbir
+        // kiracı verisi yoktur.
+        var reviewer = await _reviewer.GetAsync("/api/regulatory-changes");
+        var catalog = await _catalogManager.GetAsync("/api/regulatory-changes");
+
+        Assert.Equal(HttpStatusCode.OK, reviewer.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, catalog.StatusCode);
+    }
+
+    [Fact(DisplayName = "T6. Mevzuat kiracı kullanıcılarına da açık kalır")]
+    public async Task Kiraci_kullanicisi_mevzuati_okuyabilir()
+    {
+        // Platform rolleri için açılırken kiracı erişimi KAPANMAMALIDIR.
+        var response = await _tenantAdmin.GetAsync("/api/regulatory-changes");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact(DisplayName = "T7. Mevzuat ucu oturum ister")]
+    public async Task Mevzuat_ucu_oturum_ister()
+    {
+        using var anonim = _factory.CreateClient();
+
+        var response = await anonim.GetAsync("/api/regulatory-changes");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact(DisplayName = "T8. Mevzuat ucunun yazma yolu yoktur")]
+    public async Task Mevzuat_ucunun_yazma_yolu_yoktur()
+    {
+        // Okuma yetkisi genişletildi; yazma yolu AÇILMADI. Kayıtlar ortak kataloğa
+        // aittir ve panelden değiştirilemez.
+        var post = await _catalogManager.PostAsJsonAsync("/api/regulatory-changes", new { title = "x" });
+        var delete = await _catalogManager.DeleteAsync($"/api/regulatory-changes/{Guid.CreateVersion7()}");
+
+        Assert.Equal(HttpStatusCode.MethodNotAllowed, post.StatusCode);
+        Assert.Equal(HttpStatusCode.MethodNotAllowed, delete.StatusCode);
+    }
+
+    [Fact(DisplayName = "T9. Platform hesaplarının menüsündeki her ekran açılır")]
+    public async Task Platform_menusundeki_her_ekran_acilir()
+    {
+        // Sol menü ile sunucu politikaları ayrışırsa kullanıcı tıkladığı her yerde 403
+        // görür ve bunu ancak canlıda fark ederiz — mevzuat ekranında olan buydu.
+        // Menüdeki her satırın arkasındaki uç burada tek tek denenir.
+        (string ekran, string uc)[] inceleyici =
+        [
+            ("Fon, Hibe ve İhale Kataloğu", "/api/opportunities"),
+            ("Mevzuat Değişiklikleri", "/api/regulatory-changes"),
+            ("Karantina İnceleme", "/api/quarantine"),
+        ];
+
+        foreach (var (ekran, uc) in inceleyici)
+        {
+            var response = await _reviewer.GetAsync(uc);
+            Assert.True(response.IsSuccessStatusCode, $"PlatformReviewer / {ekran} ({uc}): {response.StatusCode}");
+        }
+
+        // Katalog yöneticisinde ek olarak kaynak yönetimi vardır.
+        foreach (var (ekran, uc) in inceleyici.Append(("Veri Kaynakları", "/api/sources")))
+        {
+            var response = await _catalogManager.GetAsync(uc);
+            Assert.True(response.IsSuccessStatusCode, $"PlatformCatalogManager / {ekran} ({uc}): {response.StatusCode}");
+        }
+    }
+
     [Fact(DisplayName = "T4. SystemIngest ihtiyaç duyduğu veri toplama uçlarına erişebilir")]
     public async Task SystemIngest_veri_toplama_uclarina_erisebilir()
     {

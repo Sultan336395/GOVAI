@@ -2,13 +2,15 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, tokenStore } from '@/api/client'
-import { CompanyContext } from '@/app/contexts'
+import { CompanyContext, useAuth } from '@/app/contexts'
 import type { CompanyContextValue } from '@/app/contexts'
+import { isPlatformRole } from '@/app/navigation'
 
 const SELECTED_COMPANY_KEY = 'govai.selectedCompany'
 
 export default function CompanyProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient()
+  const { user } = useAuth()
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(() =>
     localStorage.getItem(SELECTED_COMPANY_KEY),
   )
@@ -22,7 +24,10 @@ export default function CompanyProvider({ children }: { children: ReactNode }) {
   } = useQuery({
     queryKey: ['my-companies'],
     queryFn: api.listMyCompanies,
-    enabled: Boolean(tokenStore.get()),
+    // Platform hesaplarının şirket üyeliği yoktur ve uç onlara kapalıdır
+    // (Policies.CompanyData). İstek yine de gönderilirse her sayfa yüklemesinde
+    // sessiz bir 403 üretir; sorun ararken gerçek hataların arasına karışır.
+    enabled: Boolean(tokenStore.get()) && !isPlatformRole(user?.role ?? null),
   })
 
   // Aktif şirketi sunucu belirler (girişte jetona ve yanıta yazılır); buradaki

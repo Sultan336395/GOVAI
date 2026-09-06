@@ -9,16 +9,24 @@ namespace GovAI.Api.Controllers;
 /// <summary>
 /// Mevzuat değişiklikleri (Faz 2 – RegTech).
 ///
-/// Kiracı kullanıcıları resmî ve <b>doğrulanmış</b> kayıtları okuyabilir; değiştiremez.
-/// Kayıtlar ortak kataloğa aittir: bir müşteri düzenleme yaparak diğerlerini etkileyemez,
-/// çünkü yazma ucu yoktur.
+/// Resmî ve <b>doğrulanmış</b> kayıtlar okunur; değiştirilemez. Kayıtlar ortak kataloğa
+/// aittir: bir müşteri düzenleme yaparak diğerlerini etkileyemez, çünkü yazma ucu yoktur.
+///
+/// <para>
+/// Yetki <see cref="Policies.Read"/>'dir, <c>CompanyData</c> DEĞİL — tıpkı kardeşi
+/// <see cref="OpportunitiesController"/> gibi. Burada hiçbir kiracı verisi yoktur:
+/// dönen alanlar resmî künye, belge sürümü ve kanıt metnidir. <c>CompanyData</c>
+/// platform rollerini bilinçli olarak dışarıda bırakır ve bu ekranı platform
+/// hesaplarına 403 yapıyordu; oysa sol menü ekranı onlara da gösteriyor ve mevzuatı
+/// inceleyecek olan asıl kişi platform inceleyicisidir.
+/// </para>
 ///
 /// <b>Bu fazda şirkete etki hesaplanmaz.</b> Etki değerlendirmesi DeepTech analiz
 /// motorunun işidir.
 /// </summary>
 [ApiController]
 [Route("api/regulatory-changes")]
-[Authorize(Policy = Policies.CompanyData)]
+[Authorize(Policy = Policies.Read)]
 [Produces("application/json")]
 public sealed class RegulatoryChangesController(RegulatoryChangeService service) : ControllerBase
 {

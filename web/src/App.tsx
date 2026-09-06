@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import AppLayout from '@/app/AppLayout'
 import CompanyProvider from '@/app/CompanyProvider'
 import { useAuth } from '@/app/contexts'
+import { isPlatformRole } from '@/app/navigation'
 import CompanyEditPage from '@/pages/CompanyEditPage'
 import CompanyGroupsPage from '@/pages/CompanyGroupsPage'
 import CompanyMembersPage from '@/pages/CompanyMembersPage'
@@ -35,6 +36,24 @@ function ProtectedRoutes() {
   )
 }
 
+/**
+ * Giriş sonrası açılan ekran role göre değişir.
+ *
+ * Panel ana ekranı bir şirketin panosudur; platform hesaplarının şirket üyeliği yoktur
+ * ve sol menülerinde şirket ekranı da yoktur. Onları buraya bırakmak "Önce bir firma
+ * seçin" diyen, seçilecek firma da sunmayan bir çıkmaz üretiyordu. Platform hesabı
+ * kendi ilk ekranına, ortak kataloğa iner.
+ */
+function HomeRoute() {
+  const { user } = useAuth()
+
+  if (isPlatformRole(user?.role ?? null)) {
+    return <Navigate to="/opportunities" replace />
+  }
+
+  return <DashboardPage />
+}
+
 export default function App() {
   return (
     <Routes>
@@ -42,7 +61,7 @@ export default function App() {
       {/* Aktivasyon oturum gerektirmez: hesap henüz parolasızdır. */}
       <Route path="/activate/:token" element={<ActivatePage />} />
       <Route element={<ProtectedRoutes />}>
-        <Route path="/" element={<DashboardPage />} />
+        <Route path="/" element={<HomeRoute />} />
         <Route path="/matches" element={<MatchesPage />} />
         <Route path="/matches/:assessmentId" element={<EligibilityDetailPage />} />
         <Route path="/opportunities" element={<OpportunitiesPage />} />
