@@ -105,6 +105,13 @@ services:
       RabbitMq__HostName: rabbitmq
       RabbitMq__UserName: ${RABBITMQ_USER:-govai}
       RabbitMq__Password: ${RABBITMQ_PASSWORD}
+
+      # Platform hesabı açma ucunu koruyan bootstrap sırrı.
+      #
+      # TANIMLI DEĞİLSE UÇ 404 DÖNER — varsayılan kurulumda açıkta hesap açma yolu
+      # bulunmaz. Değer yalnızca inceleyici hesabı açılırken tanımlanır ve hesap
+      # etkinleştirildikten sonra .env'den KALDIRILIR.
+      GOVAI_PLATFORM_BOOTSTRAP_SECRET: ${GOVAI_PLATFORM_BOOTSTRAP_SECRET:-}
       Cors__AllowedOrigins__0: ${WEB_ORIGIN:-http://localhost:5180}
     volumes:
       - api-logs:/app/logs
