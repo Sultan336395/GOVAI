@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import { ApiError, api } from '@/api/client'
 import type { CompanyGroup, MyCompany } from '@/api/types'
 import { ErrorBox, FieldError } from '@/components/Common'
+import { FieldLabel, HelpTip } from '@/components/HelpTip'
 import { Typeahead, TypeaheadMulti } from '@/components/Typeahead'
 import type { TypeaheadOption } from '@/components/Typeahead'
 import { ayniMi, sadeceRakam } from '@/lib/turkce'
@@ -148,7 +149,7 @@ export default function CompanyForm({
 
         <div className="grid" style={columns}>
           <div className="field">
-            <label htmlFor="legalName">Ticari unvan *</label>
+            <FieldLabel htmlFor="legalName" field="legalName">Ticari unvan *</FieldLabel>
             <input
               id="legalName"
               value={values.legalName}
@@ -159,7 +160,7 @@ export default function CompanyForm({
           </div>
 
           <div className="field">
-            <label htmlFor="shortName">Kısa ad</label>
+            <FieldLabel htmlFor="shortName" field="shortName">Kısa ad</FieldLabel>
             <input
               id="shortName"
               value={values.shortName ?? ''}
@@ -168,7 +169,7 @@ export default function CompanyForm({
           </div>
 
           <div className="field">
-            <label htmlFor="taxNumber">Vergi numarası *</label>
+            <FieldLabel htmlFor="taxNumber" field="taxNumber">Vergi numarası *</FieldLabel>
             <input
               id="taxNumber"
               value={values.taxNumber}
@@ -186,7 +187,7 @@ export default function CompanyForm({
           </div>
 
           <div className="field">
-            <label htmlFor="country">Ülke *</label>
+            <FieldLabel htmlFor="country" field="country">Ülke *</FieldLabel>
             <input
               id="country"
               value={values.country}
@@ -197,7 +198,7 @@ export default function CompanyForm({
           </div>
 
           <div className="field">
-            <label htmlFor="legalType">Tüzel kişilik türü</label>
+            <FieldLabel htmlFor="legalType" field="legalType">Tüzel kişilik türü</FieldLabel>
             <select
               id="legalType"
               value={values.legalType ?? 'LimitedCompany'}
@@ -212,7 +213,7 @@ export default function CompanyForm({
           </div>
 
           <div className="field">
-            <label htmlFor="taxOffice">Vergi dairesi</label>
+            <FieldLabel htmlFor="taxOffice" field="taxOffice">Vergi dairesi</FieldLabel>
             <input
               id="taxOffice"
               value={values.taxOffice ?? ''}
@@ -221,7 +222,7 @@ export default function CompanyForm({
           </div>
 
           <div className="field">
-            <label htmlFor="mersisNumber">MERSİS numarası</label>
+            <FieldLabel htmlFor="mersisNumber" field="mersisNumber">MERSİS numarası</FieldLabel>
             <input
               id="mersisNumber"
               value={values.mersisNumber ?? ''}
@@ -230,7 +231,7 @@ export default function CompanyForm({
           </div>
 
           <div className="field">
-            <label htmlFor="tradeRegistryNumber">Ticaret sicil numarası</label>
+            <FieldLabel htmlFor="tradeRegistryNumber" field="tradeRegistryNumber">Ticaret sicil numarası</FieldLabel>
             <input
               id="tradeRegistryNumber"
               value={values.tradeRegistryNumber ?? ''}
@@ -245,7 +246,7 @@ export default function CompanyForm({
 
         <div className="grid" style={columns}>
           <div className="field">
-            <label htmlFor="mainSector">Ana sektör *</label>
+            <FieldLabel htmlFor="mainSector" field="mainSector">Ana sektör *</FieldLabel>
             <Typeahead
               id="mainSector"
               value={values.mainSector}
@@ -258,7 +259,7 @@ export default function CompanyForm({
           </div>
 
           <div className="field">
-            <label htmlFor="primaryNaceCode">Ana NACE kodu *</label>
+            <FieldLabel htmlFor="primaryNaceCode" field="primaryNaceCode">Ana NACE kodu *</FieldLabel>
             <Typeahead
               id="primaryNaceCode"
               value={values.primaryNaceCode}
@@ -280,7 +281,7 @@ export default function CompanyForm({
           </div>
 
           <div className="field">
-            <label htmlFor="secondaryNaceCodes">Diğer NACE kodları</label>
+            <FieldLabel htmlFor="secondaryNaceCodes" field="secondaryNaceCodes">Diğer NACE kodları</FieldLabel>
             <TypeaheadMulti
               id="secondaryNaceCodes"
               values={values.secondaryNaceCodes ?? []}
@@ -298,7 +299,7 @@ export default function CompanyForm({
           </div>
 
           <div className="field">
-            <label htmlFor="subSectors">Alt sektörler</label>
+            <FieldLabel htmlFor="subSectors" field="subSectors">Alt sektörler</FieldLabel>
             <TypeaheadMulti
               id="subSectors"
               values={values.subSectors ?? []}
@@ -310,7 +311,7 @@ export default function CompanyForm({
           </div>
 
           <div className="field">
-            <label htmlFor="city">İl</label>
+            <FieldLabel htmlFor="city" field="city">İl</FieldLabel>
             <input
               id="city"
               value={values.city ?? ''}
@@ -320,7 +321,7 @@ export default function CompanyForm({
           </div>
 
           <div className="field">
-            <label htmlFor="targetCountries">Hedef pazarlar</label>
+            <FieldLabel htmlFor="targetCountries" field="targetCountries">Hedef pazarlar</FieldLabel>
             <input
               id="targetCountries"
               value={csv(values.targetCountries)}
@@ -330,7 +331,7 @@ export default function CompanyForm({
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', marginTop: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 8 }}>
           <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <input
               type="checkbox"
@@ -339,8 +340,9 @@ export default function CompanyForm({
             />
             Teknopark içinde
           </label>
+          <HelpTip field="isInTechnopark" />
 
-          <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginLeft: 16 }}>
             <input
               type="checkbox"
               checked={values.exportFlag ?? false}
@@ -348,6 +350,7 @@ export default function CompanyForm({
             />
             İhracat yapıyor
           </label>
+          <HelpTip field="exportFlag" />
         </div>
       </div>
 
@@ -360,7 +363,7 @@ export default function CompanyForm({
 
         <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
           <div className="field">
-            <label htmlFor="employeeCount">Çalışan sayısı</label>
+            <FieldLabel htmlFor="employeeCount" field="employeeCount">Çalışan sayısı</FieldLabel>
             <input
               id="employeeCount"
               type="number"
@@ -372,7 +375,7 @@ export default function CompanyForm({
           </div>
 
           <div className="field">
-            <label htmlFor="womenEmployeeCount">Kadın çalışan</label>
+            <FieldLabel htmlFor="womenEmployeeCount" field="womenEmployeeCount">Kadın çalışan</FieldLabel>
             <input
               id="womenEmployeeCount"
               type="number"
@@ -383,7 +386,7 @@ export default function CompanyForm({
           </div>
 
           <div className="field">
-            <label htmlFor="rAndDEmployeeCount">Ar-Ge çalışanı</label>
+            <FieldLabel htmlFor="rAndDEmployeeCount" field="rAndDEmployeeCount">Ar-Ge çalışanı</FieldLabel>
             <input
               id="rAndDEmployeeCount"
               type="number"
@@ -394,7 +397,7 @@ export default function CompanyForm({
           </div>
 
           <div className="field">
-            <label htmlFor="annualRevenue">Yıllık ciro (TL)</label>
+            <FieldLabel htmlFor="annualRevenue" field="annualRevenue">Yıllık ciro (TL)</FieldLabel>
             <input
               id="annualRevenue"
               type="number"
@@ -406,7 +409,7 @@ export default function CompanyForm({
           </div>
 
           <div className="field">
-            <label htmlFor="balanceSize">Aktif toplamı (TL)</label>
+            <FieldLabel htmlFor="balanceSize" field="balanceSize">Aktif toplamı (TL)</FieldLabel>
             <input
               id="balanceSize"
               type="number"
@@ -423,7 +426,7 @@ export default function CompanyForm({
 
         <div className="grid" style={columns}>
           <div className="field">
-            <label htmlFor="website">Web sitesi</label>
+            <FieldLabel htmlFor="website" field="website">Web sitesi</FieldLabel>
             <input
               id="website"
               value={values.website ?? ''}
@@ -432,7 +435,7 @@ export default function CompanyForm({
           </div>
 
           <div className="field">
-            <label htmlFor="phone">Telefon</label>
+            <FieldLabel htmlFor="phone" field="phone">Telefon</FieldLabel>
             <input
               id="phone"
               value={values.phone ?? ''}
@@ -441,7 +444,7 @@ export default function CompanyForm({
           </div>
 
           <div className="field">
-            <label htmlFor="corporateEmail">Kurumsal e-posta</label>
+            <FieldLabel htmlFor="corporateEmail" field="corporateEmail">Kurumsal e-posta</FieldLabel>
             <input
               id="corporateEmail"
               value={values.corporateEmail ?? ''}
@@ -450,7 +453,7 @@ export default function CompanyForm({
           </div>
 
           <div className="field">
-            <label htmlFor="address">Adres</label>
+            <FieldLabel htmlFor="address" field="address">Adres</FieldLabel>
             <input
               id="address"
               value={values.address ?? ''}
@@ -466,7 +469,7 @@ export default function CompanyForm({
 
           <div className="grid" style={columns}>
             <div className="field">
-              <label htmlFor="groupId">Şirket grubu</label>
+              <FieldLabel htmlFor="groupId" field="groupId">Şirket grubu</FieldLabel>
               <select
                 id="groupId"
                 value={values.groupId ?? ''}
@@ -482,7 +485,7 @@ export default function CompanyForm({
             </div>
 
             <div className="field">
-              <label htmlFor="parentCompanyId">Ana şirket</label>
+              <FieldLabel htmlFor="parentCompanyId" field="parentCompanyId">Ana şirket</FieldLabel>
               <select
                 id="parentCompanyId"
                 value={values.parentCompanyId ?? ''}
@@ -499,7 +502,7 @@ export default function CompanyForm({
             </div>
 
             <div className="field">
-              <label htmlFor="relationshipType">İlişki türü</label>
+              <FieldLabel htmlFor="relationshipType" field="relationshipType">İlişki türü</FieldLabel>
               <select
                 id="relationshipType"
                 value={values.relationshipType ?? 'Independent'}
@@ -516,14 +519,17 @@ export default function CompanyForm({
             </div>
           </div>
 
-          <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
-            <input
-              type="checkbox"
-              checked={values.isHeadCompany ?? false}
-              onChange={(e) => set('isHeadCompany', e.target.checked)}
-            />
-            Grubun ana şirketi
-          </label>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 8 }}>
+            <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input
+                type="checkbox"
+                checked={values.isHeadCompany ?? false}
+                onChange={(e) => set('isHeadCompany', e.target.checked)}
+              />
+              Grubun ana şirketi
+            </label>
+            <HelpTip field="isHeadCompany" />
+          </div>
         </div>
       ) : null}
 

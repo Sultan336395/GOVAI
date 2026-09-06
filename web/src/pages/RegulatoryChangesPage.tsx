@@ -6,6 +6,7 @@ import type { RegulationDomain } from '@/api/types'
 import { EmptyState, ErrorBox, InfoBox, Loading } from '@/components/Common'
 import { changeTypeLabels, regulationDomainLabels, regulationDomainOrder } from '@/lib/regulatoryLabels'
 import { formatDate, NOT_PROVIDED_LABEL } from '@/lib/format'
+import { FieldLabel } from '@/components/HelpTip'
 
 /**
  * Mevzuat Değişiklikleri.
@@ -50,7 +51,7 @@ export default function RegulatoryChangesPage() {
 
       <div className="toolbar" style={{ marginBottom: 16 }}>
         <div className="field" style={{ marginBottom: 0, minWidth: 200 }}>
-          <label htmlFor="domain">Düzenleme alanı</label>
+          <FieldLabel htmlFor="domain" field="regulationDomain">Düzenleme alanı</FieldLabel>
           <select
             id="domain"
             value={domain}
@@ -66,7 +67,7 @@ export default function RegulatoryChangesPage() {
         </div>
 
         <div className="field" style={{ marginBottom: 0, minWidth: 160 }}>
-          <label htmlFor="jurisdiction">Yargı alanı</label>
+          <FieldLabel htmlFor="jurisdiction" field="regulationJurisdiction">Yargı alanı</FieldLabel>
           <select
             id="jurisdiction"
             value={jurisdiction}

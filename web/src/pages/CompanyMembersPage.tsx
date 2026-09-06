@@ -15,6 +15,7 @@ import {
 } from '@/components/Common'
 import { companyRoleHints, companyRoleLabels, companyRoleOrder } from '@/lib/companyLabels'
 import { formatDate } from '@/lib/format'
+import { FieldLabel } from '@/components/HelpTip'
 
 /**
  * Şirket kullanıcıları ve yetkileri.
@@ -299,7 +300,7 @@ export default function CompanyMembersPage() {
 
           <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
             <div className="field">
-              <label htmlFor="newMemberUserId">Kullanıcı</label>
+              <FieldLabel htmlFor="newMemberUserId" field="newMemberUserId">Kullanıcı</FieldLabel>
               <select
                 id="newMemberUserId"
                 value={newMemberUserId}
@@ -317,7 +318,7 @@ export default function CompanyMembersPage() {
             </div>
 
             <div className="field">
-              <label htmlFor="newMemberRole">Rol</label>
+              <FieldLabel htmlFor="newMemberRole" field="newMemberRole">Rol</FieldLabel>
               <select
                 id="newMemberRole"
                 value={newMemberRole}
@@ -354,7 +355,7 @@ export default function CompanyMembersPage() {
 
         <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
           <div className="field">
-            <label htmlFor="inviteEmail">E-posta</label>
+            <FieldLabel htmlFor="inviteEmail" field="inviteEmail">E-posta</FieldLabel>
             <input
               id="inviteEmail"
               type="email"
@@ -369,7 +370,7 @@ export default function CompanyMembersPage() {
           </div>
 
           <div className="field">
-            <label htmlFor="inviteRole">Rol</label>
+            <FieldLabel htmlFor="inviteRole" field="inviteRole">Rol</FieldLabel>
             <select
               id="inviteRole"
               value={inviteRole}

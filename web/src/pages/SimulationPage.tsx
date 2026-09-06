@@ -5,7 +5,9 @@ import { api } from '@/api/client'
 import type { ScenarioRequest } from '@/api/types'
 import { useCompanies } from '@/app/contexts'
 import { EmptyState, ErrorBox, Kpi, VerdictBadge } from '@/components/Common'
+import { FieldLabel } from '@/components/HelpTip'
 import { categoryLabels } from '@/lib/format'
+import { fieldHelp } from '@/lib/fieldHelp'
 
 /**
  * "What-if" ekranı: firmanın kaydına dokunmadan, değiştirilmiş bir profil üzerinde
@@ -65,7 +67,8 @@ export default function SimulationPage() {
           <h2>Senaryo tanımı</h2>
 
           <div className="field">
-            <label htmlFor="scenario-name">Senaryo adı</label>
+            <FieldLabel htmlFor="scenario-name" field="scenarioName">Senaryo adı</FieldLabel>
+            <div className="field-hint">{fieldHelp.scenarioName.short}</div>
             <input
               id="scenario-name"
               value={name}
@@ -75,7 +78,8 @@ export default function SimulationPage() {
           </div>
 
           <div className="field">
-            <label htmlFor="employee-count">Toplam çalışan sayısı</label>
+            <FieldLabel htmlFor="employee-count" field="scenarioEmployeeCount">Toplam çalışan sayısı</FieldLabel>
+            <div className="field-hint">{fieldHelp.scenarioEmployeeCount.short}</div>
             <input
               id="employee-count"
               type="number"
@@ -87,7 +91,8 @@ export default function SimulationPage() {
           </div>
 
           <div className="field">
-            <label htmlFor="women-count">Kadın çalışan sayısı</label>
+            <FieldLabel htmlFor="women-count" field="scenarioWomenCount">Kadın çalışan sayısı</FieldLabel>
+            <div className="field-hint">{fieldHelp.scenarioWomenCount.short}</div>
             <input
               id="women-count"
               type="number"
@@ -98,7 +103,8 @@ export default function SimulationPage() {
           </div>
 
           <div className="field">
-            <label htmlFor="rnd-count">Ar-Ge personeli sayısı</label>
+            <FieldLabel htmlFor="rnd-count" field="scenarioRndCount">Ar-Ge personeli sayısı</FieldLabel>
+            <div className="field-hint">{fieldHelp.scenarioRndCount.short}</div>
             <input
               id="rnd-count"
               type="number"
@@ -109,7 +115,8 @@ export default function SimulationPage() {
           </div>
 
           <div className="field">
-            <label htmlFor="revenue">Yıllık ciro (TRY)</label>
+            <FieldLabel htmlFor="revenue" field="scenarioRevenue">Yıllık ciro (TL)</FieldLabel>
+            <div className="field-hint">{fieldHelp.scenarioRevenue.short}</div>
             <input
               id="revenue"
               type="number"
@@ -120,7 +127,8 @@ export default function SimulationPage() {
           </div>
 
           <div className="field">
-            <label htmlFor="certs">Alınacak belgeler (virgülle)</label>
+            <FieldLabel htmlFor="certs" field="scenarioCertificates">Alınacak belgeler</FieldLabel>
+            <div className="field-hint">{fieldHelp.scenarioCertificates.short}</div>
             <input
               id="certs"
               placeholder="ISO9001, ISO14001"

@@ -201,7 +201,7 @@ cd web && npm ci && npm run lint && npm run typecheck && npm run test && npm run
 ```
 
 `npm run lint` **`--max-warnings 0`** ile çalışır; uyarı da hatadır.
-`npm run test` vitest'i tek seferlik koşturur (47 test); şu an yalnızca `lib/`
+`npm run test` vitest'i tek seferlik koşturur (55 test); şu an yalnızca `lib/`
 altındaki saf fonksiyonlar kapsanır (menü görünürlüğü, parola kuralı, etiket
 haritaları) — ekran testleri hâlâ yok.
 

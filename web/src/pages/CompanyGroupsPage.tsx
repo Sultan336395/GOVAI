@@ -5,6 +5,7 @@ import type { CompanyRelationshipType, MyCompany } from '@/api/types'
 import { companyPermissions, useCompanies } from '@/app/contexts'
 import { EmptyState, ErrorBox, FieldError, Loading, SuccessBox } from '@/components/Common'
 import { relationshipLabels, relationshipOrder } from '@/lib/companyLabels'
+import { FieldLabel } from '@/components/HelpTip'
 
 /**
  * Şirket grubu ve ana–bağlı şirket ilişkisi.
@@ -76,7 +77,7 @@ export default function CompanyGroupsPage() {
 
         <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
           <div className="field">
-            <label htmlFor="groupName">Grup adı</label>
+            <FieldLabel htmlFor="groupName" field="groupName">Grup adı</FieldLabel>
             <input
               id="groupName"
               value={groupName}
@@ -90,7 +91,7 @@ export default function CompanyGroupsPage() {
           </div>
 
           <div className="field">
-            <label htmlFor="groupDescription">Açıklama</label>
+            <FieldLabel htmlFor="groupDescription" field="groupDescription">Açıklama</FieldLabel>
             <input
               id="groupDescription"
               value={groupDescription}
