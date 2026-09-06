@@ -684,3 +684,100 @@ tbody tr:hover {
     transition: none;
   }
 }
+
+/* ---- öneri listeli alan (sektör / NACE) ---- */
+
+.typeahead {
+  position: relative;
+}
+
+.typeahead input {
+  width: 100%;
+}
+
+.typeahead-list {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.typeahead-option {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.typeahead-option.active {
+  background: var(--primary-soft);
+}
+
+.typeahead-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.typeahead-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.typeahead-note {
+  padding: 6px 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.field-warning {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--warning);
+}
+
+/* ---- çoklu seçim rozetleri ---- */
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px 2px 9px;
+  border-radius: 999px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.chip-remove {
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.chip-remove:hover {
+  color: var(--danger);
+}

@@ -80,6 +80,25 @@ Koruyan testler: `SectorFitTests` (13), `SectorRankingTests` (9), `test_sektor.p
 Sektör uyumsuzluğu **eleme değildir**: kayıt gizlenmez, kararı `NotEligible` yapılmaz;
 listenin sonuna iner ve "sektör uyumu doğrulanamadı"/"sektör uyumsuz" etiketiyle görünür.
 
+### 2.2.2 Sektör ve NACE alanları yazılmaz, seçilir
+
+Firma kartındaki **ana sektör**, **ana NACE kodu**, **diğer NACE kodları** ve **alt
+sektörler** serbest metin değildir. `ActivityCatalog` tek kaynaktır: arayüz öneriyi
+`/api/reference/sectors` ve `/api/reference/nace` uçlarından alır, `CompanyRegistryService`
+kaydı aynı katalogla doğrular. İki taraf ayrı listelerden beslenirse arayüzde geçerli
+görünen bir seçim sunucuda reddedilir.
+
+Gerekçe sahadan: bir firmanın sektörü "inşaat" yazarken NACE kodu `2562` (metal işleme)
+kalmıştı. Motor NACE koduna bakar; firma kendi sektöründeki ihalelerde "uyumsuz" görünür.
+Serbest metin ayrıca aynı sektörün onlarca yazımını üretir ve hiçbiri eşleşmez.
+
+İki yazım biçimini karıştırma: katalog kodu **okunaklı** gösterir (`25.62`), alan modeli
+kodu **noktasız** saklar (`2562`, `NaceCode.Normalize`) ve eşleştirme o biçim üzerinden
+çalışır. `ActivityCatalog.NormalizeNace` gösterim biçimini üretir, saklama biçimini değil.
+
+Koruyan testler: `ActivityCatalogTests` (22), `ActivityReferenceTests` (13),
+`turkce.test.ts` (8).
+
 ### 2.3 Skor ağırlıklarının toplamı 1.0'dır
 
 `ScoreWeights` yapıcısı bunu doğrular ve ihlalde `DomainException` atar.
@@ -144,7 +163,7 @@ Solution dosyası **`GovAI.slnx`**'tir (yeni XML formatı), `.sln` değil.
 
 ```bash
 dotnet build -c Release          # tüm .NET projeleri
-dotnet test                      # 394 test (58 domain + 146 application + 190 API)
+dotnet test                      # 449 test (58 domain + 188 application + 203 API)
 ```
 
 ```bash
@@ -163,7 +182,7 @@ cd web && npm ci && npm run lint && npm run typecheck && npm run test && npm run
 ```
 
 `npm run lint` **`--max-warnings 0`** ile çalışır; uyarı da hatadır.
-`npm run test` vitest'i tek seferlik koşturur (39 test); şu an yalnızca `lib/`
+`npm run test` vitest'i tek seferlik koşturur (47 test); şu an yalnızca `lib/`
 altındaki saf fonksiyonlar kapsanır (menü görünürlüğü, parola kuralı, etiket
 haritaları) — ekran testleri hâlâ yok.
 

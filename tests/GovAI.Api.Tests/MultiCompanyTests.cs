@@ -573,7 +573,7 @@ public sealed class MultiCompanyTests : IAsyncLifetime
         legalName = legalName ?? $"Yeni Şirket {taxNumber} A.Ş.",
         taxNumber,
         country = "TR",
-        mainSector = "İmalat",
+        mainSector = "Makine ve ekipman imalatı",
         primaryNaceCode = "2562",
         legalType = "LimitedCompany",
         city = "Mersin",

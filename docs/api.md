@@ -106,6 +106,27 @@ POST /api/company-profile/erp-sync
 
 `rescoringQueued: true` ise profil değişmiştir ve skorlar yeniden hesaplanmak üzere kuyruğa alınmıştır.
 
+## `/api/reference` — form önerileri (sektör ve NACE)
+
+| Metot | Yol | Yetki |
+|---|---|---|
+| GET | `/api/reference/sectors?q=` | Read |
+| GET | `/api/reference/nace?q=&sector=` | Read |
+
+Firma kartındaki sektör ve NACE alanları **yazılmaz, seçilir**. Bu uçlar arayüzün
+öneri listesini besler; `POST /api/companies` aynı kataloğu kullanarak doğrular, bu
+yüzden listede görünen her değer kayıtta da geçerlidir.
+
+`sectors` sorgusuz çağrılırsa tüm liste döner (liste kısadır). `nace` en az **3 karakter**
+ister; sorgu koda (`256`) da tanıma (`yazılım`) da uyar ve Türkçe büyük/küçük harf farkına
+takılmaz. `sector` verilirse o sektörün kodları öne alınır, diğerleri gizlenmez.
+
+```json
+[{ "code": "25.62", "title": "Metallerin makinede işlenmesi ve şekil verilmesi", "sector": "Metal sanayi ve fabrikasyon" }]
+```
+
+Koddaki nokta gösterim içindir; kayıt noktasız saklanır (`2562`).
+
 ## `/api/eligibility` — uygunluk analizi, eksik koşullar, gerekçe
 
 | Metot | Yol | Yetki |

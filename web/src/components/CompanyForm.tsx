@@ -1,8 +1,11 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { ApiError } from '@/api/client'
+import { ApiError, api } from '@/api/client'
 import type { CompanyGroup, MyCompany } from '@/api/types'
 import { ErrorBox, FieldError } from '@/components/Common'
+import { Typeahead, TypeaheadMulti } from '@/components/Typeahead'
+import type { TypeaheadOption } from '@/components/Typeahead'
+import { ayniMi, sadeceRakam } from '@/lib/turkce'
 import { validateCompanyForm } from '@/lib/companyForm'
 import type { CompanyFormValues } from '@/lib/companyForm'
 import {
@@ -19,6 +22,27 @@ import {
  * Doğrulama iki yerde çalışır: burada kullanıcı beklemeden uyarılsın diye, sunucuda ise
  * asıl karar için. Sunucudan dönen alan hataları da aynı alanların altına yazılır.
  */
+
+/**
+ * Sektör ve NACE önerileri sunucudan gelir; arayüzde kopya liste TUTULMAZ.
+ * İki taraf ayrı listelerden beslenseydi arayüzde geçerli görünen bir seçim
+ * sunucuda reddedilirdi.
+ */
+const sektorAra = async (q: string): Promise<TypeaheadOption[]> =>
+  (await api.searchSectors(q)).map((s) => ({ value: s.name, label: s.name }))
+
+const naceAra = async (q: string): Promise<TypeaheadOption[]> =>
+  (await api.searchNace(q)).map((n) => ({
+    value: n.code,
+    label: `${n.code} — ${n.title}`,
+    hint: n.sector,
+  }))
+
+/** "2562" ile "25.62" aynı koddur; serbest metin döneminden kalan kayıtlar da bulunsun. */
+const naceEsleser = (option: TypeaheadOption, value: string) =>
+  sadeceRakam(option.value) === sadeceRakam(value)
+
+const sektorEsleser = (option: TypeaheadOption, value: string) => ayniMi(option.value, value)
 
 interface Props {
   values: CompanyFormValues
@@ -201,44 +225,52 @@ export default function CompanyForm({
         <div className="grid" style={columns}>
           <div className="field">
             <label htmlFor="mainSector">Ana sektör *</label>
-            <input
+            <Typeahead
               id="mainSector"
               value={values.mainSector}
-              onChange={(e) => set('mainSector', e.target.value)}
-              placeholder="Makine imalatı"
+              onChange={(value) => set('mainSector', value)}
+              search={sektorAra}
+              matches={sektorEsleser}
+              placeholder="En az 3 harf yazın, listeden seçin"
             />
             <FieldError message={fieldError('mainSector')} />
           </div>
 
           <div className="field">
             <label htmlFor="primaryNaceCode">Ana NACE kodu *</label>
-            <input
+            <Typeahead
               id="primaryNaceCode"
               value={values.primaryNaceCode}
-              onChange={(e) => set('primaryNaceCode', e.target.value)}
-              placeholder="2562"
+              onChange={(value) => set('primaryNaceCode', value)}
+              search={naceAra}
+              matches={naceEsleser}
+              placeholder="Kod ya da tanım yazın (ör. 256 veya yazılım)"
             />
             <FieldError message={fieldError('primaryNaceCode')} />
           </div>
 
           <div className="field">
             <label htmlFor="secondaryNaceCodes">Diğer NACE kodları</label>
-            <input
+            <TypeaheadMulti
               id="secondaryNaceCodes"
-              value={csv(values.secondaryNaceCodes)}
-              onChange={(e) => set('secondaryNaceCodes', parseCsv(e.target.value))}
-              placeholder="virgülle ayırın"
+              values={values.secondaryNaceCodes ?? []}
+              onChange={(list) => set('secondaryNaceCodes', list)}
+              search={naceAra}
+              placeholder="Ekleyeceğiniz kodu arayın"
             />
+            <FieldError message={fieldError('secondaryNaceCodes')} />
           </div>
 
           <div className="field">
             <label htmlFor="subSectors">Alt sektörler</label>
-            <input
+            <TypeaheadMulti
               id="subSectors"
-              value={csv(values.subSectors)}
-              onChange={(e) => set('subSectors', parseCsv(e.target.value))}
-              placeholder="virgülle ayırın"
+              values={values.subSectors ?? []}
+              onChange={(list) => set('subSectors', list)}
+              search={sektorAra}
+              placeholder="Ekleyeceğiniz sektörü arayın"
             />
+            <FieldError message={fieldError('subSectors')} />
           </div>
 
           <div className="field">

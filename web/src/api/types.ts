@@ -322,6 +322,26 @@ export interface OpportunityDetail {
   provenance: OpportunityProvenance | null
 }
 
+/**
+ * Faaliyet sektörü seçeneği (referans kataloğu).
+ *
+ * Sektör ve NACE kodu artık yazılmaz, listeden seçilir. Liste sunucudan gelir:
+ * arayüz ile kayıt doğrulaması aynı kataloğu kullanmazsa, arayüzde geçerli görünen
+ * bir seçim sunucuda reddedilir.
+ */
+export interface SectorOption {
+  name: string
+  /** Sektörün kapsadığı iki haneli NACE bölümleri. */
+  divisions: string[]
+}
+
+/** NACE Rev. 2 kod seçeneği. */
+export interface NaceOption {
+  code: string
+  title: string
+  sector: string
+}
+
 export interface OpportunityMatch {
   assessmentId: string
   opportunityId: string

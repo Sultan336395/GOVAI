@@ -23,9 +23,11 @@ import type {
   ScenarioRequest,
   ScenarioResult,
   ManualImportResult,
+  NaceOption,
   QuarantinedDocument,
   RegulatoryChangeDetail,
   RegulatoryChangeSummary,
+  SectorOption,
   SourceDto,
   TriageReport,
   TenantUser,
@@ -164,6 +166,13 @@ export const api = {
     request<PagedResult<OpportunityMatch>>(
       `/api/eligibility/companies/${companyId}/matches${query(params)}`,
     ),
+
+  // ---- referans katalogları (form önerileri) ----
+
+  searchSectors: (q?: string) => request<SectorOption[]>(`/api/reference/sectors${query({ q })}`),
+
+  searchNace: (q: string, sector?: string) =>
+    request<NaceOption[]>(`/api/reference/nace${query({ q, sector })}`),
 
   // ---- platform hesabı aktivasyonu (oturum gerektirmez) ----
 

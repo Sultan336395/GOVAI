@@ -2,6 +2,7 @@ using System.Text.Json;
 using GovAI.Application.Abstractions.Persistence;
 using GovAI.Application.Abstractions.Services;
 using GovAI.Application.Common;
+using GovAI.Application.Reference;
 using GovAI.Domain.Common;
 using GovAI.Domain.Companies;
 using GovAI.Domain.Identity;
@@ -445,6 +446,43 @@ public sealed class CompanyRegistryService(
         {
             throw new ValidationException(nameof(request.PrimaryNaceCode), "Ana NACE kodu zorunludur.");
         }
+
+        // Serbest metin dönemi kapandı: iki alan da katalogdan seçilir. Aksi hâlde aynı
+        // sektörün onlarca yazımı ("İnşaat", "inşaat taahhüt", "İNŞAAT") birikir, hiçbiri
+        // eşleşmez ve firma kendi sektöründeki çağrılarda "uyumsuz" görünür.
+        if (ActivityCatalog.NormalizeSector(request.MainSector) is null)
+        {
+            throw new ValidationException(
+                nameof(request.MainSector),
+                "Ana sektör listeden seçilmelidir; elle yazılan değer kabul edilmez.");
+        }
+
+        if (ActivityCatalog.NormalizeNace(request.PrimaryNaceCode) is null)
+        {
+            throw new ValidationException(
+                nameof(request.PrimaryNaceCode),
+                "Ana NACE kodu listeden seçilmelidir; elle yazılan değer kabul edilmez.");
+        }
+
+        foreach (var code in request.SecondaryNaceCodes.Where(c => !string.IsNullOrWhiteSpace(c)))
+        {
+            if (ActivityCatalog.NormalizeNace(code) is null)
+            {
+                throw new ValidationException(
+                    nameof(request.SecondaryNaceCodes),
+                    $"Diğer NACE kodu listeden seçilmelidir; tanınmayan kod: {code.Trim()}");
+            }
+        }
+
+        foreach (var sub in request.SubSectors.Where(s => !string.IsNullOrWhiteSpace(s)))
+        {
+            if (ActivityCatalog.NormalizeSector(sub) is null)
+            {
+                throw new ValidationException(
+                    nameof(request.SubSectors),
+                    $"Alt sektör listeden seçilmelidir; tanınmayan değer: {sub.Trim()}");
+            }
+        }
     }
 
     private static void ApplyRequest(Company company, CreateCompanyRequest request)
@@ -458,9 +496,18 @@ public sealed class CompanyRegistryService(
             request.Website, request.Phone, request.CorporateEmail,
             request.Country, request.City, request.Address));
 
+        // Sektör katalogdaki kanonik yazımla kaydedilir; doğrulama bunu zaten garanti etti.
+        // Böylece serbest metin döneminden kalan "inşaat" kaydı ilk kaydetmede
+        // "İnşaat ve taahhüt" olur. NACE kodundaki nokta yalnızca gösterim içindir;
+        // alan modeli kodu zaten noktasız saklar.
+        var subSectors = request.SubSectors
+            .Select(ActivityCatalog.NormalizeSector)
+            .OfType<string>()
+            .ToList();
+
         company.UpdateSectors(
-            request.MainSector,
-            request.SubSectors.Count > 0 ? JsonSerializer.Serialize(request.SubSectors) : null,
+            ActivityCatalog.NormalizeSector(request.MainSector),
+            subSectors.Count > 0 ? JsonSerializer.Serialize(subSectors) : null,
             request.TargetCountries.Count > 0 ? JsonSerializer.Serialize(request.TargetCountries) : null);
 
         company.UpdateWorkforce(new Workforce(
@@ -477,12 +524,15 @@ public sealed class CompanyRegistryService(
 
         var naceCodes = new List<CompanyNaceCode>
         {
-            new(request.PrimaryNaceCode.Trim(), isPrimary: true, null)
+            new(ActivityCatalog.NormalizeNace(request.PrimaryNaceCode)!, isPrimary: true, null)
         };
 
         naceCodes.AddRange(request.SecondaryNaceCodes
-            .Where(c => !string.IsNullOrWhiteSpace(c))
-            .Select(c => new CompanyNaceCode(c.Trim(), isPrimary: false, null)));
+            .Select(ActivityCatalog.NormalizeNace)
+            .OfType<string>()
+            .Where(c => c != naceCodes[0].Code)
+            .Distinct(StringComparer.Ordinal)
+            .Select(c => new CompanyNaceCode(c, isPrimary: false, null)));
 
         company.ReplaceNaceCodes(naceCodes);
 
