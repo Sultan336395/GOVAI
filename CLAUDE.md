@@ -96,8 +96,26 @@ Serbest metin ayrıca aynı sektörün onlarca yazımını üretir ve hiçbiri e
 kodu **noktasız** saklar (`2562`, `NaceCode.Normalize`) ve eşleştirme o biçim üzerinden
 çalışır. `ActivityCatalog.NormalizeNace` gösterim biçimini üretir, saklama biçimini değil.
 
-Koruyan testler: `ActivityCatalogTests` (22), `ActivityReferenceTests` (13),
-`turkce.test.ts` (8).
+**İki alanın tek tek geçerli olması yetmez; birbirini de tutmalıdır.** Sahada sektörü
+"İnşaat ve taahhüt" seçilmiş bir firmaya beton ürünleri kodu (23.61) atandı; ikisi de
+katalogdaydı ama farklı faaliyetleri anlatıyordu ve firma kendi sektöründeki ihalelerde
+"uyumsuz" göründü. İki hat birlikte korur:
+
+1. `/api/reference/nace` **yalnızca** verilen sektörlerin kodlarını döner — kullanıcı
+   tutmayan kodu göremez, dolayısıyla seçemez.
+2. `ValidateSectorConsistency` ana kodu ana sektöre, diğer kodları ana sektör veya beyan
+   edilen alt sektörlere karşı doğrular.
+
+Ana sektör değişince arayüz NACE seçimlerini boşaltır: eski kodlar yeni sektöre ait
+değildir ve kayıtta reddedilirlerdi.
+
+**Profil değişince skor tazelenir.** `CompanyRegistryService.UpdateAsync` yeniden
+skorlamayı kuyruğa bırakır. Bu tetikleme yalnızca ERP yolunda vardı; panel yolunda
+olmadığı için kullanıcı sektörünü düzeltiyor, liste eski sektörle hesaplanmış hâlde
+kalıyordu.
+
+Koruyan testler: `ActivityCatalogTests` (29), `ActivityReferenceTests` (13),
+`SectorConsistencyTests` (11), `turkce.test.ts` (8).
 
 ### 2.3 Skor ağırlıklarının toplamı 1.0'dır
 
@@ -163,7 +181,7 @@ Solution dosyası **`GovAI.slnx`**'tir (yeni XML formatı), `.sln` değil.
 
 ```bash
 dotnet build -c Release          # tüm .NET projeleri
-dotnet test                      # 454 test (58 domain + 188 application + 208 API)
+dotnet test                      # 482 test (58 domain + 203 application + 221 API)
 ```
 
 ```bash

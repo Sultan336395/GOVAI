@@ -405,6 +405,52 @@ public sealed class PlatformActivationTests(GovAiApiFactory factory)
         return sourceId;
     }
 
+    [Fact(DisplayName = "PA15. Reddedilen istek denetim kaydına GEÇMEZ")]
+    public async Task Reddedilen_istek_denetim_kaydina_gecmez()
+    {
+        // Sahada görüldü: bootstrap sırrı kaldırıldıktan sonra uca yapılan ve 404 alan
+        // denemeler denetim kaydına "Platform.ActivationCreated" olarak düştü. Kayıtta
+        // 6 satır vardı, gerçekte 3 bağlantı üretilmişti. Denetlenebilirlik bu ürünün
+        // üç iddiasından biridir; olmayan bir işlemin kaydı, kaydın tamamını şüpheli yapar.
+        var oncekiSayi = await QueryAsync(db => db.AuditLog
+            .IgnoreQueryFilters()
+            .CountAsync(a => a.Action == "Platform.ActivationCreated"));
+
+        using var yanlisSir = new HttpRequestMessage(HttpMethod.Post, "/api/platform/activations")
+        {
+            Content = JsonContent.Create(new { email = Eposta("denetim"), fullName = "Denetim Testi" }),
+        };
+        yanlisSir.Headers.Add(PlatformActivationController.BootstrapHeader, "yanlis-sir");
+
+        var reddedilen = await _anonim.SendAsync(yanlisSir);
+
+        var sonrakiSayi = await QueryAsync(db => db.AuditLog
+            .IgnoreQueryFilters()
+            .CountAsync(a => a.Action == "Platform.ActivationCreated"));
+
+        // Sır tanımlıyken yanlış sır 403, sır hiç tanımlı değilken 404 döner; ikisi de
+        // "işlem gerçekleşmedi" demektir ve ikisi de kayda geçmemelidir.
+        Assert.Equal(HttpStatusCode.Forbidden, reddedilen.StatusCode);
+        Assert.Equal(oncekiSayi, sonrakiSayi);
+    }
+
+    [Fact(DisplayName = "PA16. Gerçekleşen işlem denetim kaydına GEÇER")]
+    public async Task Gerceklesen_islem_denetim_kaydina_gecer()
+    {
+        // Karşı yön: reddedilen istekleri elerken gerçek işlemleri de elememeliyiz.
+        var oncekiSayi = await QueryAsync(db => db.AuditLog
+            .IgnoreQueryFilters()
+            .CountAsync(a => a.Action == "Platform.ActivationCreated"));
+
+        await UretAsync(Eposta("denetim-gecerli"));
+
+        var sonrakiSayi = await QueryAsync(db => db.AuditLog
+            .IgnoreQueryFilters()
+            .CountAsync(a => a.Action == "Platform.ActivationCreated"));
+
+        Assert.Equal(oncekiSayi + 1, sonrakiSayi);
+    }
+
     [Fact(DisplayName = "PA14. Geçersiz jeton hesap bilgisi sızdırmaz")]
     public async Task Gecersiz_jeton_bilgi_sizdirmaz()
     {

@@ -171,7 +171,8 @@ export const api = {
 
   searchSectors: (q?: string) => request<SectorOption[]>(`/api/reference/sectors${query({ q })}`),
 
-  searchNace: (q: string, sector?: string) =>
+  /** `sector` birden çok kez gönderilir; liste o sektörlerin kodlarıyla sınırlanır. */
+  searchNace: (q: string, sector?: string[]) =>
     request<NaceOption[]>(`/api/reference/nace${query({ q, sector })}`),
 
   // ---- platform hesabı aktivasyonu (oturum gerektirmez) ----

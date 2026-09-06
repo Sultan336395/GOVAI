@@ -119,7 +119,11 @@ yüzden listede görünen her değer kayıtta da geçerlidir.
 
 `sectors` sorgusuz çağrılırsa tüm liste döner (liste kısadır). `nace` en az **3 karakter**
 ister; sorgu koda (`256`) da tanıma (`yazılım`) da uyar ve Türkçe büyük/küçük harf farkına
-takılmaz. `sector` verilirse o sektörün kodları öne alınır, diğerleri gizlenmez.
+takılmaz.
+
+`sector` birden çok kez verilebilir ve liste o sektörlerin kodlarıyla **sınırlanır**
+(sıralanmaz, filtrelenir). Sektör ile NACE kodunun çelişmesi böyle önlenir: kullanıcı
+sektörüne ait olmayan bir kodu göremez, `POST /api/companies` de aynı kısıtı doğrular.
 
 ```json
 [{ "code": "25.62", "title": "Metallerin makinede işlenmesi ve şekil verilmesi", "sector": "Metal sanayi ve fabrikasyon" }]

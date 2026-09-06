@@ -123,16 +123,80 @@ public sealed class ActivityCatalogTests
         Assert.StartsWith("62.0", sonuc[0].Code, StringComparison.Ordinal);
     }
 
-    [Fact(DisplayName = "AC11. Sektör verilirse o sektörün kodları öne alınır, diğerleri gizlenmez")]
-    public void Sektor_verilirse_one_alinir()
+    [Fact(DisplayName = "AC11. Sektör verilirse liste o sektörle SINIRLANIR")]
+    public void Sektor_verilirse_liste_sinirlanir()
     {
-        var sonuc = ActivityCatalog.SearchNace("imalat", "Makine ve ekipman imalatı");
+        // Sahada görülen hata: sektörü "İnşaat ve taahhüt" seçilmiş firmaya beton
+        // ürünleri kodu (23.61) atandı. Kullanıcı tutmayan kodu göremezse seçemez de.
+        var sonuc = ActivityCatalog.SearchNace("imalat", ["Makine ve ekipman imalatı"]);
 
-        Assert.Equal("Makine ve ekipman imalatı", sonuc[0].Sector);
+        Assert.NotEmpty(sonuc);
+        Assert.All(sonuc, n => Assert.Equal("Makine ve ekipman imalatı", n.Sector));
+    }
 
-        // Diğer sektörlerin kodları elenmez: firmanın kodu seçtiği sektörün dışında
-        // kalabilir ve bunu görebilmelidir.
-        Assert.Contains(sonuc, n => n.Sector != "Makine ve ekipman imalatı");
+    [Fact(DisplayName = "AC11b. Birden çok sektör verilebilir; birleşimleri döner")]
+    public void Birden_cok_sektor_birlestirilir()
+    {
+        // Bir firma birden fazla alanda faaliyet gösterebilir; alt sektörünü beyan
+        // ettiyse o alanın kodları da seçilebilir olmalıdır.
+        var sonuc = ActivityCatalog.SearchNace("imalat", ["Makine ve ekipman imalatı", "Yapı malzemeleri ve cam"]);
+
+        Assert.Contains(sonuc, n => n.Sector == "Makine ve ekipman imalatı");
+        Assert.Contains(sonuc, n => n.Sector == "Yapı malzemeleri ve cam");
+        Assert.DoesNotContain(sonuc, n => n.Sector == "Bilişim ve yazılım");
+    }
+
+    [Fact(DisplayName = "AC11c. Sektör verilmezse kısıt yoktur")]
+    public void Sektor_verilmezse_kisit_yoktur()
+    {
+        var hepsi = ActivityCatalog.SearchNace("imalat");
+
+        Assert.True(hepsi.Select(n => n.Sector).Distinct().Count() > 1);
+    }
+
+    [Fact(DisplayName = "AC11d. Sektör dışı kod aranınca hiç sonuç dönmez")]
+    public void Sektor_disi_kod_bulunamaz()
+    {
+        // 23.61 "Yapı malzemeleri ve cam" sektörüne aittir; inşaat sektörü seçiliyken
+        // aranarak da bulunamamalıdır, aksi hâlde filtre yalnızca gösterişten ibaret olur.
+        var sonuc = ActivityCatalog.SearchNace("2361", ["İnşaat ve taahhüt"]);
+
+        Assert.Empty(sonuc);
+    }
+
+    [Theory(DisplayName = "AC11e. Kod sektöre ait mi sorusu doğru cevaplanır")]
+    [InlineData("23.61", "İnşaat ve taahhüt", false)]
+    [InlineData("23.61", "Yapı malzemeleri ve cam", true)]
+    [InlineData("41.20", "İnşaat ve taahhüt", true)]
+    [InlineData("25.62", "Metal sanayi ve fabrikasyon", true)]
+    [InlineData("25.62", "Makine ve ekipman imalatı", false)]
+    [InlineData("62.01", "Bilişim ve yazılım", true)]
+    [InlineData("9999", "Bilişim ve yazılım", false)]
+    public void Kod_sektore_ait_mi(string kod, string sektor, bool beklenen)
+    {
+        Assert.Equal(beklenen, ActivityCatalog.NaceBelongsToSectors(kod, [sektor]));
+    }
+
+    [Theory(DisplayName = "AC11f. Kodun gerçek sektörü bulunabilir")]
+    [InlineData("23.61", "Yapı malzemeleri ve cam")]
+    [InlineData("2361", "Yapı malzemeleri ve cam")]
+    [InlineData("41.20", "İnşaat ve taahhüt")]
+    [InlineData("62.01", "Bilişim ve yazılım")]
+    public void Kodun_gercek_sektoru_bulunur(string kod, string beklenen)
+    {
+        // Hata mesajı kullanıcıya "bu kod aslında şu sektöre ait" diyebilmelidir.
+        Assert.Equal(beklenen, ActivityCatalog.SectorOfNace(kod));
+    }
+
+    [Fact(DisplayName = "AC11g. Katalogdaki her kod kendi sektörüyle uyumludur")]
+    public void Her_kod_kendi_sektoruyle_uyumludur()
+    {
+        // Katalog kendi içinde çelişirse doğrulama seçilebilir bir kodu reddeder.
+        Assert.All(
+            ActivityCatalog.NaceCodes,
+            n => Assert.True(
+                ActivityCatalog.NaceBelongsToSectors(n.Code, [n.Sector]),
+                $"{n.Code} kodu kendi sektörü '{n.Sector}' ile uyumsuz görünüyor."));
     }
 
     [Fact(DisplayName = "AC12. Öneri sayısı sınırlıdır")]

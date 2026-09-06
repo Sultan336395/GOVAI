@@ -130,6 +130,13 @@ public sealed class GovAiApiFactory : WebApplicationFactory<Program>
             services.AddSingleton<SahteIndirici>();
             services.AddScoped<IDocumentDownloader>(sp => sp.GetRequiredService<SahteIndirici>());
 
+            // Kuyruğa gerçekten iş bırakılıp bırakılmadığı sınanabilsin diye yayıncı
+            // kaydedilir. Varsayılan LoggingEventPublisher yalnızca log'a yazar ve
+            // "profil değişti ama yeniden skorlama tetiklenmedi" hatası testten kaçardı.
+            services.RemoveAll<IEventPublisher>();
+            services.AddSingleton<SahteOlayYayinci>();
+            services.AddScoped<IEventPublisher>(sp => sp.GetRequiredService<SahteOlayYayinci>());
+
             if (PostgresHost is null)
             {
                 // Bellek içi sağlayıcı işlem (transaction) desteklemez ve BeginTransaction
@@ -462,6 +469,46 @@ public sealed class TenantFixture(string name, string slug, string email, string
 /// testte adres denetimi <c>ManualImportService</c> katmanında sınanır, ağ trafiği
 /// gerekmez.
 /// </summary>
+/// <summary>
+/// Kuyruğa bırakılan olayları kaydeden yayıncı. Gerçek RabbitMQ'ya bağlanmaz; testler
+/// "şu eylem şu kuyruğa iş bıraktı mı" sorusunu buradan sorar.
+/// </summary>
+public sealed class SahteOlayYayinci : IEventPublisher
+{
+    private readonly List<(string RoutingKey, object Payload)> _olaylar = [];
+    private readonly Lock _kilit = new();
+
+    public IReadOnlyList<(string RoutingKey, object Payload)> Olaylar
+    {
+        get
+        {
+            lock (_kilit)
+            {
+                return [.. _olaylar];
+            }
+        }
+    }
+
+    public void Temizle()
+    {
+        lock (_kilit)
+        {
+            _olaylar.Clear();
+        }
+    }
+
+    public Task PublishAsync<T>(string routingKey, T payload, CancellationToken cancellationToken = default)
+        where T : class
+    {
+        lock (_kilit)
+        {
+            _olaylar.Add((routingKey, payload));
+        }
+
+        return Task.CompletedTask;
+    }
+}
+
 public sealed class SahteIndirici : IDocumentDownloader
 {
     private readonly Dictionary<string, DownloadedDocument> _icerikler = new(StringComparer.Ordinal);

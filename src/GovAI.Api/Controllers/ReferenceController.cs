@@ -35,10 +35,18 @@ public sealed class ReferenceController : ControllerBase
 
     /// <summary>
     /// NACE Rev. 2 kod önerileri. Sorgu koda ("256") da tanıma ("yazılım") da uyar.
-    /// <c>sector</c> verilirse o sektörün kodları öne alınır; diğerleri gizlenmez.
+    ///
+    /// <para>
+    /// <c>sector</c> birden çok kez verilebilir ve liste o sektörlerin kodlarıyla
+    /// <b>sınırlanır</b>. Arayüz ana sektörü (diğer kodlar için alt sektörleri de)
+    /// gönderir; böylece kullanıcı sektörüne ait olmayan bir kodu görmez ve seçemez.
+    /// Kayıt doğrulaması da aynı kısıtı uygular.
+    /// </para>
     /// </summary>
     [HttpGet("nace")]
-    public ActionResult<IReadOnlyList<NaceOptionDto>> Nace([FromQuery] string? q, [FromQuery] string? sector) =>
+    public ActionResult<IReadOnlyList<NaceOptionDto>> Nace(
+        [FromQuery] string? q,
+        [FromQuery] string[]? sector) =>
         Ok(ActivityCatalog.SearchNace(q, sector)
             .Select(n => new NaceOptionDto(n.Code, n.Title, n.Sector))
             .ToList());

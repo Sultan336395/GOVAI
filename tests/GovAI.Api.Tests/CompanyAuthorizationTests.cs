@@ -60,7 +60,7 @@ public sealed class CompanyAuthorizationTests(GovAiApiFactory factory)
         legalName,
         taxNumber,
         country = "TR",
-        mainSector = "Makine ve ekipman imalatı",
+        mainSector = "Metal sanayi ve fabrikasyon",
         primaryNaceCode = "2562"
     };
 

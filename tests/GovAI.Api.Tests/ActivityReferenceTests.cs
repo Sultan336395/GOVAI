@@ -58,7 +58,7 @@ public sealed class ActivityReferenceTests(GovAiApiFactory factory)
 
     private static object YeniSirket(
         string taxNumber,
-        string mainSector = "Makine ve ekipman imalatı",
+        string mainSector = "Metal sanayi ve fabrikasyon",
         string primaryNaceCode = "25.62",
         string[]? secondaryNaceCodes = null,
         string[]? subSectors = null) => new
@@ -139,7 +139,8 @@ public sealed class ActivityReferenceTests(GovAiApiFactory factory)
             .First(s => s.GetProperty("name").GetString() == "İnşaat ve taahhüt")
             .GetProperty("name").GetString()!;
 
-        var nace = (await GetirAsync("/api/reference/nace?q=412"))[0].GetProperty("code").GetString()!;
+        var nace = (await GetirAsync($"/api/reference/nace?q=412&sector={Uri.EscapeDataString(sektor)}"))[0]
+            .GetProperty("code").GetString()!;
 
         var response = await _owner.PostAsJsonAsync("/api/companies", YeniSirket("5550001111", sektor, nace));
 

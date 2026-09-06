@@ -27,6 +27,7 @@ public sealed class CompanyRegistryService(
     ICurrentUser currentUser,
     CompanyAccessGuard access,
     IDateTimeProvider clock,
+    IEventPublisher events,
     ILogger<CompanyRegistryService> logger)
 {
     // ══════════════════════ Şirketlerim ══════════════════════
@@ -216,9 +217,27 @@ public sealed class CompanyRegistryService(
         ApplyRequest(company, request);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
+        // Profil değişti; eski skorlar artık bu firmayı anlatmıyor.
+        //
+        // Bu tetikleme ERP eşitleme yolunda vardı ama panel yolunda YOKTU. Sonucu sahada
+        // görüldü: kullanıcı sektörünü düzeltti, "fırsatlarım" listesi eski sektörle
+        // hesaplanmış hâlde kaldı ve düzeltmenin işe yaramadığını sandı. Sektör artık
+        // sıralamanın birincil ölçütü olduğu için bu sessiz eskime kabul edilemez.
+        await QueueRescoringAsync(companyId, cancellationToken);
+
         var membership = await memberships.GetAsync(RequireUser(), companyId, cancellationToken);
         return ToMyCompany(company, membership!, null, null);
     }
+
+    /// <summary>
+    /// Yeniden skorlamayı kuyruğa bırakır. Skor burada hesaplanmaz: hesaplama uzun
+    /// sürebilir ve kullanıcının kaydet düğmesini bekletmemelidir.
+    /// </summary>
+    private Task QueueRescoringAsync(Guid companyId, CancellationToken cancellationToken) =>
+        events.PublishAsync(
+            QueueNames.ScoringRequested,
+            new { CompanyId = companyId, RequestedAt = clock.UtcNow, Reason = "CompanyProfileChanged" },
+            cancellationToken);
 
     // ══════════════════════ Grup yönetimi ══════════════════════
 
@@ -481,6 +500,57 @@ public sealed class CompanyRegistryService(
                 throw new ValidationException(
                     nameof(request.SubSectors),
                     $"Alt sektör listeden seçilmelidir; tanınmayan değer: {sub.Trim()}");
+            }
+        }
+
+        ValidateSectorConsistency(request);
+    }
+
+    /// <summary>
+    /// Sektör ile NACE kodunun birbirini tutması. İki alanın tek tek geçerli olması
+    /// YETMEZ.
+    ///
+    /// <para>
+    /// Sahada görüldü: sektörü "İnşaat ve taahhüt" seçilmiş bir firmaya beton ürünleri
+    /// imalatı kodu (23.61) atandı. İkisi de katalogdaydı ama farklı alanları anlatıyordu.
+    /// Motor NACE koduna baktığı için firma kendi sektöründeki ihalelerde "sektör uyumsuz"
+    /// göründü — üstelik profilinde sektörü doğru yazıyordu.
+    /// </para>
+    ///
+    /// <para>
+    /// Ana NACE kodu <b>ana sektöre</b> ait olmalıdır. Diğer kodlar ana sektöre ya da
+    /// beyan edilen <b>alt sektörlerden</b> birine ait olabilir: bir firma birden fazla
+    /// alanda faaliyet gösterebilir, ama bunu beyan etmek zorundadır.
+    /// </para>
+    /// </summary>
+    private static void ValidateSectorConsistency(CreateCompanyRequest request)
+    {
+        var anaSektor = ActivityCatalog.NormalizeSector(request.MainSector)!;
+
+        if (!ActivityCatalog.NaceBelongsToSectors(request.PrimaryNaceCode, [anaSektor]))
+        {
+            var gercekSektor = ActivityCatalog.SectorOfNace(request.PrimaryNaceCode);
+
+            throw new ValidationException(
+                nameof(request.PrimaryNaceCode),
+                $"Ana NACE kodu '{ActivityCatalog.NormalizeNace(request.PrimaryNaceCode)}' "
+                + $"'{gercekSektor}' sektörüne aittir, seçtiğiniz '{anaSektor}' sektörüne değil. "
+                + "Ya sektörü ya da kodu düzeltin; ikisi aynı faaliyeti göstermelidir.");
+        }
+
+        var izinliSektorler = new List<string> { anaSektor };
+        izinliSektorler.AddRange(request.SubSectors.Select(ActivityCatalog.NormalizeSector).OfType<string>());
+
+        foreach (var code in request.SecondaryNaceCodes.Where(c => !string.IsNullOrWhiteSpace(c)))
+        {
+            if (!ActivityCatalog.NaceBelongsToSectors(code, izinliSektorler))
+            {
+                var gercekSektor = ActivityCatalog.SectorOfNace(code);
+
+                throw new ValidationException(
+                    nameof(request.SecondaryNaceCodes),
+                    $"'{ActivityCatalog.NormalizeNace(code)}' kodu '{gercekSektor}' sektörüne aittir. "
+                    + "Bu alanda da faaliyet gösteriyorsanız önce onu alt sektör olarak ekleyin.");
             }
         }
     }

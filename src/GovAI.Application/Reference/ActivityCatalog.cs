@@ -484,13 +484,20 @@ public static class ActivityCatalog
     /// NACE önerileri. Sorgu koda da tanıma da uyabilir: "256" kodu, "yazılım" tanımı arar.
     ///
     /// <para>
+    /// <paramref name="sectors"/> verildiğinde liste o sektörlerin kodlarıyla
+    /// <b>SINIRLANIR</b> — sıralanmaz, filtrelenir. Gerekçe sahadan: sektörü "İnşaat ve
+    /// taahhüt" seçilmiş bir firmaya beton ürünleri imalatı kodu (23.61) atanabildi.
+    /// İki alan da tek tek katalogda geçerliydi ama birbirini tutmuyordu; motor NACE'ye
+    /// baktığı için firma kendi sektöründeki ihalelerde "uyumsuz" göründü. Kullanıcı
+    /// tutmayan kodu göremezse seçemez de.
+    /// </para>
+    ///
+    /// <para>
     /// Sıralama kasıtlıdır: önce koda göre eşleşenler, sonra tanımı sorguyla başlayanlar,
     /// en sonda tanımın içinde geçenler. Kullanıcı kodunu biliyorsa ilk satırda görmelidir.
-    /// <paramref name="sector"/> verilirse o sektörün kodları öne alınır — ama diğerleri
-    /// gizlenmez: bir firmanın kodu seçtiği sektörün dışında kalabilir ve bunu görmelidir.
     /// </para>
     /// </summary>
-    public static IReadOnlyList<NaceOption> SearchNace(string? query, string? sector = null)
+    public static IReadOnlyList<NaceOption> SearchNace(string? query, IEnumerable<string>? sectors = null)
     {
         var raw = (query ?? string.Empty).Trim();
         var folded = TurkceMetin.BasligiKatla(raw);
@@ -501,12 +508,13 @@ public static class ActivityCatalog
             return [];
         }
 
-        var sectorName = sector is null ? null : NormalizeSector(sector);
+        var izinli = AllowedDivisions(sectors);
 
         return
         [
             .. NaceOptions
-                .Select(option => (Option: option, Rank: Rank(option, folded, digits, sectorName)))
+                .Where(option => izinli is null || izinli.Contains(option.Code[..2]))
+                .Select(option => (Option: option, Rank: Rank(option, folded, digits)))
                 .Where(x => x.Rank < int.MaxValue)
                 .OrderBy(x => x.Rank)
                 .ThenBy(x => x.Option.Code, StringComparer.Ordinal)
@@ -515,14 +523,65 @@ public static class ActivityCatalog
         ];
     }
 
-    private static int Rank(NaceOption option, string folded, string digits, string? sectorName)
+    /// <summary>
+    /// Verilen sektörlerin kapsadığı NACE bölümleri. Sektör verilmediyse <c>null</c> —
+    /// yani kısıt yok. Tanınmayan sektör adı sessizce atlanır; doğrulama ayrı yerde yapılır.
+    /// </summary>
+    private static HashSet<string>? AllowedDivisions(IEnumerable<string>? sectors)
     {
-        var sectorBonus = sectorName is not null && option.Sector == sectorName ? 0 : 1;
+        if (sectors is null)
+        {
+            return null;
+        }
+
+        var adlar = sectors
+            .Select(NormalizeSector)
+            .OfType<string>()
+            .ToHashSet(StringComparer.Ordinal);
+
+        if (adlar.Count == 0)
+        {
+            return null;
+        }
+
+        return SectorTable
+            .Where(s => adlar.Contains(s.Name))
+            .SelectMany(s => s.Divisions)
+            .ToHashSet(StringComparer.Ordinal);
+    }
+
+    /// <summary>
+    /// NACE kodu, verilen sektörlerden birine ait mi? Karşılaştırma iki haneli bölüm
+    /// üzerinden yapılır: 23.61 bölüm 23'tür ve bölüm 23 "Yapı malzemeleri ve cam"a aittir.
+    /// </summary>
+    public static bool NaceBelongsToSectors(string? code, IEnumerable<string>? sectors)
+    {
+        var kanonik = NormalizeNace(code);
+        if (kanonik is null)
+        {
+            return false;
+        }
+
+        var izinli = AllowedDivisions(sectors);
+
+        return izinli is null || izinli.Contains(kanonik[..2]);
+    }
+
+    /// <summary>Bir NACE kodunun bağlı olduğu sektörün adı; kod tanınmıyorsa <c>null</c>.</summary>
+    public static string? SectorOfNace(string? code)
+    {
+        var kanonik = NormalizeNace(code);
+
+        return kanonik is null ? null : NaceByDigits[Digits(kanonik)].Sector;
+    }
+
+    private static int Rank(NaceOption option, string folded, string digits)
+    {
         var codeDigits = Digits(option.Code);
 
         if (digits.Length >= 2 && codeDigits.StartsWith(digits, StringComparison.Ordinal))
         {
-            return (sectorBonus * 10) + 1;
+            return 1;
         }
 
         if (folded.Length >= MinimumQueryLength)
@@ -531,12 +590,12 @@ public static class ActivityCatalog
 
             if (title.StartsWith(folded, StringComparison.Ordinal))
             {
-                return (sectorBonus * 10) + 2;
+                return 2;
             }
 
             if (Contains(title, folded))
             {
-                return (sectorBonus * 10) + 3;
+                return 3;
             }
 
             // Kullanıcının kelimesi resmî tanımdakinden farklı olabilir ("nakliye" /
@@ -545,7 +604,7 @@ public static class ActivityCatalog
             if (Synonyms.TryGetValue(folded, out var esAnlamlilar)
                 && esAnlamlilar.Any(term => Contains(title, term)))
             {
-                return (sectorBonus * 10) + 4;
+                return 4;
             }
         }
 

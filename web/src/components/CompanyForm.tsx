@@ -31,12 +31,23 @@ import {
 const sektorAra = async (q: string): Promise<TypeaheadOption[]> =>
   (await api.searchSectors(q)).map((s) => ({ value: s.name, label: s.name }))
 
-const naceAra = async (q: string): Promise<TypeaheadOption[]> =>
-  (await api.searchNace(q)).map((n) => ({
-    value: n.code,
-    label: `${n.code} — ${n.title}`,
-    hint: n.sector,
-  }))
+/**
+ * NACE önerileri **seçilen sektörle sınırlıdır**.
+ *
+ * Sahada görülen hata: sektörü "İnşaat ve taahhüt" seçilmiş firmaya beton ürünleri
+ * imalatı kodu (23.61) atandı. İki alan da tek tek geçerliydi ama farklı faaliyetleri
+ * anlatıyordu; motor NACE'ye baktığı için firma kendi sektöründeki ihalelerde "uyumsuz"
+ * göründü. Kullanıcı tutmayan kodu göremezse seçemez de — filtre asıl güvence budur,
+ * sunucu doğrulaması ikinci hattır.
+ */
+const naceArayici =
+  (sektorler: string[]) =>
+  async (q: string): Promise<TypeaheadOption[]> =>
+    (await api.searchNace(q, sektorler.filter(Boolean))).map((n) => ({
+      value: n.code,
+      label: `${n.code} — ${n.title}`,
+      hint: n.sector,
+    }))
 
 /** "2562" ile "25.62" aynı koddur; serbest metin döneminden kalan kayıtlar da bulunsun. */
 const naceEsleser = (option: TypeaheadOption, value: string) =>
@@ -85,6 +96,16 @@ export default function CompanyForm({
 
   const set = <K extends keyof CompanyFormValues>(key: K, value: CompanyFormValues[K]) =>
     onChange({ ...values, [key]: value })
+
+  // Ana sektör değişince NACE seçimleri düşer: eski kodlar yeni sektöre ait değildir ve
+  // kayıtta reddedilirlerdi. Kullanıcıyı kaydet düğmesinde şaşırtmak yerine alanı
+  // burada boşaltmak dürüst davranış.
+  const setMainSector = (value: string) =>
+    onChange({ ...values, mainSector: value, primaryNaceCode: '', secondaryNaceCodes: [] })
+
+  const sektorSecildi = Boolean(values.mainSector)
+  const anaSektorAramasi = naceArayici([values.mainSector])
+  const tumSektorlerAramasi = naceArayici([values.mainSector, ...(values.subSectors ?? [])])
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
@@ -228,7 +249,7 @@ export default function CompanyForm({
             <Typeahead
               id="mainSector"
               value={values.mainSector}
-              onChange={(value) => set('mainSector', value)}
+              onChange={setMainSector}
               search={sektorAra}
               matches={sektorEsleser}
               placeholder="En az 3 harf yazın, listeden seçin"
@@ -242,10 +263,18 @@ export default function CompanyForm({
               id="primaryNaceCode"
               value={values.primaryNaceCode}
               onChange={(value) => set('primaryNaceCode', value)}
-              search={naceAra}
+              search={anaSektorAramasi}
               matches={naceEsleser}
-              placeholder="Kod ya da tanım yazın (ör. 256 veya yazılım)"
+              disabled={!sektorSecildi}
+              placeholder={
+                sektorSecildi ? 'Kod ya da tanım yazın (ör. 412 veya tesisat)' : 'Önce ana sektörü seçin'
+              }
             />
+            <div className="field-hint">
+              {sektorSecildi
+                ? `Yalnızca "${values.mainSector}" sektörünün kodları listelenir.`
+                : 'Ana sektör seçilince o sektöre ait kodlar listelenir.'}
+            </div>
             <FieldError message={fieldError('primaryNaceCode')} />
           </div>
 
@@ -255,9 +284,14 @@ export default function CompanyForm({
               id="secondaryNaceCodes"
               values={values.secondaryNaceCodes ?? []}
               onChange={(list) => set('secondaryNaceCodes', list)}
-              search={naceAra}
-              placeholder="Ekleyeceğiniz kodu arayın"
+              search={tumSektorlerAramasi}
+              disabled={!sektorSecildi}
+              placeholder={sektorSecildi ? 'Ekleyeceğiniz kodu arayın' : 'Önce ana sektörü seçin'}
             />
+            <div className="field-hint">
+              Ana sektörün ve eklediğiniz alt sektörlerin kodları listelenir. Başka bir
+              alanda da faaliyet gösteriyorsanız önce onu alt sektör olarak ekleyin.
+            </div>
             <FieldError message={fieldError('secondaryNaceCodes')} />
           </div>
 
