@@ -36,6 +36,22 @@ public sealed record CreateCompanyRequest
     public int RAndDEmployeeCount { get; init; }
     public int WomenEmployeeCount { get; init; }
 
+    /// <summary>
+    /// Genç çalışan sayısı. İsteğe bağlıdır; boş bırakılırsa "belirtilmemiş" sayılır.
+    /// Kişi bazlı hiçbir bilgi istenmez — yalnızca toplu sayı.
+    /// </summary>
+    public int YoungEmployeeCount { get; init; }
+
+    /// <summary>
+    /// Firmanın genç çalışanı sayarken kullandığı azami yaş. Sistem bunu VARSAYMAZ:
+    /// teşvik programları 25, 29 ve 30 sınırlarını birlikte kullanır ve hangi sınıra
+    /// göre sayıldığı bilinmeden koşul doğrulanamaz.
+    /// </summary>
+    public int? YoungEmployeeMaxAge { get; init; }
+
+    /// <summary>Engelli çalışan sayısı. Kişi bazlı engel bilgisi istenmez ve saklanmaz.</summary>
+    public int DisabledEmployeeCount { get; init; }
+
     public decimal AnnualRevenue { get; init; }
     public decimal BalanceSize { get; init; }
 

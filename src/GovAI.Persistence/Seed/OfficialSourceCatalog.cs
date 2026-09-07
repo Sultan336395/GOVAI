@@ -120,17 +120,16 @@ public static class OfficialSourceCatalog
         new("Sosyal Güvenlik Kurumu", SourceType.Ministry, SourceCategory.SocialSecurity,
             "Sosyal Güvenlik Kurumu", "TR", "sgk.gov.tr",
             "https://www.sgk.gov.tr", "0 8 * * *",
-            // Canlı sayfada doğrulandı (07.09.2026). SGK duyuruları İKİ katmanlıdır:
-            // /duyuru genel müdürlük sayfalarını, genel müdürlük sayfası da asıl
-            // duyuruları (/duyuru/detay/) listeler. Tarayıcı tek katman iner, bu yüzden
-            // başlangıç doğrudan işveren ve prim duyurularının toplandığı Sigorta
-            // Primleri Genel Müdürlüğü sayfasıdır. Ana sayfadan (eski ayar) hiç duyuru
-            // bağlantısı çıkmıyordu.
+            // Canlı sayfada doğrulandı (07.09.2026). `/duyuru` KALICI arşiv adresidir ve
+            // tekil duyuruları (`/duyuru/detay/…`) doğrudan listeler — 10 bağlantı çıkıyor.
             //
-            // Adres kalıcı bağlantıdır ama slug'ında tarih taşır; kurum sayfayı yeniden
-            // yayımlarsa değişebilir. Bozulursa doğrulama "bağlantı çıkmadı" der ve
-            // kaynak sağlığı düşer — sessizce boş dönmez.
-            StartUrl: "/duyuru/index/SIGORTA-PRIMLERI-GENEL-MUDURLUGU-2026-04-09-02-52-13",
+            // Önceki ayar bir genel müdürlük sayfasının kalıcı bağlantısını kullanıyordu;
+            // o adres slug'ında tarih taşıyordu ve kurum sayfayı yeniden yayımladığında
+            // sessizce kırılırdı. Tarihli adres artık başlangıç olarak SABİTLENMEZ.
+            //
+            // SGK tek akışta ilaç listesi, satış ilanı ve personel sınavı da yayımlar;
+            // işveren mevzuatı ayrımını `collector/konu.py` yapar.
+            StartUrl: "/duyuru",
             ListSelector: "a[href*='/duyuru/detay/']",
             ContentSelector: "main",
             UrlPattern: "/duyuru/detay/", MaxPages: 20, Language: "tr",

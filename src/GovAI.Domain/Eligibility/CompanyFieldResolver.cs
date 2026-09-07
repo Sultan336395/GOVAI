@@ -27,8 +27,9 @@ public static class CompanyFieldResolver
             ["Workforce.EmployeeCount"] = "Toplam çalışan sayısı",
             ["Workforce.WomenEmployeeCount"] = "Kadın çalışan sayısı",
             ["Workforce.WomenEmployeeRate"] = "Kadın çalışan oranı (0..1)",
-            ["Workforce.YoungEmployeeCount"] = "29 yaş altı çalışan sayısı",
+            ["Workforce.YoungEmployeeCount"] = "Genç çalışan sayısı (yaş sınırı firmanın beyanına göre)",
             ["Workforce.YoungEmployeeRate"] = "Genç çalışan oranı (0..1)",
+            ["Workforce.YoungEmployeeMaxAge"] = "Firmanın genç çalışan sayarken kullandığı azami yaş",
             ["Workforce.RAndDEmployeeCount"] = "Ar-Ge personeli sayısı",
             ["Workforce.RAndDEmployeeRate"] = "Ar-Ge personeli oranı (0..1)",
             ["Workforce.DisabledEmployeeCount"] = "Engelli çalışan sayısı",
@@ -63,8 +64,16 @@ public static class CompanyFieldResolver
             var f when Is(f, "Workforce.EmployeeCount") => Headcount(company, company.Workforce.EmployeeCount),
             var f when Is(f, "Workforce.WomenEmployeeCount") => Headcount(company, company.Workforce.WomenEmployeeCount),
             var f when Is(f, "Workforce.WomenEmployeeRate") => Headcount(company, company.Workforce.WomenEmployeeRate),
-            var f when Is(f, "Workforce.YoungEmployeeCount") => Headcount(company, company.Workforce.YoungEmployeeCount),
-            var f when Is(f, "Workforce.YoungEmployeeRate") => Headcount(company, company.Workforce.YoungEmployeeRate),
+            // Genç çalışan sayısı, tanımı bilinmeden ANLAMSIZDIR: teşvik programları
+            // 25, 29 ve 30 yaş sınırlarını birlikte kullanır. Firma hangi sınıra göre
+            // saydığını beyan etmediyse sayı "bilinmiyor"dur — sıfır değil, uygun da
+            // değil. Aksi hâlde 30 yaş altını sayan bir firma, 25 yaş altı arayan
+            // çağrıda sessizce uygun görünürdü.
+            var f when Is(f, "Workforce.YoungEmployeeCount") => Young(company, company.Workforce.YoungEmployeeCount),
+            var f when Is(f, "Workforce.YoungEmployeeRate") => Young(company, company.Workforce.YoungEmployeeRate),
+            var f when Is(f, "Workforce.YoungEmployeeMaxAge") => company.Workforce.YoungEmployeeMaxAge is { } yas
+                ? FieldValue.FromNumber(yas)
+                : FieldValue.Unknown(),
             var f when Is(f, "Workforce.RAndDEmployeeCount") => Headcount(company, company.Workforce.RAndDEmployeeCount),
             var f when Is(f, "Workforce.RAndDEmployeeRate") => Headcount(company, company.Workforce.RAndDEmployeeRate),
             var f when Is(f, "Workforce.DisabledEmployeeCount") => Headcount(company, company.Workforce.DisabledEmployeeCount),
@@ -88,6 +97,15 @@ public static class CompanyFieldResolver
     /// Doldurulmamış bir profil firmayı ELEMEZ; "belirsiz" sonucu üretir ve kullanıcıdan veri ister.
     /// Aksi hâlde sistem, sadece profili eksik olduğu için firmayı uygun fırsatlardan mahrum bırakırdı.
     /// </summary>
+    /// <summary>
+    /// Genç çalışan alanları, yaş tanımı beyan edilmediği sürece <b>bilinmiyor</b>dur.
+    /// Gerekçe <see cref="Companies.Workforce.YoungEmployeeMaxAge"/> üzerinde yazılıdır.
+    /// </summary>
+    private static FieldValue Young(Company company, decimal value) =>
+        company.Workforce.YoungEmployeeMaxAge is null
+            ? FieldValue.Unknown()
+            : Headcount(company, value);
+
     private static FieldValue Money(decimal value) =>
         value == 0m ? FieldValue.Unknown() : FieldValue.FromNumber(value);
 

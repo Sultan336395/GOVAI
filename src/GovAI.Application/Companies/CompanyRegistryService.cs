@@ -580,12 +580,17 @@ public sealed class CompanyRegistryService(
             subSectors.Count > 0 ? JsonSerializer.Serialize(subSectors) : null,
             request.TargetCountries.Count > 0 ? JsonSerializer.Serialize(request.TargetCountries) : null);
 
+        // Genç ve engelli çalışan sayıları Faz 3'te girilebilir oldu. Önceden sabit 0
+        // gidiyordu; bu yüzden "en az 5 genç çalışan" arayan teşvikler hiçbir firmada
+        // sağlanamıyordu. Alanlar isteğe bağlıdır — boş bırakılırsa 0 kalır ve motor
+        // yaş tanımı beyan edilmediği için sonucu "doğrulanamadı" sayar.
         company.UpdateWorkforce(new Workforce(
             request.EmployeeCount,
             request.WomenEmployeeCount,
-            youngEmployeeCount: 0,
+            request.YoungEmployeeCount,
             request.RAndDEmployeeCount,
-            disabledEmployeeCount: 0));
+            request.DisabledEmployeeCount,
+            request.YoungEmployeeMaxAge));
 
         company.UpdateFinancials(new Financials(
             request.AnnualRevenue, request.BalanceSize, equity: 0, exportRevenue: 0, "TRY", null));

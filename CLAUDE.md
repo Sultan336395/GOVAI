@@ -182,11 +182,11 @@ Solution dosyası **`GovAI.slnx`**'tir (yeni XML formatı), `.sln` değil.
 
 ```bash
 dotnet build -c Release          # tüm .NET projeleri
-dotnet test                      # 521 test (58 domain + 239 application + 224 API)
+dotnet test                      # 547 test (73 domain + 239 application + 235 API)
 ```
 
 ```bash
-cd workers && .venv/Scripts/python -m pytest -q      # 332 test
+cd workers && .venv/Scripts/python -m pytest -q      # 362 test
 cd workers && .venv/Scripts/python -m ruff check .   # lint (satır sınırı 100)
 ```
 

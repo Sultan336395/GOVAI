@@ -126,6 +126,8 @@ export interface Workforce {
   employeeCount: number
   womenEmployeeCount: number
   youngEmployeeCount: number
+  /** Firmanın genç çalışanı sayarken kullandığı azami yaş; sistem varsaymaz. */
+  youngEmployeeMaxAge?: number | null
   rAndDEmployeeCount: number
   disabledEmployeeCount: number
 }
@@ -580,6 +582,11 @@ export interface CreateCompanyRequest {
   employeeCount?: number
   rAndDEmployeeCount?: number
   womenEmployeeCount?: number
+  /** İsteğe bağlı; boş bırakılırsa "belirtilmemiş" sayılır. Yalnızca toplu sayı. */
+  youngEmployeeCount?: number
+  /** Firmanın genç çalışanı sayarken kullandığı azami yaş; sistem varsaymaz. */
+  youngEmployeeMaxAge?: number | null
+  disabledEmployeeCount?: number
 
   annualRevenue?: number
   balanceSize?: number

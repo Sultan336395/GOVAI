@@ -75,8 +75,30 @@ class Dayanak:
     madde: str | None
 
 
+#: Adlandırılmış mevzuat kalıbının başına yapışabilen bölüm başlıkları. Kurum sayfası
+#: "Mevzuat" başlığının hemen ardından yönerge adını yazar; kalıp ikisini birlikte
+#: yakalar ve künye "Mevzuat KOBİ Dijital Dönüşüm … Yönergesi" olur.
+_BOLUM_BASLIKLARI = ("mevzuat", "destek unsurlari", "basvuru sartlari", "programin amaci")
+
+
 def _temizle(deger: str) -> str:
-    return " ".join((deger or "").split()).strip(" ,;:-")
+    temiz = " ".join((deger or "").split()).strip(" ,;:-")
+
+    for baslik in _BOLUM_BASLIKLARI:
+        n = len(baslik)
+        if len(temiz) > n and _katla(temiz[:n]) == baslik and temiz[n] == " ":
+            temiz = temiz[n:].strip()
+            break
+
+    return temiz
+
+
+def _katla(deger: str) -> str:
+    """Bölüm başlığı karşılaştırması için Türkçe katlama."""
+    esleme = {"ı": "i", "İ": "i", "I": "i", "ş": "s", "Ş": "s", "ğ": "g", "Ğ": "g",
+              "ü": "u", "Ü": "u", "ö": "o", "Ö": "o", "ç": "c", "Ç": "c"}
+
+    return "".join(esleme.get(ch, ch) for ch in deger).lower()
 
 
 def _madde_bul(cumle: str) -> str | None:

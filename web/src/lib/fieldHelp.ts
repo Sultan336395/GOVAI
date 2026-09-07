@@ -58,6 +58,10 @@ export const fieldHelp = {
   employeeCount: CALISAN,
   womenEmployeeCount: KADIN_CALISAN,
   rAndDEmployeeCount: ARGE_CALISAN,
+  youngEmployeeCount: 'Belirlediğiniz yaş sınırının altındaki sigortalı çalışan sayısı.',
+  youngEmployeeMaxAge:
+    'Genç çalışan sayısını hangi yaşın altı için verdiğiniz; teşvikler 25, 29 ve 30 sınırlarını kullanır.',
+  disabledEmployeeCount: 'Engelli statüsünde çalıştırılan sigortalı personel sayısı.',
   annualRevenue: CIRO,
   balanceSize:
     'Bilançonun aktif toplamı; şirketin sahip olduğu tüm varlıkların toplam değeri.',

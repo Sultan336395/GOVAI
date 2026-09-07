@@ -101,6 +101,11 @@ ORAN_BAGLAMI: tuple[str, ...] = (
 ORAN_DISLAYICI: tuple[str, ...] = (
     "kdv", "faiz", "kadin", "kadın", "genc", "genç", "engelli", "istihdam orani",
     "istihdam oranı", "ar-ge personeli", "stopaj", "vergi orani", "vergi oranı",
+    # Ortaklık ve hisse payı bir BAŞVURU KOŞULUDUR, destek oranı değil. Gerçek
+    # KOSGEB Girişimci Destek Programı metninde "girişimcinin ortaklık payı en az
+    # %50 olmalıdır" cümlesi destek oranı diye okunuyordu.
+    "ortaklik payi", "ortaklık payı", "hisse", "pay orani", "pay oranı",
+    "sermaye payi", "sermaye payı", "katilim payi", "katılım payı",
 )
 
 

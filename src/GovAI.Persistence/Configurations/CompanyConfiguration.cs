@@ -80,6 +80,7 @@ public sealed class CompanyConfiguration : IEntityTypeConfiguration<Company>
             workforce.Property(w => w.YoungEmployeeCount).HasColumnName("young_employee_count");
             workforce.Property(w => w.RAndDEmployeeCount).HasColumnName("rnd_employee_count");
             workforce.Property(w => w.DisabledEmployeeCount).HasColumnName("disabled_employee_count");
+            workforce.Property(w => w.YoungEmployeeMaxAge).HasColumnName("young_employee_max_age");
             workforce.Ignore(w => w.WomenEmployeeRate);
             workforce.Ignore(w => w.YoungEmployeeRate);
             workforce.Ignore(w => w.RAndDEmployeeRate);

@@ -24,6 +24,7 @@ from bs4 import BeautifulSoup
 
 from govai_workers.collector.alaka import alakasiz_mi
 from govai_workers.collector.fetcher import FetchedDocument, PoliteFetcher
+from govai_workers.collector.konu import isveren_mevzuati_mi
 from govai_workers.collector.safety import DomainPolicy
 from govai_workers.config import settings
 from govai_workers.logging_setup import get_logger
@@ -170,7 +171,7 @@ class SourceCrawler:
         if listing is None:
             return result
 
-        links = self._discover_links(listing, policy, config)
+        links = self._discover_links(listing, policy, config, source.get("category"))
         log.info("links_discovered", source=source["name"], count=len(links))
 
         # Kaynağın kendi sınırı ile genel üst sınırın küçüğü uygulanır. Eskiden yalnızca
@@ -221,9 +222,17 @@ class SourceCrawler:
             log.warning("fetch_failed", url=url, error=str(exc))
             return None
 
+    #: Konu süzgecinin uygulandığı kaynak kategorileri. Bu kaynaklar tek bir duyuru
+    #: akışında çok farklı iş yayımlar; işveren mevzuatı ile ilaç listesi aynı listede
+    #: durur ve ayrılmazsa gerçek teşvik duyurusu çöpün arasında kaybolur.
+    ISVEREN_KONULU_KATEGORILER = frozenset({"SocialSecurity", "LabourLaw"})
+
     @staticmethod
     def _discover_links(
-        listing: FetchedDocument, policy: DomainPolicy, config: SourceConfig
+        listing: FetchedDocument,
+        policy: DomainPolicy,
+        config: SourceConfig,
+        category: str | None = None,
     ) -> list[str]:
         if listing.is_pdf:
             return [listing.canonical_url]
@@ -255,7 +264,17 @@ class SourceCrawler:
             # bağlantı verir; bunlar desene takılmadan geçer, indirilir ve çöp kayıt
             # üretir. Kararsız kalınan bağlantı GEÇİRİLİR — elenen bir çağrı hiç
             # görülmez, geçen bir çöp görülür ve silinir.
-            if alakasiz_mi(absolute, anchor.get_text(" ", strip=True)):
+            baglanti_metni = anchor.get_text(" ", strip=True)
+
+            if alakasiz_mi(absolute, baglanti_metni):
+                continue
+
+            # Konu ayrımı: sosyal güvenlik kaynağı tek akışta ilaç listesi, satış ilanı
+            # ve personel sınavı da yayımlar. İşveren mevzuatı olmayan duyuru
+            # indirilmez; "belirsiz" de indirilmez ve TAHMİN EDİLMEZ.
+            if category in SourceCrawler.ISVEREN_KONULU_KATEGORILER and not isveren_mevzuati_mi(
+                baglanti_metni
+            ):
                 continue
 
             if absolute in seen:

@@ -25,7 +25,8 @@ public sealed record Workforce
         int womenEmployeeCount,
         int youngEmployeeCount,
         int rAndDEmployeeCount,
-        int disabledEmployeeCount)
+        int disabledEmployeeCount,
+        int? youngEmployeeMaxAge = null)
     {
         DomainException.ThrowIf(employeeCount < 0, "Çalışan sayısı negatif olamaz.");
         DomainException.ThrowIf(
@@ -36,7 +37,12 @@ public sealed record Workforce
         DomainException.ThrowIf(rAndDEmployeeCount > employeeCount, "Ar-Ge personeli sayısı toplam çalışan sayısını aşamaz.");
         DomainException.ThrowIf(disabledEmployeeCount > employeeCount, "Engelli çalışan sayısı toplam çalışan sayısını aşamaz.");
 
+        DomainException.ThrowIf(
+            youngEmployeeMaxAge is not null and (< 15 or > 65),
+            "Genç çalışan yaş sınırı 15 ile 65 arasında olmalıdır.");
+
         EmployeeCount = employeeCount;
+        YoungEmployeeMaxAge = youngEmployeeMaxAge;
         WomenEmployeeCount = womenEmployeeCount;
         YoungEmployeeCount = youngEmployeeCount;
         RAndDEmployeeCount = rAndDEmployeeCount;
@@ -53,6 +59,33 @@ public sealed record Workforce
     public int RAndDEmployeeCount { get; init; }
 
     public int DisabledEmployeeCount { get; init; }
+
+    /// <summary>
+    /// Firmanın <see cref="YoungEmployeeCount"/> sayarken kullandığı azami yaş.
+    ///
+    /// <para>
+    /// Sistem "genç çalışan"ın ne demek olduğunu <b>varsaymaz</b>. Teşvik programları
+    /// farklı sınırlar kullanır (29 altı, 25 altı, 30 altı) ve firmanın hangi sınıra
+    /// göre saydığı bilinmeden "en az 5 genç çalışan" koşulu doğrulanamaz. Boşsa tanım
+    /// bilinmiyordur ve karşılaştırma <b>doğrulanamaz</b> sayılır — "uygun" değil.
+    /// </para>
+    /// </summary>
+    public int? YoungEmployeeMaxAge { get; init; }
+
+    /// <summary>
+    /// Firmanın genç tanımı, çağrının aradığı yaş sınırını karşılıyor mu?
+    ///
+    /// <para>
+    /// Firma 29 yaş altını sayıyorsa 25 yaş altı arayan bir çağrı için bu sayı
+    /// KULLANILAMAZ: 29 altındaki grup 25 altındakini kapsar ama eşit değildir, sayı
+    /// olduğundan büyüktür. Ters yön güvenlidir — 25 altını sayan firma, 29 altı
+    /// arayan çağrının koşulunu zaten sağlar.
+    /// </para>
+    ///
+    /// <para>Tanım bilinmiyorsa <c>null</c> döner: "hayır" değil, "bilinmiyor".</para>
+    /// </summary>
+    public bool? YoungDefinitionSatisfies(int requiredMaxAge) =>
+        YoungEmployeeMaxAge is null ? null : YoungEmployeeMaxAge <= requiredMaxAge;
 
     /// <summary><c>womenEmployeeRate</c> — 0..1 aralığında oran.</summary>
     public decimal WomenEmployeeRate => Ratio(WomenEmployeeCount);

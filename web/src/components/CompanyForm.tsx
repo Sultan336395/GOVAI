@@ -386,6 +386,62 @@ export default function CompanyForm({
           </div>
 
           <div className="field">
+            <FieldLabel htmlFor="youngEmployeeCount" field="youngEmployeeCount">Genç çalışan</FieldLabel>
+            <input
+              id="youngEmployeeCount"
+              type="number"
+              min={0}
+              step={1}
+              inputMode="numeric"
+              value={values.youngEmployeeCount ?? 0}
+              onChange={(e) => set('youngEmployeeCount', Number(e.target.value))}
+            />
+            <div className="field-hint">İsteğe bağlı. Boş bırakırsanız belirtilmemiş sayılır.</div>
+            <FieldError message={fieldError('youngEmployeeCount')} />
+          </div>
+
+          <div className="field">
+            <FieldLabel htmlFor="youngEmployeeMaxAge" field="youngEmployeeMaxAge">
+              Genç çalışan yaş sınırı
+            </FieldLabel>
+            <input
+              id="youngEmployeeMaxAge"
+              type="number"
+              min={15}
+              max={65}
+              step={1}
+              inputMode="numeric"
+              placeholder="ör. 29"
+              value={values.youngEmployeeMaxAge ?? ''}
+              onChange={(e) =>
+                set('youngEmployeeMaxAge', e.target.value === '' ? null : Number(e.target.value))
+              }
+            />
+            <div className="field-hint">
+              Kaç yaşın altını saydığınız. Belirtilmezse teşviklerin genç şartı
+              &quot;doğrulanamadı&quot; kalır.
+            </div>
+            <FieldError message={fieldError('youngEmployeeMaxAge')} />
+          </div>
+
+          <div className="field">
+            <FieldLabel htmlFor="disabledEmployeeCount" field="disabledEmployeeCount">
+              Engelli çalışan
+            </FieldLabel>
+            <input
+              id="disabledEmployeeCount"
+              type="number"
+              min={0}
+              step={1}
+              inputMode="numeric"
+              value={values.disabledEmployeeCount ?? 0}
+              onChange={(e) => set('disabledEmployeeCount', Number(e.target.value))}
+            />
+            <div className="field-hint">İsteğe bağlı. Yalnızca toplam sayı; kişi bilgisi istenmez.</div>
+            <FieldError message={fieldError('disabledEmployeeCount')} />
+          </div>
+
+          <div className="field">
             <FieldLabel htmlFor="rAndDEmployeeCount" field="rAndDEmployeeCount">Ar-Ge çalışanı</FieldLabel>
             <input
               id="rAndDEmployeeCount"

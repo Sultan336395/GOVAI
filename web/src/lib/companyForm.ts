@@ -21,6 +21,9 @@ export function emptyCompanyForm(): CompanyFormValues {
     employeeCount: 0,
     rAndDEmployeeCount: 0,
     womenEmployeeCount: 0,
+    youngEmployeeCount: 0,
+    youngEmployeeMaxAge: null,
+    disabledEmployeeCount: 0,
     annualRevenue: 0,
     balanceSize: 0,
     isInTechnopark: false,
@@ -68,6 +71,36 @@ export function validateCompanyForm(values: CompanyFormValues): Record<string, s
   }
 
   if ((values.employeeCount ?? 0) < 0) errors.employeeCount = 'Çalışan sayısı negatif olamaz.'
+
+  // Genç ve engelli sayıları isteğe bağlıdır ama girildiyse tutarlı olmalıdır.
+  // Sunucu da aynı kuralı uygular; buradaki denetim kullanıcıyı beklemeden uyarır.
+  const toplam = values.employeeCount ?? 0
+
+  for (const [alan, etiket] of [
+    ['youngEmployeeCount', 'Genç çalışan sayısı'],
+    ['disabledEmployeeCount', 'Engelli çalışan sayısı'],
+  ] as const) {
+    const deger = values[alan] ?? 0
+
+    if (deger < 0) {
+      errors[alan] = `${etiket} negatif olamaz.`
+    } else if (!Number.isInteger(deger)) {
+      errors[alan] = `${etiket} tam sayı olmalıdır.`
+    } else if (toplam > 0 && deger > toplam) {
+      errors[alan] = `${etiket} toplam çalışan sayısını (${toplam}) aşamaz.`
+    }
+  }
+
+  const yas = values.youngEmployeeMaxAge
+
+  if (yas !== null && yas !== undefined && (yas < 15 || yas > 65)) {
+    errors.youngEmployeeMaxAge = 'Yaş sınırı 15 ile 65 arasında olmalıdır.'
+  }
+
+  if ((values.youngEmployeeCount ?? 0) > 0 && (yas === null || yas === undefined)) {
+    errors.youngEmployeeMaxAge =
+      'Genç çalışan sayısı girdiyseniz hangi yaş sınırına göre saydığınızı da belirtin.'
+  }
   if ((values.annualRevenue ?? 0) < 0) errors.annualRevenue = 'Ciro negatif olamaz.'
 
   return errors
