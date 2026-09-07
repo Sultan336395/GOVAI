@@ -182,6 +182,8 @@ public sealed class SourceConfiguration : IEntityTypeConfiguration<Source>
             plan.Property(x => x.ContentSelector).HasColumnName("content_selector").HasMaxLength(500);
             plan.Property(x => x.UrlPattern).HasColumnName("url_pattern").HasMaxLength(500);
             plan.Property(x => x.MaxPages).HasColumnName("max_pages");
+            plan.Property(x => x.ListPageParameter).HasColumnName("list_page_parameter").HasMaxLength(40);
+            plan.Property(x => x.ListPageCount).HasColumnName("list_page_count");
             plan.Property(x => x.AllowedDomains).HasColumnName("allowed_domains").HasMaxLength(1000);
             plan.Property(x => x.DocumentTypes).HasColumnName("document_types").HasMaxLength(500);
         });

@@ -65,7 +65,9 @@ DISLAYICI_ISARETLER: tuple[str, ...] = (
     # Kurum içi işler
     "giris sinavi", "personel alimi", "sozlesmeli bilisim personeli",
     "atama", "gorevde yukselme", "unvan degisikligi",
-    "planli altyapi calismasi", "sistem bakimi", "kesinti",
+    "planli altyapi calismasi", "sistem bakimi", "sistem altyapi",
+    "altyapi calismasi", "altyapi iyilestirme", "kesinti",
+    "kpss", "yerlestirme sonuc", "danisma gunleri", "sosyal guvenlik haftasi",
     # "Basın duyurusu" bir BİÇİMDİR, konu değil: prim borcu erteleme duyuruları da
     # bu başlıkla çıkar. Dışlayıcı listeye alınırsa gerçek işveren duyurusu elenir.
     "ziyaret", "toplanti", "protokol imza",

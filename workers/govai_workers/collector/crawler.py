@@ -33,6 +33,14 @@ from govai_workers.parser.extractors import extract_text
 log = get_logger(__name__)
 
 
+def _tam_sayi(deger: object, varsayilan: int) -> int:
+    """Sözleşmeden gelen sayıyı okur; okunamazsa varsayılanı korur."""
+    try:
+        return int(deger) if deger not in (None, "") else varsayilan
+    except (TypeError, ValueError):
+        return varsayilan
+
+
 @dataclass(slots=True)
 class SourceConfig:
     """Kaynağın tarama planı.
@@ -51,6 +59,14 @@ class SourceConfig:
     content_selector: str = ""
     url_pattern: str = ""
     max_pages: int = 1
+
+    #: Liste sayfasının sayfalama parametresi ("page"). Boşsa sayfalama yapılmaz.
+    list_page_parameter: str = ""
+
+    #: Kaç liste sayfası gezilecek. SGK'da işveren duyuruları seyrek: altı sayfalık
+    #: gerçek örnekte 60 duyurudan yalnızca biri işveren konuluydu. Tek sayfaya
+    #: bakmak, kaynağın çalıştığını doğrulamaya yetmez.
+    list_page_count: int = 1
     allowed_domains: str = ""
 
     #: Yayın takvimi olan kaynaklarda arşiv adresi şablonu.
@@ -87,6 +103,8 @@ class SourceConfig:
             url_pattern=pick("urlPattern", legacy.url_pattern),
             max_pages=max(1, resolved_max),
             allowed_domains=pick("allowedDomains", legacy.allowed_domains),
+            list_page_parameter=pick("listPageParameter", legacy.list_page_parameter),
+            list_page_count=max(1, _tam_sayi(source.get("listPageCount"), legacy.list_page_count)),
         )
 
     @classmethod
@@ -114,6 +132,8 @@ class SourceConfig:
             max_pages=max(1, max_pages),
             allowed_domains=data.get("allowedDomains", ""),
             archive_url_template=data.get("archiveUrlTemplate", ""),
+            list_page_parameter=data.get("listPageParameter", ""),
+            list_page_count=max(1, _tam_sayi(data.get("listPageCount"), 1)),
         )
 
 
@@ -167,12 +187,42 @@ class SourceCrawler:
             or (urljoin(base_url, config.list_url) if config.list_url else base_url)
         )
 
-        listing = self._safe_fetch(list_url, result)
-        if listing is None:
-            return result
+        # Sayfalama: kaynak birden çok liste sayfası veriyorsa hepsi gezilir. Tek
+        # sayfaya bakmak kaynağın çalıştığını doğrulamaya yetmiyor — SGK'da altı
+        # sayfalık gerçek örnekte 60 duyurudan yalnızca biri işveren konuluydu ve o
+        # da beşinci sayfadaydı.
+        links: list[str] = []
+        gorulen: set[str] = set()
 
-        links = self._discover_links(listing, policy, config, source.get("category"))
-        log.info("links_discovered", source=source["name"], count=len(links))
+        for sayfa in range(1, max(1, config.list_page_count) + 1):
+            sayfa_adresi = self._sayfa_adresi(list_url, config, sayfa)
+            listing = self._safe_fetch(sayfa_adresi, result)
+
+            if listing is None:
+                # İlk sayfaya erişilemiyorsa kaynak gerçekten sorunlu; sonraki
+                # sayfaların boş dönmesi arıza sayılmaz.
+                if sayfa == 1:
+                    return result
+                break
+
+            sayfa_baglantilari = self._discover_links(
+                listing, policy, config, source.get("category")
+            )
+            yeni_baglantilar = [b for b in sayfa_baglantilari if b not in gorulen]
+
+            if not yeni_baglantilar and sayfa > 1:
+                # Sayfalama desteklenmiyor ya da bitti; aynı içerik tekrar geliyor.
+                break
+
+            gorulen.update(yeni_baglantilar)
+            links.extend(yeni_baglantilar)
+
+        log.info(
+            "links_discovered",
+            source=source["name"],
+            count=len(links),
+            pages=config.list_page_count,
+        )
 
         # Kaynağın kendi sınırı ile genel üst sınırın küçüğü uygulanır. Eskiden yalnızca
         # genel ayar okunuyordu ve kaynağın maxPages değeri hiçbir şey ifade etmiyordu.
@@ -284,6 +334,17 @@ class SourceCrawler:
             links.append(absolute)
 
         return links
+
+    @staticmethod
+    def _sayfa_adresi(list_url: str, config: SourceConfig, sayfa: int) -> str:
+        """Sayfalanmış liste adresi. İlk sayfa parametresiz istenir — kurum siteleri
+        ``?page=1`` ile ``/duyuru`` için farklı önbellek anahtarı kullanabilir."""
+        if sayfa <= 1 or not config.list_page_parameter:
+            return list_url
+
+        ayrac = "&" if "?" in list_url else "?"
+
+        return f"{list_url}{ayrac}{config.list_page_parameter}={sayfa}"
 
     @staticmethod
     def _extract(document: FetchedDocument, config: SourceConfig) -> tuple[str, str]:

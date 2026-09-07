@@ -62,7 +62,18 @@ public static class OfficialSourceCatalog
         /// yeniler. Artırılmadıkça seed hiçbir kaynağın gövdesine dokunmaz — bu, seed'in
         /// her açılışta güvenle çalışabilmesinin şartıdır.
         /// </summary>
-        int ArchiveUrlTemplateVersion = 1);
+        int ArchiveUrlTemplateVersion = 1,
+
+        /// <summary>
+        /// Liste sayfasının sayfalama parametresi ("page"). Boşsa sayfalama yapılmaz.
+        /// </summary>
+        string? ListPageParameter = null,
+
+        /// <summary>
+        /// Kaç liste sayfası gezilecek. Aranan içerik seyrekse tek sayfa yetmez;
+        /// SGK'da işveren duyuruları altı sayfada bir çıkıyor.
+        /// </summary>
+        int ListPageCount = 1);
 
     /// <summary>Türkiye ve AB pilot kaynakları.</summary>
     public static IReadOnlyList<Definition> All { get; } =
@@ -132,6 +143,10 @@ public static class OfficialSourceCatalog
             StartUrl: "/duyuru",
             ListSelector: "a[href*='/duyuru/detay/']",
             ContentSelector: "main",
+            // Sayfalama şart: arşivin altı sayfası gerçekten gezildi (07.09.2026) ve
+            // 60 duyurudan YALNIZCA BİRİ işveren konuluydu — o da beşinci sayfadaydı.
+            // Tek sayfaya bakan bir kurulum kaynağı "çalışmıyor" sanırdı.
+            ListPageParameter: "page", ListPageCount: 6,
             UrlPattern: "/duyuru/detay/", MaxPages: 20, Language: "tr",
             DocumentTypes: "text/html,application/pdf",
             Note: "SGK işveren ve prim duyuruları."),
@@ -267,7 +282,9 @@ public static class OfficialSourceCatalog
             definition.UrlPattern,
             definition.MaxPages,
             AllowedDomains: definition.AllowedDomains ?? definition.OfficialDomain,
-            DocumentTypes: definition.DocumentTypes));
+            DocumentTypes: definition.DocumentTypes,
+            ListPageParameter: definition.ListPageParameter,
+            ListPageCount: definition.ListPageCount));
         // Arşiv şablonu plan kolonlarında yok; toplayıcının okuduğu serbest gövdede taşınır.
         if (definition.ArchiveUrlTemplate is { Length: > 0 } arsiv)
         {

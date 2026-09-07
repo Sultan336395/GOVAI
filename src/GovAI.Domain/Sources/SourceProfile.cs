@@ -43,7 +43,16 @@ public sealed record SourceCrawlPlan(
     /// <summary>Virgülle ayrılmış ek alan adları; resmî alan adının yanında izin verilenler.</summary>
     string? AllowedDomains,
     /// <summary>Virgülle ayrılmış kabul edilen medya türleri (ör. <c>text/html,application/pdf</c>).</summary>
-    string? DocumentTypes)
+    string? DocumentTypes,
+    /// <summary>
+    /// Liste sayfasının sayfalama parametresi (ör. <c>page</c>). Boşsa sayfalama yapılmaz.
+    /// </summary>
+    string? ListPageParameter = null,
+    /// <summary>
+    /// Kaç liste sayfası gezilecek. Aranan içerik seyrekse tek sayfa yetmez: SGK
+    /// arşivinin altı sayfasında 60 duyurudan yalnızca biri işveren konuluydu.
+    /// </summary>
+    int ListPageCount = 1)
 {
     public static SourceCrawlPlan Empty => new(null, null, null, null, 1, null, null);
 
