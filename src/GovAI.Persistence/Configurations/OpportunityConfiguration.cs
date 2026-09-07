@@ -19,6 +19,7 @@ public sealed class OpportunityConfiguration : IEntityTypeConfiguration<Opportun
         builder.Property(o => o.Title).HasMaxLength(600).IsRequired();
         builder.Property(o => o.Publisher).HasMaxLength(300).IsRequired();
         builder.Property(o => o.Summary).HasMaxLength(4000);
+        builder.Property(o => o.LegalBasis).HasMaxLength(400);
         builder.Property(o => o.SourceUrl).HasMaxLength(1000);
         builder.Property(o => o.SourceType).HasConversion<int>();
         builder.Property(o => o.SupportCategory).HasConversion<int>();

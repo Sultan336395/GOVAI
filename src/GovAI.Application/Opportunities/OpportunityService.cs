@@ -102,6 +102,7 @@ public sealed class OpportunityService(
         // katalogdaki bozuk başlık yerinde kalmamalı.
         opportunity.RefreshTitle(request.Title);
         opportunity.RefreshPublisher(request.Publisher);
+        opportunity.RefreshLegalBasis(request.LegalBasis);
         opportunity.Describe(request.Summary, request.SourceUrl, request.SourceDocumentId);
         opportunity.SetSchedule(request.PublishedAt, request.Deadline);
         opportunity.SetBudget(request.Budget is null
@@ -267,6 +268,7 @@ public sealed class OpportunityService(
         opportunity.Budget is null
             ? null
             : new BudgetDto(opportunity.Budget.MinAmount, opportunity.Budget.MaxAmount, opportunity.Budget.Currency, opportunity.Budget.SupportRate),
+        opportunity.LegalBasis,
         opportunity.RuleExtractionConfidence,
         opportunity.IsReviewedByConsultant,
         opportunity.Rules.Select(r => new OpportunityRuleDto(

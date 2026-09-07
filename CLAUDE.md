@@ -186,7 +186,7 @@ dotnet test                      # 489 test (58 domain + 207 application + 224 A
 ```
 
 ```bash
-cd workers && .venv/Scripts/python -m pytest -q      # 222 test
+cd workers && .venv/Scripts/python -m pytest -q      # 307 test
 cd workers && .venv/Scripts/python -m ruff check .   # lint (satır sınırı 100)
 ```
 

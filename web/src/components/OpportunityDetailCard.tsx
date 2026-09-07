@@ -68,6 +68,11 @@ export function OpportunityDetailCard({ data }: { data: OpportunityDetail }) {
             durum={durum.budget}
           />
           <Alan
+            ad="Mevzuat dayanağı"
+            deger={data.legalBasis}
+            durum={data.legalBasis ? 'Provided' : 'NotProvided'}
+          />
+          <Alan
             ad="Coğrafi kapsam"
             deger={KuralDegeri(data.rules, 'Region')}
             durum={durum.geography}

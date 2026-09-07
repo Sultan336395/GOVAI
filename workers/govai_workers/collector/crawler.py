@@ -22,6 +22,7 @@ from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 
+from govai_workers.collector.alaka import alakasiz_mi
 from govai_workers.collector.fetcher import FetchedDocument, PoliteFetcher
 from govai_workers.collector.safety import DomainPolicy
 from govai_workers.config import settings
@@ -247,6 +248,14 @@ class SourceCrawler:
                 continue
 
             if pattern is not None and not pattern.search(absolute):
+                continue
+
+            # Konuya alaka: yukarıdaki üç süzgeç de ADRESE bakar. Kurum siteleri çağrı
+            # listesiyle aynı bölümde "Çerez Politikası", "KVKK" ve "İletişim"e de
+            # bağlantı verir; bunlar desene takılmadan geçer, indirilir ve çöp kayıt
+            # üretir. Kararsız kalınan bağlantı GEÇİRİLİR — elenen bir çağrı hiç
+            # görülmez, geçen bir çöp görülür ve silinir.
+            if alakasiz_mi(absolute, anchor.get_text(" ", strip=True)):
                 continue
 
             if absolute in seen:

@@ -312,6 +312,8 @@ export interface OpportunityDetail {
   deadline: string | null
   daysUntilDeadline: number | null
   budget: Budget | null
+  /** Çağrının mevzuat dayanağı, metinde geçtiği biçimiyle. */
+  legalBasis: string | null
   ruleExtractionConfidence: number
   isReviewedByConsultant: boolean
   rules: OpportunityRule[]

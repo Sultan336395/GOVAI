@@ -13,11 +13,14 @@ from typing import Any
 
 from govai_workers.api_client import GovAiClient
 from govai_workers.collector import eurlex
+from govai_workers.collector.alaka import alakasiz_baslik_mi
 from govai_workers.collector.fetcher import PoliteFetcher
 from govai_workers.logging_setup import configure_logging, get_logger
 from govai_workers.messaging import RoutingKeys, consume
 from govai_workers.parser.bolum_basligi import toplu_bolum_basligi
+from govai_workers.parser.butce import butce_yuku
 from govai_workers.parser.chunker import build_chunks
+from govai_workers.parser.dayanak import dayanak_metni
 from govai_workers.parser.extractors import extract_document
 from govai_workers.parser.ihale import IhaleAlanlari, ihale_alanlari
 from govai_workers.parser.rule_extractor import extract_rules, rules_to_payload
@@ -284,6 +287,18 @@ def process_document(client: GovAiClient, document: dict[str, Any]) -> None:
     if ihale.baslik:
         title = ihale.baslik
 
+    # Konuya alaka: bağlantı süzgecinden geçmiş ama içeriği kurumsal sayfa çıkmış
+    # belge burada elenir. Kayıt açılmaz; belge kaynağında durur, uydurma fırsat
+    # üretilmez.
+    if alakasiz_baslik_mi(title):
+        log.info("parse_skipped_irrelevant", document_id=document_id, title=title[:120])
+        client.record_parse_result(
+            document_id,
+            status="Skipped",
+            error="Başlık kurumsal sayfa başlığı; çağrı kaydı açılmadı.",
+        )
+        return
+
     extraction = extract_rules(title, text)
 
     if not extraction.rules:
@@ -304,6 +319,11 @@ def process_document(client: GovAiClient, document: dict[str, Any]) -> None:
             or "Bilinmiyor"
         ),
         "publishedAt": document.get("collectedAt"),
+        # Bütçe ve mevzuat dayanağı metinden okunur; okunamazsa None gider ve
+        # sunucu mevcut değeri korur. Boş bir bütçe nesnesi GÖNDERİLMEZ: kaydı
+        # "bütçesi girilmiş ama sıfır" hâline getirir ve veri kalitesini yanıltır.
+        "budget": butce_yuku(text),
+        "legalBasis": dayanak_metni(text),
         "summary": extraction.summary or text[:1500],
         "sourceUrl": url,
         "deadline": extraction.deadline or ihale.ihale_tarihi,

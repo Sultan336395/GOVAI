@@ -60,6 +60,24 @@ public class Opportunity : AggregateRoot, IAuditable, ISoftDeletable
 
     public BudgetRange? Budget { get; private set; }
 
+    /// <summary>
+    /// Çağrının mevzuat dayanağı — metinde geçtiği biçimiyle (Faz 3).
+    /// Örnek: "5746 sayılı Kanun md. 3; Ar-Ge Merkezleri Yönetmeliği".
+    ///
+    /// <para>
+    /// Bir destek çağrısı boşlukta durmaz; bir kanuna, yönetmeliğe ya da karara
+    /// dayanır. Danışman başvurunun hukuki zeminini bu alan olmadan kaynağa kadar
+    /// takip edemez.
+    /// </para>
+    ///
+    /// <para>
+    /// Metindeki yazım KORUNUR, resmî tam ada genişletilmez: genişletme bir eşleme
+    /// tablosu gerektirir ve tablo eskidiğinde alan sessizce yanlış adı gösterir.
+    /// Bulunamazsa <c>null</c> kalır; dayanak asla uydurulmaz.
+    /// </para>
+    /// </summary>
+    public string? LegalBasis { get; private set; }
+
     /// <summary>Çağrı metninden çıkarılan koşulların ne kadarının otomatik doğrulanabildiği (0..1).</summary>
     public decimal RuleExtractionConfidence { get; private set; }
 
@@ -110,6 +128,20 @@ public class Opportunity : AggregateRoot, IAuditable, ISoftDeletable
     /// Boş değer mevcut kurumu SİLMEZ: bir sonraki yakalanışta alan çıkarılamadıysa
     /// bilinen doğru değer kaybedilmemelidir.
     /// </summary>
+    /// <summary>
+    /// Mevzuat dayanağını günceller. Boş değer mevcut dayanağı SİLMEZ: yeniden
+    /// ayrıştırmada kalıp tutmazsa daha önce bulunmuş doğru bilgi kaybolmamalıdır.
+    /// </summary>
+    public void RefreshLegalBasis(string? legalBasis)
+    {
+        var aday = legalBasis?.Trim();
+
+        if (!string.IsNullOrWhiteSpace(aday))
+        {
+            LegalBasis = aday;
+        }
+    }
+
     public void RefreshPublisher(string? publisher)
     {
         var aday = publisher?.Trim();

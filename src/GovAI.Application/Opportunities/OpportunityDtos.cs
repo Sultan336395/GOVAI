@@ -30,6 +30,10 @@ public sealed record OpportunityDetailDto(
     DateTimeOffset? Deadline,
     int? DaysUntilDeadline,
     BudgetDto? Budget,
+
+    /// <summary>Çağrının mevzuat dayanağı, metinde geçtiği biçimiyle (Faz 3).</summary>
+    string? LegalBasis,
+
     decimal RuleExtractionConfidence,
     bool IsReviewedByConsultant,
     IReadOnlyList<OpportunityRuleDto> Rules,
@@ -106,6 +110,13 @@ public sealed record UpsertOpportunityRequest
     public DateTimeOffset? Deadline { get; init; }
 
     public BudgetDto? Budget { get; init; }
+
+    /// <summary>
+    /// Çağrının mevzuat dayanağı, metinde geçtiği biçimiyle (Faz 3).
+    /// Boş gönderilirse mevcut dayanak korunur; yeniden ayrıştırmada kalıp tutmazsa
+    /// daha önce bulunmuş bilgi kaybolmamalıdır.
+    /// </summary>
+    public string? LegalBasis { get; init; }
 
     public decimal RuleExtractionConfidence { get; init; } = 1m;
 
