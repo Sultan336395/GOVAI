@@ -42,7 +42,22 @@ public static class SectionHeading
         "İLANLAR",
         "DUYURULAR",
         "RESMÎ İLÂNLAR",
+        "DESTEKLER",
+        "DESTEKLER LİSTESİ",
+        "DESTEK PROGRAMLARI",
+        "YÜRÜRLÜKTEN KALDIRILAN DESTEKLER",
+        "MEVZUAT",
+        "GENELGELER",
+        "TEBLİĞLER",
     ];
+
+    /// <summary>
+    /// Kurum siteleri başlığa kurum adını ekler: "Destekler Listesi - KOSGEB T.C. Küçük
+    /// ve Orta Ölçekli İşletmeleri Geliştirme ve Destekleme İdaresi Başkanlığı". Ayraçtan
+    /// önceki ilk parça sayfanın kendi başlığıdır; kurum adı her sayfada aynıdır ve
+    /// ayırt edici değildir.
+    /// </summary>
+    private static readonly char[] TitleSeparators = ['-', '|', '–', '—', '·'];
 
     private static readonly HashSet<string> Folded =
         Collective.Select(TurkceMetin.BasligiKatla).ToHashSet(StringComparer.Ordinal);
@@ -57,7 +72,18 @@ public static class SectionHeading
             return false;
         }
 
-        return Folded.Contains(TurkceMetin.BasligiKatla(title));
+        if (Folded.Contains(TurkceMetin.BasligiKatla(title)))
+        {
+            return true;
+        }
+
+        // Kurum adı eklenmiş başlık: ilk parçaya bakılır. KOSGEB'in liste sayfası
+        // "Destekler Listesi - KOSGEB …" başlığıyla geliyordu ve tam eşleşmeye
+        // takılmadan fırsat kaydına dönüşüyordu.
+        var first = title.Split(TitleSeparators, 2)[0];
+
+        return !string.IsNullOrWhiteSpace(first)
+               && Folded.Contains(TurkceMetin.BasligiKatla(first));
     }
 
     /// <summary>Reddedilen kayıt için operatöre gösterilecek gerekçe.</summary>

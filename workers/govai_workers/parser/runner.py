@@ -13,7 +13,7 @@ from typing import Any
 
 from govai_workers.api_client import GovAiClient
 from govai_workers.collector import eurlex
-from govai_workers.collector.alaka import alakasiz_baslik_mi
+from govai_workers.collector.alaka import alakasiz_baslik_mi, katla
 from govai_workers.collector.fetcher import PoliteFetcher
 from govai_workers.logging_setup import configure_logging, get_logger
 from govai_workers.messaging import RoutingKeys, consume
@@ -52,10 +52,36 @@ _CATEGORY_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
 
 #: Sayfa başlığı olarak işe yaramayan kalıplar. Resmî Gazete günlük nüshalarında
 #: <title> yalnızca tarihtir ("26 Ağustos 2026 ÇARŞAMBA"), belgenin adı değildir.
-_TARIH_BASLIGI = re.compile(
-    r"^\d{1,2}\s+\w+\s+\d{4}(\s+\w+)?$|^\d{1,2}[./]\d{1,2}[./]\d{4}",
+#: Başlığın başındaki tarih. Sökülüp geriye ne kaldığına bakılır.
+_ONDEKI_TARIH = re.compile(
+    r"^\s*(?:\d{1,2}[./]\d{1,2}[./]\d{2,4}|\d{1,2}\s+\w+\s+\d{4})\s*",
     re.UNICODE,
 )
+
+#: Tarihten sonra kalan ama tek başına ad sayılmayan bağlaç/sıfatlar.
+_TARIH_EKLERI = frozenset({
+    "tarihli", "tarihinde", "tarihli ve", "carsamba", "persembe", "cuma",
+    "cumartesi", "pazar", "pazartesi", "sali", "gunlu",
+})
+
+
+def tarih_basligi_mi(aday: str) -> bool:
+    """Başlık gerçekte yalnızca bir tarih mi?
+
+    Tarihle BAŞLAYAN başlık geçerlidir ve elenmemelidir: resmî duyuruların tarihle
+    başlaması olağandır ("29/08/2026 SUT Değişiklik Tebliği …"). İlk sürüm tarihle
+    başlayan her başlığı eliyordu; sonucu sahada görüldü — SGK'nın iki duyurusunun
+    doğru adı reddedildi, metne düşüldü ve gövdedeki "ÇALIŞAN VE İŞVEREN" menü
+    başlığı duyuru adı olarak kaydedildi.
+
+    Karar, tarih sökülünce geriye anlamlı bir ad kalıp kalmadığına göre verilir.
+    """
+    kalan = _ONDEKI_TARIH.sub("", aday or "", count=1).strip(" -–—,:")
+
+    if not kalan:
+        return True
+
+    return katla(kalan) in _TARIH_EKLERI or len(kalan) <= 12
 
 
 def belge_basligi(sayfa_basligi: str | None, metin: str) -> str | None:
@@ -68,7 +94,9 @@ def belge_basligi(sayfa_basligi: str | None, metin: str) -> str | None:
     """
     aday = (sayfa_basligi or "").strip()
 
-    if aday and len(aday) > 12 and not _TARIH_BASLIGI.match(aday):
+    # Menü/kategori başlığı sayfa başlığı olarak da gelebilir; uzun ve tarihsiz olması
+    # onu belgenin adı yapmaz.
+    if aday and len(aday) > 12 and not tarih_basligi_mi(aday) and not gezinme_basligi_mi(aday):
         return aday
 
     # Belge türü satırı (TEBLİĞ, YÖNETMELİK…) tek başına ad değildir; asıl ad
@@ -85,7 +113,7 @@ def belge_basligi(sayfa_basligi: str | None, metin: str) -> str | None:
 
         if not (12 < len(satir) <= 200):
             continue
-        if _TARIH_BASLIGI.match(satir):
+        if tarih_basligi_mi(satir):
             continue
         if satir.endswith((".", ":", ";")):
             continue
@@ -98,9 +126,43 @@ def belge_basligi(sayfa_basligi: str | None, metin: str) -> str | None:
         if sum(1 for k in harfler if k.isupper()) / len(harfler) < 0.8:
             continue
 
+        # Menü, kategori ve bölüm başlıkları da büyük harflidir ve bu denetimden
+        # geçerler. Kurum sayfasının gövdesinde "ÇALIŞAN VE İŞVEREN", "KURUMSAL",
+        # "MENÜ" gibi satırlar bulunur; bunlar belgenin adı DEĞİLDİR.
+        if gezinme_basligi_mi(satir):
+            continue
+
         return f"{tur_satiri} — {satir}" if tur_satiri else satir
 
-    return tur_satiri or (aday or None)
+    if tur_satiri:
+        return tur_satiri
+
+    # Son çare sayfa başlığıdır — ama yalnızca güvenilirse. Tarihten ibaret ya da
+    # menü başlığı olan bir değer başlık sayılmaz; None dönerse kayıt zorunlu alan
+    # eksikliğinden karantinaya girer ve insan inceler. Uydurma yapılmaz.
+    if aday and not tarih_basligi_mi(aday) and not gezinme_basligi_mi(aday):
+        return aday
+
+    return None
+
+
+#: Kurum sitelerinin gövdesinde geçen menü, kategori ve bölüm başlıkları. Büyük harfli
+#: oldukları için "resmî başlık" denetiminden geçerler ama belgenin adı değildirler.
+#: Karşılaştırma Türkçe katlamayla ve TAM eşleşmeyle yapılır: gerçek bir duyurunun
+#: adında bu kelimeler geçebilir ("Çalışan ve işveren primlerine ilişkin duyuru"),
+#: yalnızca satırın KENDİSİ menü başlığıysa elenir.
+_GEZINME_BASLIKLARI = frozenset({
+    "calisan ve isveren", "kurumsal", "menu", "ana menu", "hizli erisim",
+    "duyurular", "haberler", "mevzuat", "istatistikler", "e hizmetler",
+    "sikca sorulan sorular", "iletisim", "hakkimizda", "site haritasi",
+    "genel bilgi", "kategoriler", "baglantilar", "arama", "giris",
+    "sosyal guvenlik kurumu", "emekli", "isveren", "sigortali", "genel saglik sigortasi",
+})
+
+
+def gezinme_basligi_mi(satir: str) -> bool:
+    """Satır bir menü/kategori başlığı mı? Belgenin adı olamaz."""
+    return katla(satir) in _GEZINME_BASLIKLARI
 
 
 #: Tek başına başlık sayılmayan, belgenin türünü bildiren satırlar.
