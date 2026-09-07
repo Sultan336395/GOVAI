@@ -20,6 +20,27 @@ public sealed class OpportunityConfiguration : IEntityTypeConfiguration<Opportun
         builder.Property(o => o.Publisher).HasMaxLength(300).IsRequired();
         builder.Property(o => o.Summary).HasMaxLength(4000);
         builder.Property(o => o.LegalBasis).HasMaxLength(400);
+
+        // Türlü bütçe kalemleri (Faz 3). Eski budget_* kolonları geriye dönük uyum
+        // için yerinde durur; bu tablolar yeni analizin kullandığı ayrıştırılmış
+        // veridir ve hibe ile krediyi ayırır.
+        builder.HasMany(o => o.BudgetItems)
+            .WithOne()
+            .HasForeignKey(b => b.OpportunityId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasMany(o => o.BudgetRates)
+            .WithOne()
+            .HasForeignKey(r => r.OpportunityId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Ignore(o => o.GrantCeiling);
+        builder.Ignore(o => o.CreditCeiling);
+        builder.Ignore(o => o.SupportRate);
+        builder.Ignore(o => o.HasUndeterminedBudget);
+
+        CompanyConfiguration.UseBackingFields(builder, "BudgetItems");
+        CompanyConfiguration.UseBackingFields(builder, "BudgetRates");
         builder.Property(o => o.SourceUrl).HasMaxLength(1000);
         builder.Property(o => o.SourceType).HasConversion<int>();
         builder.Property(o => o.SupportCategory).HasConversion<int>();
@@ -217,5 +238,38 @@ public sealed class SourceDocumentConfiguration : IEntityTypeConfiguration<Sourc
         builder.HasIndex(d => new { d.SourceId, d.Url }).IsUnique();
         builder.HasIndex(d => d.ContentHash);
         builder.HasIndex(d => d.Status);
+    }
+}
+
+public sealed class BudgetItemConfiguration : IEntityTypeConfiguration<BudgetItem>
+{
+    public void Configure(EntityTypeBuilder<BudgetItem> builder)
+    {
+        builder.ToTable("opportunity_budget_items");
+        builder.HasKey(b => b.Id);
+        builder.Ignore(b => b.NeedsReview);
+
+        builder.Property(b => b.Type).HasConversion<int>();
+        builder.Property(b => b.Amount).HasPrecision(18, 2);
+        builder.Property(b => b.Currency).HasMaxLength(3).IsRequired();
+        builder.Property(b => b.Excerpt).HasMaxLength(600);
+
+        builder.HasIndex(b => new { b.OpportunityId, b.Type });
+    }
+}
+
+public sealed class BudgetRateConfiguration : IEntityTypeConfiguration<BudgetRate>
+{
+    public void Configure(EntityTypeBuilder<BudgetRate> builder)
+    {
+        builder.ToTable("opportunity_budget_rates");
+        builder.HasKey(r => r.Id);
+        builder.Ignore(r => r.NeedsReview);
+
+        builder.Property(r => r.Type).HasConversion<int>();
+        builder.Property(r => r.Rate).HasPrecision(5, 4);
+        builder.Property(r => r.Excerpt).HasMaxLength(600);
+
+        builder.HasIndex(r => new { r.OpportunityId, r.Type });
     }
 }

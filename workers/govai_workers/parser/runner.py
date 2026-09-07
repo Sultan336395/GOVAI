@@ -18,7 +18,7 @@ from govai_workers.collector.fetcher import PoliteFetcher
 from govai_workers.logging_setup import configure_logging, get_logger
 from govai_workers.messaging import RoutingKeys, consume
 from govai_workers.parser.bolum_basligi import toplu_bolum_basligi
-from govai_workers.parser.butce import butce_yuku
+from govai_workers.parser.butce_turu import butce_yuku as turlu_butce
 from govai_workers.parser.chunker import build_chunks
 from govai_workers.parser.dayanak import dayanak_metni
 from govai_workers.parser.extractors import extract_document
@@ -384,7 +384,11 @@ def process_document(client: GovAiClient, document: dict[str, Any]) -> None:
         # Bütçe ve mevzuat dayanağı metinden okunur; okunamazsa None gider ve
         # sunucu mevcut değeri korur. Boş bir bütçe nesnesi GÖNDERİLMEZ: kaydı
         # "bütçesi girilmiş ama sıfır" hâline getirir ve veri kalitesini yanıltır.
-        "budget": butce_yuku(text),
+        # Bütçe TÜRÜYLE birlikte gider: hibe ile kredi aynı belgede geçer ve
+        # karışırsa kullanıcıya 20 milyonluk kredi, hibe gibi gösterilir.
+        "budget": _butce.get("legacy") if (_butce := turlu_butce(text)) else None,
+        "budgetItems": _butce.get("items", []) if _butce else [],
+        "budgetRates": _butce.get("rates", []) if _butce else [],
         "legalBasis": dayanak_metni(text),
         "summary": extraction.summary or text[:1500],
         "sourceUrl": url,

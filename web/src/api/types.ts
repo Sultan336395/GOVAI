@@ -302,6 +302,29 @@ export interface OpportunityProvenance {
 }
 
 /** Fırsat detay ekranının verisi. C# karşılığı: OpportunityDetailDto. */
+/** Türü belirlenmiş tek bir tutar. Etiket olmadan "1.500.000 TL" hibe mi kredi mi belli değildir. */
+export interface BudgetItem {
+  type: string
+  label: string
+  amount: number
+  currency: string
+  excerpt: string | null
+  startOffset: number
+  endOffset: number
+  /** Türü belirlenemedi; hibe gibi gösterilemez. */
+  needsReview: boolean
+}
+
+export interface BudgetRate {
+  type: string
+  label: string
+  rate: number
+  excerpt: string | null
+  startOffset: number
+  endOffset: number
+  needsReview: boolean
+}
+
 export interface OpportunityDetail {
   id: string
   title: string
@@ -314,6 +337,9 @@ export interface OpportunityDetail {
   deadline: string | null
   daysUntilDeadline: number | null
   budget: Budget | null
+  /** Türü belirlenmiş tutarlar; hibe ile krediyi ayırt eden tek kaynak. */
+  budgetItems: BudgetItem[]
+  budgetRates: BudgetRate[]
   /** Çağrının mevzuat dayanağı, metinde geçtiği biçimiyle. */
   legalBasis: string | null
   ruleExtractionConfidence: number

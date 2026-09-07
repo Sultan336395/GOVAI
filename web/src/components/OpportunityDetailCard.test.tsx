@@ -61,6 +61,8 @@ const FIRSAT: OpportunityDetail = {
   deadline: '2026-09-15T07:00:00Z',
   daysUntilDeadline: 19,
   budget: { minAmount: null, maxAmount: 4250000, currency: 'TRY', supportRate: null },
+  budgetItems: [],
+  budgetRates: [],
   legalBasis: null,
   ruleExtractionConfidence: 0.8,
   isReviewedByConsultant: false,

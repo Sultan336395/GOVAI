@@ -31,6 +31,14 @@ public sealed record OpportunityDetailDto(
     int? DaysUntilDeadline,
     BudgetDto? Budget,
 
+    /// <summary>
+    /// Türü belirlenmiş tutarlar (Faz 3). Ekran bunları kullanır; hibe ile krediyi
+    /// ayırt eden tek kaynak budur.
+    /// </summary>
+    IReadOnlyList<BudgetItemDto> BudgetItems,
+
+    IReadOnlyList<BudgetRateDto> BudgetRates,
+
     /// <summary>Çağrının mevzuat dayanağı, metinde geçtiği biçimiyle (Faz 3).</summary>
     string? LegalBasis,
 
@@ -57,6 +65,50 @@ public sealed record OpportunityDetailDto(
     OpportunityProvenanceDto? Provenance = null);
 
 public sealed record BudgetDto(decimal? MinAmount, decimal? MaxAmount, string Currency, decimal? SupportRate);
+
+/// <summary>
+/// Türü belirlenmiş tek bir tutar (Faz 3). <c>Label</c> ekranda tutarın yanında
+/// yazar: "1.500.000 TL" tek başına hibe mi kredi mi olduğunu söylemez.
+/// </summary>
+public sealed record BudgetItemDto(
+    BudgetItemType Type,
+    string Label,
+    decimal Amount,
+    string Currency,
+    string? Excerpt,
+    int StartOffset,
+    int EndOffset,
+    bool NeedsReview);
+
+public sealed record BudgetRateDto(
+    BudgetRateType Type,
+    string Label,
+    decimal Rate,
+    string? Excerpt,
+    int StartOffset,
+    int EndOffset,
+    bool NeedsReview);
+
+/// <summary>Türlü bütçe kalemlerinin Türkçe etiketleri.</summary>
+public static class BudgetLabels
+{
+    public static string Of(BudgetItemType type) => type switch
+    {
+        BudgetItemType.TotalProgrammeBudget => "Toplam program bütçesi",
+        BudgetItemType.GrantCeiling => "Hibe üst limiti",
+        BudgetItemType.CreditCeiling => "Kredi üst limiti",
+        BudgetItemType.RepayableSupport => "Geri ödemeli destek",
+        BudgetItemType.EligibleExpenditure => "Uygun harcama tutarı",
+        _ => "Türü belirlenemedi"
+    };
+
+    public static string Of(BudgetRateType type) => type switch
+    {
+        BudgetRateType.SupportRate => "Destek oranı",
+        BudgetRateType.OwnContributionRate => "Öz kaynak / ortaklık payı",
+        _ => "Türü belirlenemedi"
+    };
+}
 
 public sealed record OpportunityRuleDto(
     Guid Id,
@@ -118,6 +170,14 @@ public sealed record UpsertOpportunityRequest
     /// </summary>
     public string? LegalBasis { get; init; }
 
+    /// <summary>
+    /// Türü belirlenmiş tutarlar. Boş gelirse mevcut kalemler korunur; yeniden
+    /// ayrıştırmada kalıp tutmazsa daha önce çıkarılmış doğru bilgi kaybolmamalıdır.
+    /// </summary>
+    public IReadOnlyList<UpsertBudgetItemDto> BudgetItems { get; init; } = [];
+
+    public IReadOnlyList<UpsertBudgetRateDto> BudgetRates { get; init; } = [];
+
     public decimal RuleExtractionConfidence { get; init; } = 1m;
 
     public IReadOnlyList<UpsertRuleDto> Rules { get; init; } = [];
@@ -165,3 +225,18 @@ public sealed record OverrideRuleRequest(
     string Value,
     RuleSeverity Severity,
     string HumanReadable);
+
+public sealed record UpsertBudgetItemDto(
+    BudgetItemType Type,
+    decimal Amount,
+    string Currency,
+    string? Excerpt,
+    int StartOffset,
+    int EndOffset);
+
+public sealed record UpsertBudgetRateDto(
+    BudgetRateType Type,
+    decimal Rate,
+    string? Excerpt,
+    int StartOffset,
+    int EndOffset);

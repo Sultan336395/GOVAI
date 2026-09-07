@@ -67,6 +67,24 @@ export function OpportunityDetailCard({ data }: { data: OpportunityDetail }) {
             deger={data.budget?.supportRate != null ? formatPercent(data.budget.supportRate) : null}
             durum={durum.budget}
           />
+          {data.budgetItems.map((kalem) => (
+            <Alan
+              key={`${kalem.type}-${kalem.startOffset}`}
+              ad={kalem.needsReview ? `${kalem.label} (incelenmeli)` : kalem.label}
+              deger={`${formatCurrency(kalem.amount)} ${kalem.currency}`}
+              durum="Provided"
+            />
+          ))}
+          {data.budgetRates
+            .filter((oran) => !oran.needsReview)
+            .map((oran) => (
+              <Alan
+                key={`${oran.type}-${oran.startOffset}`}
+                ad={oran.label}
+                deger={formatPercent(oran.rate)}
+                durum="Provided"
+              />
+            ))}
           <Alan
             ad="Mevzuat dayanağı"
             deger={data.legalBasis}

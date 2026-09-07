@@ -10,6 +10,8 @@ namespace GovAI.Domain.Opportunities;
 public class Opportunity : AggregateRoot, IAuditable, ISoftDeletable
 {
     private readonly List<OpportunityRule> _rules = [];
+    private readonly List<BudgetItem> _budgetItems = [];
+    private readonly List<BudgetRate> _budgetRates = [];
     private readonly List<DocumentRequirement> _documentChecklist = [];
 
     private Opportunity()
@@ -85,6 +87,31 @@ public class Opportunity : AggregateRoot, IAuditable, ISoftDeletable
     public bool IsReviewedByConsultant { get; private set; }
 
     public IReadOnlyCollection<OpportunityRule> Rules => _rules.AsReadOnly();
+
+    /// <summary>
+    /// Belgeden çıkarılmış, <b>türü belirlenmiş</b> tutarlar (Faz 3). Eski tek alanlı
+    /// <see cref="Budget"/> geriye dönük uyum için durur; yeni analizler bu listeyi
+    /// kullanır çünkü hibe ile krediyi ayırt eder.
+    /// </summary>
+    public IReadOnlyCollection<BudgetItem> BudgetItems => _budgetItems.AsReadOnly();
+
+    public IReadOnlyCollection<BudgetRate> BudgetRates => _budgetRates.AsReadOnly();
+
+    /// <summary>Hibe üst limiti; belgede yoksa <c>null</c> (NotProvided).</summary>
+    public BudgetItem? GrantCeiling =>
+        _budgetItems.FirstOrDefault(b => b.Type == BudgetItemType.GrantCeiling);
+
+    /// <summary>Kredi üst limiti; hibe ile <b>karıştırılmaz</b>.</summary>
+    public BudgetItem? CreditCeiling =>
+        _budgetItems.FirstOrDefault(b => b.Type == BudgetItemType.CreditCeiling);
+
+    /// <summary>Destek oranı; öz kaynak payı bu alana YAZILMAZ.</summary>
+    public BudgetRate? SupportRate =>
+        _budgetRates.FirstOrDefault(r => r.Type == BudgetRateType.SupportRate);
+
+    /// <summary>Türü belirlenememiş kalem var mı? Varsa ekran "incelenmeli" der.</summary>
+    public bool HasUndeterminedBudget =>
+        _budgetItems.Any(b => b.NeedsReview) || _budgetRates.Any(r => r.NeedsReview);
 
     public IReadOnlyCollection<DocumentRequirement> DocumentChecklist => _documentChecklist.AsReadOnly();
 
@@ -167,6 +194,29 @@ public class Opportunity : AggregateRoot, IAuditable, ISoftDeletable
     }
 
     public void SetBudget(BudgetRange? budget) => Budget = budget;
+
+    /// <summary>
+    /// Türlü bütçe kalemlerini değiştirir. Boş liste gelirse mevcut kalemler
+    /// SİLİNMEZ: yeniden ayrıştırmada kalıp tutmazsa daha önce çıkarılmış doğru
+    /// bilgi kaybolmamalıdır.
+    /// </summary>
+    public void ReplaceBudgetItems(IEnumerable<BudgetItem> items, IEnumerable<BudgetRate> rates)
+    {
+        var yeniKalemler = items.ToList();
+        var yeniOranlar = rates.ToList();
+
+        if (yeniKalemler.Count > 0)
+        {
+            _budgetItems.Clear();
+            _budgetItems.AddRange(yeniKalemler);
+        }
+
+        if (yeniOranlar.Count > 0)
+        {
+            _budgetRates.Clear();
+            _budgetRates.AddRange(yeniOranlar);
+        }
+    }
 
     // ── Faz 2: veri kalitesi ──────────────────────────────────────────────
 

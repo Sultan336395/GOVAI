@@ -103,6 +103,12 @@ public sealed class OpportunityService(
         opportunity.RefreshTitle(request.Title);
         opportunity.RefreshPublisher(request.Publisher);
         opportunity.RefreshLegalBasis(request.LegalBasis);
+
+        opportunity.ReplaceBudgetItems(
+            request.BudgetItems.Select(b => new BudgetItem(
+                b.Type, b.Amount, b.Currency, b.Excerpt, b.StartOffset, b.EndOffset)),
+            request.BudgetRates.Select(r => new BudgetRate(
+                r.Type, r.Rate, r.Excerpt, r.StartOffset, r.EndOffset)));
         opportunity.Describe(request.Summary, request.SourceUrl, request.SourceDocumentId);
         opportunity.SetSchedule(request.PublishedAt, request.Deadline);
         opportunity.SetBudget(request.Budget is null
@@ -268,6 +274,12 @@ public sealed class OpportunityService(
         opportunity.Budget is null
             ? null
             : new BudgetDto(opportunity.Budget.MinAmount, opportunity.Budget.MaxAmount, opportunity.Budget.Currency, opportunity.Budget.SupportRate),
+        opportunity.BudgetItems.Select(b => new BudgetItemDto(
+            b.Type, BudgetLabels.Of(b.Type), b.Amount, b.Currency, b.Excerpt,
+            b.StartOffset, b.EndOffset, b.NeedsReview)).ToList(),
+        opportunity.BudgetRates.Select(r => new BudgetRateDto(
+            r.Type, BudgetLabels.Of(r.Type), r.Rate, r.Excerpt,
+            r.StartOffset, r.EndOffset, r.NeedsReview)).ToList(),
         opportunity.LegalBasis,
         opportunity.RuleExtractionConfidence,
         opportunity.IsReviewedByConsultant,

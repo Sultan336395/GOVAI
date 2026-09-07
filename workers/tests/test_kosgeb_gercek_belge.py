@@ -15,7 +15,8 @@ Bu testler iki gerçek hatayı sabitler — ikisi de gerçek metinle karşılaş
 
 from __future__ import annotations
 
-from govai_workers.parser.butce import butce_yuku, oran_bul
+from govai_workers.parser.butce import oran_bul
+from govai_workers.parser.butce_turu import ButceTuru, butce_kalemleri, ilk
 from govai_workers.parser.dayanak import dayanak_metni
 
 #: KOBİ Dijital Dönüşüm Destek Programı — gerçek metinden alıntı.
@@ -45,12 +46,14 @@ GIRISIMCI = (
 
 
 class TestKobiDijital:
-    def test_butce_ust_limiti_okunur(self) -> None:
-        yuk = butce_yuku(KOBI_DIJITAL)
+    def test_hibe_ust_limiti_krediden_ayrilir(self) -> None:
+        kalemler = butce_kalemleri(KOBI_DIJITAL)
 
-        assert yuk is not None
-        assert yuk["maxAmount"] is not None
-        assert yuk["currency"] == "TRY"
+        hibe = ilk(kalemler, ButceTuru.HIBE_UST_LIMITI)
+        kredi = ilk(kalemler, ButceTuru.KREDI_UST_LIMITI)
+
+        assert hibe is not None and hibe.tutar == 1_500_000.0
+        assert kredi is not None and kredi.tutar == 20_000_000.0
 
     def test_dayanak_bolum_basligi_olmadan_okunur(self) -> None:
         # "Mevzuat" bir bölüm başlığıdır, mevzuatın adı değil.
@@ -68,10 +71,9 @@ class TestGirisimci:
         assert oran_bul(GIRISIMCI) == 0.6
 
     def test_ust_limit_okunur(self) -> None:
-        yuk = butce_yuku(GIRISIMCI)
+        kalemler = butce_kalemleri(GIRISIMCI)
 
-        assert yuk is not None
-        assert yuk["maxAmount"] == 1_000_000.0
+        assert any(k.tutar == 1_000_000.0 for k in kalemler)
 
     def test_dayanak_okunur(self) -> None:
         dayanak = dayanak_metni(GIRISIMCI)
@@ -88,15 +90,17 @@ class TestUydurmama:
             "KOSGEB Veri Tabanında kayıtlı olmaktır."
         )
 
-        assert butce_yuku(metin) is None
+        assert butce_kalemleri(metin) == []
         assert dayanak_metni(metin) is None
 
     def test_alt_limit_uydurulmaz(self) -> None:
+        from govai_workers.parser.butce_turu import butce_yuku
+
         yuk = butce_yuku(KOBI_DIJITAL)
 
         assert yuk is not None
-        assert yuk["minAmount"] is None
+        assert yuk["legacy"]["minAmount"] is None
 
     def test_ayni_girdi_ayni_sonuc(self) -> None:
-        assert butce_yuku(GIRISIMCI) == butce_yuku(GIRISIMCI)
+        assert butce_kalemleri(GIRISIMCI) == butce_kalemleri(GIRISIMCI)
         assert dayanak_metni(GIRISIMCI) == dayanak_metni(GIRISIMCI)
