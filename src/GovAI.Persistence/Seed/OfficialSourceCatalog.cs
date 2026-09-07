@@ -102,6 +102,12 @@ public static class OfficialSourceCatalog
             Note: "Artırma, eksiltme ve ihale ilânları. Mevzuat kaynağından AYRIDIR: "
                 + "ilan bir yükümlülük değil, başvurulabilecek bir çağrıdır."),
 
+        // GİB sitesi Next.js ile yeniden yazıldı: sunucudan gelen HTML'de HİÇ bağlantı
+        // yok, gezinme tarayıcıda JavaScript ile üretiliyor. Toplayıcı statik HTML okur,
+        // dolayısıyla sayfayı boş görür. Bu bir seçici hatası DEĞİLDİR; seçici
+        // değiştirerek çözülmez. Kaynak, başsız tarayıcı desteği ya da resmî bir
+        // makine erişimi (RSS/JSON) eklenene kadar kapalı kalır. GİB tebliğleri
+        // Resmî Gazete'de de yayımlanır ve o kaynak zaten çalışmaktadır.
         new("Gelir İdaresi Başkanlığı", SourceType.Ministry, SourceCategory.Tax,
             "Gelir İdaresi Başkanlığı", "TR", "gib.gov.tr",
             "https://www.gib.gov.tr", "0 8 * * *",
@@ -114,11 +120,22 @@ public static class OfficialSourceCatalog
         new("Sosyal Güvenlik Kurumu", SourceType.Ministry, SourceCategory.SocialSecurity,
             "Sosyal Güvenlik Kurumu", "TR", "sgk.gov.tr",
             "https://www.sgk.gov.tr", "0 8 * * *",
-            StartUrl: "/", ListSelector: "a[href*='genelge'], a[href*='duyuru']",
-            ContentSelector: "#content, .icerik",
-            UrlPattern: "genelge|duyuru|teblig", MaxPages: 5, Language: "tr",
+            // Canlı sayfada doğrulandı (07.09.2026). SGK duyuruları İKİ katmanlıdır:
+            // /duyuru genel müdürlük sayfalarını, genel müdürlük sayfası da asıl
+            // duyuruları (/duyuru/detay/) listeler. Tarayıcı tek katman iner, bu yüzden
+            // başlangıç doğrudan işveren ve prim duyurularının toplandığı Sigorta
+            // Primleri Genel Müdürlüğü sayfasıdır. Ana sayfadan (eski ayar) hiç duyuru
+            // bağlantısı çıkmıyordu.
+            //
+            // Adres kalıcı bağlantıdır ama slug'ında tarih taşır; kurum sayfayı yeniden
+            // yayımlarsa değişebilir. Bozulursa doğrulama "bağlantı çıkmadı" der ve
+            // kaynak sağlığı düşer — sessizce boş dönmez.
+            StartUrl: "/duyuru/index/SIGORTA-PRIMLERI-GENEL-MUDURLUGU-2026-04-09-02-52-13",
+            ListSelector: "a[href*='/duyuru/detay/']",
+            ContentSelector: "main",
+            UrlPattern: "/duyuru/detay/", MaxPages: 20, Language: "tr",
             DocumentTypes: "text/html,application/pdf",
-            Note: "SGK genelge ve duyuruları."),
+            Note: "SGK işveren ve prim duyuruları."),
 
         new("Çalışma ve Sosyal Güvenlik Bakanlığı", SourceType.Ministry, SourceCategory.LabourLaw,
             "Çalışma ve Sosyal Güvenlik Bakanlığı", "TR", "csgb.gov.tr",
@@ -134,9 +151,13 @@ public static class OfficialSourceCatalog
             "KOSGEB", "TR", "kosgeb.gov.tr",
             "https://www.kosgeb.gov.tr", "0 9 * * *",
             StartUrl: "/site/tr/genel/destekler/3/destekler",
-            ListSelector: "a[href*='/destekler/']",
-            ContentSelector: "#content, .destek-detay",
-            UrlPattern: "/destek", MaxPages: 10, Language: "tr",
+            // Canlı sayfada doğrulandı (07.09.2026): destek programlarının tamamı
+            // /destekdetay/ altında. Önceki desen (/destek) liste sayfasının kendisini
+            // ve "Yürürlükten Kaldırılan Destekler" sayfasını da yakalıyordu; ikisi de
+            // çağrı değildir ve çöp kayıt üretiyordu.
+            ListSelector: "a[href*='/destekdetay/']",
+            ContentSelector: "article",
+            UrlPattern: "/destekdetay/", MaxPages: 25, Language: "tr",
             DocumentTypes: "text/html,application/pdf",
             Note: "KOBİ destek programları."),
 
