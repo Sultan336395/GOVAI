@@ -191,3 +191,33 @@ internal sealed class FakeScenarioRepository : IScenarioSimulationRepository
         return Task.CompletedTask;
     }
 }
+
+/// <summary>
+/// Bellek içi bakım çalıştırması deposu. Silme yeteneği <b>yoktur</b>: geri alınmış
+/// bir çalıştırma da denetim izinin parçasıdır.
+/// </summary>
+internal sealed class FakeMaintenanceRunRepository : IMaintenanceRunRepository
+{
+    private readonly List<GovAI.Domain.Maintenance.MaintenanceRun> _runs = [];
+
+    public IReadOnlyList<GovAI.Domain.Maintenance.MaintenanceRun> Runs => _runs;
+
+    public Task<GovAI.Domain.Maintenance.MaintenanceRun?> GetAsync(
+        Guid runId,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(_runs.FirstOrDefault(r => r.Id == runId));
+
+    public Task<IReadOnlyList<GovAI.Domain.Maintenance.MaintenanceRun>> ListRecentAsync(
+        int take,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<GovAI.Domain.Maintenance.MaintenanceRun>>(
+            [.. _runs.OrderByDescending(r => r.StartedAt).Take(take)]);
+
+    public Task AddAsync(
+        GovAI.Domain.Maintenance.MaintenanceRun run,
+        CancellationToken cancellationToken = default)
+    {
+        _runs.Add(run);
+        return Task.CompletedTask;
+    }
+}

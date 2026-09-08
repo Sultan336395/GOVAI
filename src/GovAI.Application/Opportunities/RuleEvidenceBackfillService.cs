@@ -1,7 +1,10 @@
 using GovAI.Application.Abstractions.Persistence;
 using GovAI.Application.Abstractions.Services;
 using GovAI.Application.Sources;
+using GovAI.Domain.Maintenance;
 using GovAI.Domain.Sources;
+using GovAI.Application.Common;
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
 
 namespace GovAI.Application.Opportunities;
@@ -30,9 +33,11 @@ namespace GovAI.Application.Opportunities;
 /// </summary>
 public sealed class RuleEvidenceBackfillService(
     IRuleEvidenceBackfillRepository repository,
+    IMaintenanceRunRepository runs,
     IUnitOfWork unitOfWork,
     IDateTimeProvider clock,
     IEventPublisher events,
+    ICurrentUser currentUser,
     ILogger<RuleEvidenceBackfillService> logger)
 {
     /// <summary>Kuru çalıştırma. <b>Hiçbir kayıt değişmez.</b></summary>
@@ -41,11 +46,42 @@ public sealed class RuleEvidenceBackfillService(
         CancellationToken cancellationToken = default) =>
         RunAsync(request, apply: false, cancellationToken);
 
-    /// <summary>Planı uygular. Yalnızca kanıtı bulunan kurallara bağlantı ekler.</summary>
-    public Task<RuleEvidenceBackfillReport> ApplyAsync(
+    /// <summary>
+    /// Planı uygular. Yalnızca kanıtı bulunan kurallara bağlantı ekler.
+    ///
+    /// <para>
+    /// <paramref name="confirmedPlanHash"/> ZORUNLUDUR ve o an hesaplanan turun parmak
+    /// iziyle tutmalıdır: kullanıcının görmediği bir plan uygulanamaz, gösterildikten
+    /// sonra veri değiştiyse de uygulanmaz.
+    /// </para>
+    /// </summary>
+    public async Task<RuleEvidenceBackfillReport> ApplyAsync(
         RuleEvidenceBackfillRequest request,
-        CancellationToken cancellationToken = default) =>
-        RunAsync(request, apply: true, cancellationToken);
+        string confirmedPlanHash,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(confirmedPlanHash))
+        {
+            throw new ValidationException(
+                nameof(confirmedPlanHash),
+                "Onaylanan planın özeti gönderilmedi. Önce planı görüntüleyip onaylayın.");
+        }
+
+        // Plan ÖNCE kuru çalıştırılır ve özeti karşılaştırılır. Uygulama turunun
+        // kendi özetine bakmak yetmezdi: yazma başladıktan sonra reddetmek, kısmen
+        // uygulanmış bir plan bırakırdı.
+        var kuru = await RunAsync(request, apply: false, cancellationToken);
+
+        if (!string.Equals(confirmedPlanHash, kuru.PlanHash, StringComparison.Ordinal))
+        {
+            throw new ValidationException(
+                nameof(confirmedPlanHash),
+                "Plan, siz görüntüledikten sonra değişti. Hiçbir kayda dokunulmadı; "
+                + "planı yeniden görüntüleyip onaylayın.");
+        }
+
+        return await RunAsync(request, apply: true, cancellationToken);
+    }
 
     private async Task<RuleEvidenceBackfillReport> RunAsync(
         RuleEvidenceBackfillRequest request,
@@ -88,8 +124,29 @@ public sealed class RuleEvidenceBackfillService(
             }
         }
 
+        var planHash = PlanFingerprint.Compute(sonuclar.SelectMany(Satirlar));
+        Guid? runId = null;
+
         if (apply)
         {
+            var kurulanlar = sonuclar
+                .SelectMany(s => s.CreatedLinks ?? [])
+                .ToList();
+
+            if (kurulanlar.Count > 0)
+            {
+                var run = new MaintenanceRun(
+                    MaintenanceOperation.RuleEvidenceBackfill,
+                    planHash,
+                    JsonSerializer.Serialize(kurulanlar),
+                    kurulanlar.Count,
+                    currentUser.Email,
+                    clock.UtcNow);
+
+                await runs.AddAsync(run, cancellationToken);
+                runId = run.Id;
+            }
+
             await unitOfWork.SaveChangesAsync(cancellationToken);
 
             // Yeniden ayrıştırma mesajı YAZMA İŞLEMİNDEN SONRA yayımlanır: mesaj
@@ -124,7 +181,62 @@ public sealed class RuleEvidenceBackfillService(
             EvidenceLinksCreated: sonuclar.Sum(s => s.RulesBound),
             NextCursor: sonImlec,
             HasMore: devamVar,
-            Items: sonuclar);
+            Items: sonuclar,
+            PlanHash: planHash,
+            RunId: runId);
+    }
+
+    /// <summary>
+    /// Bir kaydın parmak izi satırları. Sonuç türü ve <b>kurulacak her bağlantı</b>
+    /// girer; yalnızca sayıya bakmak, farklı parçalara bağlanan iki planın aynı özeti
+    /// üretmesine yol açardı.
+    /// </summary>
+    private static IEnumerable<string> Satirlar(RuleEvidenceBackfillItem item)
+    {
+        yield return $"{item.OpportunityId}|{item.Outcome}|{item.RulesBound}";
+
+        foreach (var link in item.CreatedLinks ?? [])
+        {
+            yield return $"{item.OpportunityId}|bag|{link.RuleId}|{link.EvidenceChunkId}|{link.Role}";
+        }
+    }
+
+    /// <summary>
+    /// Bir kanıt bağlama çalıştırmasını geri alır: <b>yalnızca o turda kurulan</b>
+    /// bağlantıları siler.
+    ///
+    /// <para>
+    /// Kural, belge, sürüm ve kanıt parçaları yerinde kalır — silinen tek şey, işlemin
+    /// kendi kurduğu ilişki satırlarıdır. Daha önce var olan bağlantılara dokunulmaz;
+    /// bu yüzden liste tam üçlü (kural, parça, rol) olarak saklanır.
+    /// </para>
+    /// </summary>
+    public async Task<int> UndoAsync(Guid runId, CancellationToken cancellationToken = default)
+    {
+        var run = await runs.GetAsync(runId, cancellationToken)
+                  ?? throw new NotFoundException("Bakım çalıştırması", runId);
+
+        if (run.Operation != MaintenanceOperation.RuleEvidenceBackfill)
+        {
+            throw new ValidationException(nameof(runId), "Bu çalıştırma bir kanıt bağlama değil.");
+        }
+
+        if (!run.CanUndo)
+        {
+            throw new ValidationException(nameof(runId), "Bu çalıştırma zaten geri alınmış.");
+        }
+
+        var baglantilar = JsonSerializer.Deserialize<List<RuleEvidenceLink>>(run.DetailJson) ?? [];
+        var silinen = await repository.RemoveEvidenceAsync(baglantilar, cancellationToken);
+
+        run.MarkUndone(currentUser.Email, clock.UtcNow);
+
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        logger.LogInformation(
+            "Kanıt bağlama geri alındı. CalistirmaId={RunId} SilinenBag={Count}", runId, silinen);
+
+        return silinen;
     }
 
     private static int Say(List<RuleEvidenceBackfillItem> sonuclar, RuleEvidenceBackfillOutcome outcome) =>
@@ -226,6 +338,7 @@ public sealed class RuleEvidenceBackfillService(
 
         var now = clock.UtcNow;
         var baglanan = 0;
+        var kurulanlar = new List<RuleEvidenceLink>();
 
         foreach (var kural in bagsizlar)
         {
@@ -238,6 +351,10 @@ public sealed class RuleEvidenceBackfillService(
             }
 
             baglanan++;
+
+            // Bağlantı listesi PLAN modunda da doldurulur: planın parmak izi ile
+            // uygulamanınki aynı olmalı, yoksa onay hiçbir zaman tutmazdı.
+            kurulanlar.AddRange(eslesen.Select(e => new RuleEvidenceLink(kural.Id, e.Chunk.Id, (int)e.Role)));
 
             if (apply)
             {
@@ -259,7 +376,7 @@ public sealed class RuleEvidenceBackfillService(
             $"{baglanan} kural, belge sürüm {version.VersionNumber} içindeki parçalara bağlandı"
             + (bagsizKalan > 0 ? $"; {bagsizKalan} kural kanıtsız kaldı ve dokunulmadı." : "."),
             kurallar.Count, zatenBagli, version, link.Url,
-            rulesBound: baglanan, rulesWithoutEvidence: bagsizKalan), null);
+            rulesBound: baglanan, rulesWithoutEvidence: bagsizKalan, createdLinks: kurulanlar), null);
     }
 
     private static RuleEvidenceBackfillItem Sonuc(
@@ -272,7 +389,8 @@ public sealed class RuleEvidenceBackfillService(
         SourceDocumentVersion? version = null,
         string? officialUrl = null,
         int rulesBound = 0,
-        int rulesWithoutEvidence = 0) => new(
+        int rulesWithoutEvidence = 0,
+        IReadOnlyList<RuleEvidenceLink>? createdLinks = null) => new(
         opportunityId,
         title,
         outcome,
@@ -283,5 +401,6 @@ public sealed class RuleEvidenceBackfillService(
         rulesWithoutEvidence,
         version?.VersionNumber,
         version?.RawContentHash,
-        officialUrl);
+        officialUrl,
+        createdLinks);
 }

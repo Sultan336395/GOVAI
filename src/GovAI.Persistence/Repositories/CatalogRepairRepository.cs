@@ -122,6 +122,44 @@ public sealed class CatalogRepairRepository(GovAiDbContext context) : ICatalogRe
         return degerlendirmeler.Count + analizler.Count;
     }
 
+    public async Task<int> ReleaseAsync(
+        CatalogRepairTarget target,
+        Guid recordId,
+        CancellationToken cancellationToken = default)
+    {
+        if (target == CatalogRepairTarget.RegulatoryChange)
+        {
+            var kayit = await context.RegulatoryChanges
+                .FirstOrDefaultAsync(r => r.Id == recordId, cancellationToken);
+
+            // Karantinada DEĞİLSE dokunulmaz: aradan başka bir işlem geçmiş olabilir
+            // ve geri alma, kendi yapmadığı bir değişikliği bozmamalıdır.
+            if (kayit is null || kayit.Status != RegulatoryChangeStatus.Quarantined)
+            {
+                return 0;
+            }
+
+            kayit.ReleaseFromQuarantine();
+            return 1;
+        }
+
+        var firsat = await context.Opportunities
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(o => o.Id == recordId, cancellationToken);
+
+        if (firsat is null || firsat.IsPublishable)
+        {
+            return 0;
+        }
+
+        firsat.ReleaseFromQuarantine();
+
+        // Değerlendirmeler ve analizler GERİ GETİRİLMEZ: onarım onları silmedi,
+        // "yeniden değerlendirilmeli" olarak işaretledi. Doğru olan yeniden
+        // hesaplanmalarıdır; eski sonucu diriltmek yanlış veriyi geri getirirdi.
+        return 1;
+    }
+
     public async Task<int> RetitleAsync(
         CatalogRepairTarget target,
         Guid recordId,

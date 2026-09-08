@@ -45,11 +45,50 @@ describe('platform rolleri', () => {
     expect(etiketler(ctx)).not.toContain('Fırsat Eşleşmelerim')
   })
 
-  it('inceleyici karantinayı görür ama kaynak yapılandırmasını görmez', () => {
+  it('inceleyici YALNIZCA Platform İnceleme alanını görür', () => {
     const ctx = baglam({ userRole: 'PlatformReviewer' })
 
-    expect(etiketler(ctx)).toContain('Karantina İnceleme')
-    expect(etiketler(ctx)).not.toContain('Veri Kaynakları')
+    // Rolün tek işi kataloğu denetlemek. Tek grup görmesi en az yetki ilkesinin
+    // görünen yüzü; hesabı devralan kişi ne yapacağını aramak zorunda kalmaz.
+    expect(gruplar(ctx)).toEqual(['Platform İnceleme'])
+
+    expect(etiketler(ctx)).toEqual([
+      'Karantina İnceleme',
+      'Katalog Onarımı',
+      'Kanıt Bağlama',
+    ])
+  })
+
+  it('inceleyici kaynak yapılandırmasını ve şirket ekranlarını görmez', () => {
+    const ctx = baglam({ userRole: 'PlatformReviewer' })
+
+    for (const gorunmemeli of [
+      'Veri Kaynakları',
+      'Şirketlerim',
+      'Fırsat Eşleşmelerim',
+      'Fon, Hibe ve İhale Kataloğu',
+      'Mevzuat Değişiklikleri',
+    ]) {
+      expect(etiketler(ctx)).not.toContain(gorunmemeli)
+    }
+  })
+
+  it('katalog yöneticisi bakım ekranlarını da görür', () => {
+    const ctx = baglam({ userRole: 'PlatformCatalogManager' })
+
+    expect(etiketler(ctx)).toContain('Katalog Onarımı')
+    expect(etiketler(ctx)).toContain('Kanıt Bağlama')
+  })
+
+  it('kiracı kullanıcısı bakım ekranlarını hiç görmez', () => {
+    // Menü bir güvenlik sınırı değildir; sunucu yetkisi PlatformReviewAccessTests ile
+    // ayrıca doğrulanır. Buradaki iş, çalışmayacak bağlantı göstermemektir.
+    for (const rol of ['SuperAdmin', 'CompanyManager', 'OperationUser', 'ReadOnly'] as UserRole[]) {
+      const ctx = baglam({ userRole: rol })
+
+      expect(etiketler(ctx)).not.toContain('Katalog Onarımı')
+      expect(etiketler(ctx)).not.toContain('Kanıt Bağlama')
+    }
   })
 
   it('veri toplama servisi hesabı hiçbir menü görmez', () => {

@@ -27,6 +27,9 @@ import type {
   ManualImportResult,
   NaceOption,
   QuarantinedDocument,
+  CatalogRepairPlanReport,
+  CatalogRepairReport,
+  RuleEvidenceBackfillReport,
   RegulatoryChangeDetail,
   RegulatoryChangeSummary,
   SectorOption,
@@ -353,6 +356,42 @@ export const api = {
   /** apply=false yalnızca rapor üretir, hiçbir şeyi değiştirmez. */
   runTriage: (apply = false) =>
     request<TriageReport>(`/api/quarantine/triage${query({ apply })}`, { method: 'POST' }),
+
+  // ── Platform İnceleme: bakım işlemleri (Faz 3) ─────────────────────────
+  //
+  // İki adım AYRIDIR: plan hiçbir şey yazmaz, apply uygular. Uygulama isteği
+  // planın parmak izini taşır — bu kural sunucuda da zorunludur, arayüzde
+  // gevşetilemez.
+
+  catalogRepairPlan: () => request<CatalogRepairPlanReport>('/api/sources/catalog-repair/plan'),
+
+  applyCatalogRepair: (planHash: string) =>
+    request<CatalogRepairReport>('/api/sources/catalog-repair/apply', {
+      method: 'POST',
+      body: JSON.stringify({ planHash }),
+    }),
+
+  undoCatalogRepair: (runId: string) =>
+    request<CatalogRepairReport>(`/api/sources/catalog-repair/runs/${runId}/undo`, {
+      method: 'POST',
+    }),
+
+  ruleEvidenceBackfillPlan: (batchSize = 100, after?: string) =>
+    request<RuleEvidenceBackfillReport>(
+      `/api/opportunities/rule-evidence/backfill/plan${query({ batchSize, after })}`,
+    ),
+
+  applyRuleEvidenceBackfill: (planHash: string, batchSize = 100, after?: string) =>
+    request<RuleEvidenceBackfillReport>(
+      `/api/opportunities/rule-evidence/backfill/apply${query({ batchSize, after })}`,
+      { method: 'POST', body: JSON.stringify({ planHash }) },
+    ),
+
+  undoRuleEvidenceBackfill: (runId: string) =>
+    request<{ removedLinkCount: number }>(
+      `/api/opportunities/rule-evidence/backfill/runs/${runId}/undo`,
+      { method: 'POST' },
+    ),
 
   approveQuarantined: (documentId: string) =>
     request<void>(`/api/quarantine/${documentId}/approve`, { method: 'POST' }),

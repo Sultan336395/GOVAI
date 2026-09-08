@@ -1,5 +1,6 @@
 using GovAI.Application.Abstractions.Persistence;
 using GovAI.Application.Abstractions.Services;
+using GovAI.Application.Common;
 using GovAI.Application.Opportunities;
 using GovAI.Domain.Common;
 using GovAI.Domain.Opportunities;
@@ -41,14 +42,28 @@ public class RuleEvidenceBackfillServiceTests
     private static (RuleEvidenceBackfillService Service, FakeUnitOfWork Uow, FakeEventPublisher Events)
         Build(params RuleEvidenceBackfillContext[] kayitlar)
     {
-        var uow = new FakeUnitOfWork();
-        var events = new FakeEventPublisher();
-
-        var service = new RuleEvidenceBackfillService(
-            new FakeBackfillRepository(kayitlar), uow, new FixedClock(Now), events,
-            NullLogger<RuleEvidenceBackfillService>.Instance);
+        var (service, uow, events, _, _) = BuildFull(kayitlar);
 
         return (service, uow, events);
+    }
+
+    private static (
+        RuleEvidenceBackfillService Service,
+        FakeUnitOfWork Uow,
+        FakeEventPublisher Events,
+        FakeMaintenanceRunRepository Runs,
+        FakeBackfillRepository Repo) BuildFull(params RuleEvidenceBackfillContext[] kayitlar)
+    {
+        var uow = new FakeUnitOfWork();
+        var events = new FakeEventPublisher();
+        var runs = new FakeMaintenanceRunRepository();
+        var repo = new FakeBackfillRepository(kayitlar);
+
+        var service = new RuleEvidenceBackfillService(
+            repo, runs, uow, new FixedClock(Now), events, new FakeCurrentUser(),
+            NullLogger<RuleEvidenceBackfillService>.Instance);
+
+        return (service, uow, events, runs, repo);
     }
 
     // ── Kurgu yardımcıları ────────────────────────────────────────────────
@@ -173,6 +188,17 @@ public class RuleEvidenceBackfillServiceTests
             belgeVar ? kurgu.Version : null,
             belgeVar ? kurgu.Source : null);
 
+    /// <summary>Planı alır ve onun özetiyle uygular; onay kapısı gerçek akışla sınanır.</summary>
+    private static async Task<RuleEvidenceBackfillReport> UygulaAsync(
+        RuleEvidenceBackfillService service,
+        RuleEvidenceBackfillRequest? request = null)
+    {
+        var istek = request ?? new RuleEvidenceBackfillRequest();
+        var plan = await service.PlanAsync(istek);
+
+        return await service.ApplyAsync(istek, plan.PlanHash);
+    }
+
     // ── Testler ───────────────────────────────────────────────────────────
 
     [Fact(DisplayName = "GB1. Kuru çalıştırma hiçbir kaydı değiştirmez")]
@@ -198,7 +224,7 @@ public class RuleEvidenceBackfillServiceTests
         var kurgu = Kurgu();
         var (service, _, _) = Build(Baglam(kurgu));
 
-        var rapor = await service.ApplyAsync(new RuleEvidenceBackfillRequest());
+        var rapor = await UygulaAsync(service);
 
         Assert.True(rapor.Applied);
         Assert.Equal(1, rapor.BoundCount);
@@ -224,8 +250,8 @@ public class RuleEvidenceBackfillServiceTests
         var kurgu = Kurgu();
         var (service, _, _) = Build(Baglam(kurgu));
 
-        await service.ApplyAsync(new RuleEvidenceBackfillRequest());
-        var ikinci = await service.ApplyAsync(new RuleEvidenceBackfillRequest());
+        await UygulaAsync(service);
+        var ikinci = await UygulaAsync(service);
 
         Assert.Single(kurgu.Opportunity.Rules.Single().Evidence);
         Assert.Equal(0, ikinci.EvidenceLinksCreated);
@@ -239,7 +265,7 @@ public class RuleEvidenceBackfillServiceTests
         var kurgu = Kurgu(hamIcerikVar: false);
         var (service, _, events) = Build(Baglam(kurgu));
 
-        var rapor = await service.ApplyAsync(new RuleEvidenceBackfillRequest());
+        var rapor = await UygulaAsync(service);
 
         Assert.Equal(1, rapor.NeedsRedownloadCount);
         Assert.Empty(kurgu.Opportunity.Rules.Single().Evidence);
@@ -259,7 +285,7 @@ public class RuleEvidenceBackfillServiceTests
         Assert.Equal(1, plan.NeedsReparseCount);
         Assert.Empty(events.Published);
 
-        var rapor = await service.ApplyAsync(new RuleEvidenceBackfillRequest());
+        var rapor = await UygulaAsync(service);
 
         Assert.Equal(1, rapor.NeedsReparseCount);
 
@@ -277,7 +303,7 @@ public class RuleEvidenceBackfillServiceTests
         var kurgu = Kurgu(firsatKarantinada: true);
         var (service, _, _) = Build(Baglam(kurgu));
 
-        var rapor = await service.ApplyAsync(new RuleEvidenceBackfillRequest());
+        var rapor = await UygulaAsync(service);
 
         Assert.Equal(1, rapor.SkippedQuarantinedCount);
         Assert.Empty(kurgu.Opportunity.Rules.Single().Evidence);
@@ -289,7 +315,7 @@ public class RuleEvidenceBackfillServiceTests
         var kurgu = Kurgu(belgeKarantinada: true);
         var (service, _, _) = Build(Baglam(kurgu));
 
-        var rapor = await service.ApplyAsync(new RuleEvidenceBackfillRequest());
+        var rapor = await UygulaAsync(service);
 
         Assert.Equal(1, rapor.SkippedQuarantinedCount);
         Assert.Empty(kurgu.Opportunity.Rules.Single().Evidence);
@@ -301,7 +327,7 @@ public class RuleEvidenceBackfillServiceTests
         var kurgu = Kurgu(kaynakDogrulanmis: false);
         var (service, _, _) = Build(Baglam(kurgu));
 
-        var rapor = await service.ApplyAsync(new RuleEvidenceBackfillRequest());
+        var rapor = await UygulaAsync(service);
 
         Assert.Equal(1, rapor.SkippedUnverifiedSourceCount);
         Assert.Empty(kurgu.Opportunity.Rules.Single().Evidence);
@@ -314,7 +340,7 @@ public class RuleEvidenceBackfillServiceTests
         var kurgu = Kurgu(alinti: "yıllık cirosu 50 milyon TL üzerinde olan işletmeler");
         var (service, _, _) = Build(Baglam(kurgu));
 
-        var rapor = await service.ApplyAsync(new RuleEvidenceBackfillRequest());
+        var rapor = await UygulaAsync(service);
 
         Assert.Equal(1, rapor.NoEvidenceCount);
         Assert.Equal(0, rapor.EvidenceLinksCreated);
@@ -334,7 +360,7 @@ public class RuleEvidenceBackfillServiceTests
         var kurgu = Kurgu(alinti: "10 çalışan");
         var (service, _, _) = Build(Baglam(kurgu));
 
-        var rapor = await service.ApplyAsync(new RuleEvidenceBackfillRequest());
+        var rapor = await UygulaAsync(service);
 
         Assert.Equal(1, rapor.NoEvidenceCount);
         Assert.Empty(kurgu.Opportunity.Rules.Single().Evidence);
@@ -346,7 +372,7 @@ public class RuleEvidenceBackfillServiceTests
         var kurgu = Kurgu();
         var (service, _, _) = Build(Baglam(kurgu, belgeVar: false));
 
-        var rapor = await service.ApplyAsync(new RuleEvidenceBackfillRequest());
+        var rapor = await UygulaAsync(service);
 
         Assert.Equal(1, rapor.NoSourceDocumentCount);
         Assert.Empty(kurgu.Opportunity.Rules.Single().Evidence);
@@ -358,7 +384,7 @@ public class RuleEvidenceBackfillServiceTests
         var kurgu = Kurgu(kuralVar: false);
         var (service, _, _) = Build(Baglam(kurgu));
 
-        var rapor = await service.ApplyAsync(new RuleEvidenceBackfillRequest());
+        var rapor = await UygulaAsync(service);
 
         Assert.Equal(0, rapor.BoundCount);
         Assert.Equal(0, rapor.FailedCount);
@@ -371,14 +397,14 @@ public class RuleEvidenceBackfillServiceTests
         var kayitlar = Enumerable.Range(0, 3).Select(_ => Baglam(Kurgu())).ToArray();
         var (service, _, _) = Build(kayitlar);
 
-        var ilk = await service.ApplyAsync(new RuleEvidenceBackfillRequest(BatchSize: 2));
+        var ilk = await UygulaAsync(service, new RuleEvidenceBackfillRequest(BatchSize: 2));
 
         Assert.Equal(2, ilk.TotalExamined);
         Assert.True(ilk.HasMore);
         Assert.NotNull(ilk.NextCursor);
 
-        var ikinci = await service.ApplyAsync(
-            new RuleEvidenceBackfillRequest(ilk.NextCursor, BatchSize: 2));
+        var ikinci = await UygulaAsync(
+            service, new RuleEvidenceBackfillRequest(ilk.NextCursor, BatchSize: 2));
 
         Assert.Equal(1, ikinci.TotalExamined);
         Assert.False(ikinci.HasMore);
@@ -394,10 +420,11 @@ public class RuleEvidenceBackfillServiceTests
         var repo = new FakeBackfillRepository([saglam], patlayanKimlik: Guid.CreateVersion7());
 
         var service = new RuleEvidenceBackfillService(
-            repo, new FakeUnitOfWork(), new FixedClock(Now), new FakeEventPublisher(),
+            repo, new FakeMaintenanceRunRepository(), new FakeUnitOfWork(), new FixedClock(Now),
+            new FakeEventPublisher(), new FakeCurrentUser(),
             NullLogger<RuleEvidenceBackfillService>.Instance);
 
-        var rapor = await service.ApplyAsync(new RuleEvidenceBackfillRequest());
+        var rapor = await UygulaAsync(service);
 
         Assert.Equal(1, rapor.FailedCount);
         Assert.Equal(1, rapor.BoundCount);
@@ -412,6 +439,135 @@ public class RuleEvidenceBackfillServiceTests
         Assert.Equal(
             RuleEvidenceBackfillRequest.MaximumBatchSize,
             new RuleEvidenceBackfillRequest(BatchSize: 100_000).SafeBatchSize);
+    }
+
+    // ── Onay kapısı ve geri alma (Faz 3) ──────────────────────────────────
+
+    [Fact(DisplayName = "GB16. Onay özeti olmadan hiçbir bağlantı kurulmaz")]
+    public async Task Onaysiz_baglanmaz()
+    {
+        var kurgu = Kurgu();
+        var (service, _, _) = Build(Baglam(kurgu));
+
+        await Assert.ThrowsAsync<ValidationException>(
+            () => service.ApplyAsync(new RuleEvidenceBackfillRequest(), string.Empty));
+
+        Assert.Empty(kurgu.Opportunity.Rules.Single().Evidence);
+    }
+
+    [Fact(DisplayName = "GB17. Görülmemiş plan özeti reddedilir")]
+    public async Task Uydurma_ozet_reddedilir()
+    {
+        var kurgu = Kurgu();
+        var (service, _, _) = Build(Baglam(kurgu));
+
+        await Assert.ThrowsAsync<ValidationException>(
+            () => service.ApplyAsync(new RuleEvidenceBackfillRequest(), new string('a', 64)));
+
+        Assert.Empty(kurgu.Opportunity.Rules.Single().Evidence);
+    }
+
+    [Fact(DisplayName = "GB18. Plan gösterildikten sonra veri değişirse uygulama reddedilir")]
+    public async Task Bayat_plan_reddedilir()
+    {
+        var kurgu = Kurgu();
+        var (service, _, _) = Build(Baglam(kurgu));
+
+        var plan = await service.PlanAsync(new RuleEvidenceBackfillRequest());
+
+        // Aradan başka bir işlem geçti: kural artık kanıtlı.
+        var kural = kurgu.Opportunity.Rules.Single();
+        var parca = kurgu.Version!.Chunks[0];
+
+        kural.AttachEvidence(new GovAI.Domain.Opportunities.OpportunityRuleEvidence(
+            parca.Id, kurgu.Version.Id, GovAI.Domain.Opportunities.RuleEvidenceRole.ValueSource,
+            parca.StartOffset, parca.EndOffset, Now));
+
+        await Assert.ThrowsAsync<ValidationException>(
+            () => service.ApplyAsync(new RuleEvidenceBackfillRequest(), plan.PlanHash));
+    }
+
+    [Fact(DisplayName = "GB19. Planın özeti uygulamanınkiyle aynıdır")]
+    public async Task Plan_ve_uygulama_ozeti_ayni()
+    {
+        var kurgu = Kurgu();
+        var (service, _, _) = Build(Baglam(kurgu));
+
+        var plan = await service.PlanAsync(new RuleEvidenceBackfillRequest());
+        var uygulama = await service.ApplyAsync(new RuleEvidenceBackfillRequest(), plan.PlanHash);
+
+        // Aynı olmasaydı onay hiçbir zaman tutmaz, kapı kilitli kalırdı.
+        Assert.Equal(plan.PlanHash, uygulama.PlanHash);
+    }
+
+    [Fact(DisplayName = "GB20. Kurulan bağlantılar geri alınabilir")]
+    public async Task Baglantilar_geri_alinabilir()
+    {
+        var kurgu = Kurgu();
+        var (service, _, _, runs, repo) = BuildFull(Baglam(kurgu));
+
+        var rapor = await UygulaAsync(service);
+
+        Assert.Equal(1, rapor.EvidenceLinksCreated);
+        Assert.NotNull(rapor.RunId);
+        Assert.Single(kurgu.Opportunity.Rules.Single().Evidence);
+
+        var silinen = await service.UndoAsync(rapor.RunId!.Value);
+
+        Assert.Equal(1, silinen);
+        Assert.Empty(kurgu.Opportunity.Rules.Single().Evidence);
+        Assert.NotNull(runs.Runs.Single().UndoneAt);
+
+        // Silinen TAM OLARAK kurulan bağlantıdır.
+        Assert.Single(repo.Removed);
+    }
+
+    [Fact(DisplayName = "GB21. Geri alma önceden var olan bağlantıya dokunmaz")]
+    public async Task Onceki_baglanti_korunur()
+    {
+        var kurgu = Kurgu();
+
+        // Kayıtta ZATEN bir bağlantı var; toplu işlem onu hiç ele almaz.
+        var kural = kurgu.Opportunity.Rules.Single();
+        var parca = kurgu.Version!.Chunks[^1];
+
+        kural.AttachEvidence(new GovAI.Domain.Opportunities.OpportunityRuleEvidence(
+            parca.Id, kurgu.Version.Id, GovAI.Domain.Opportunities.RuleEvidenceRole.Supporting,
+            parca.StartOffset, parca.EndOffset, Now));
+
+        var (service, _, _) = Build(Baglam(kurgu));
+
+        var rapor = await UygulaAsync(service);
+
+        // Kanıtı olan kural işlenmez; kurulacak bağ yok, çalıştırma da açılmaz.
+        Assert.Equal(1, rapor.AlreadyBoundCount);
+        Assert.Null(rapor.RunId);
+        Assert.Single(kural.Evidence);
+    }
+
+    [Fact(DisplayName = "GB22. Aynı çalıştırma iki kez geri alınamaz")]
+    public async Task Ikinci_geri_alma_reddedilir()
+    {
+        var kurgu = Kurgu();
+        var (service, _, _) = Build(Baglam(kurgu));
+
+        var rapor = await UygulaAsync(service);
+        await service.UndoAsync(rapor.RunId!.Value);
+
+        await Assert.ThrowsAsync<ValidationException>(() => service.UndoAsync(rapor.RunId!.Value));
+    }
+
+    [Fact(DisplayName = "GB23. Bağ kurulmadıysa çalıştırma kaydı açılmaz")]
+    public async Task Bag_yoksa_kayit_acilmaz()
+    {
+        var kurgu = Kurgu(alinti: "belgede geçmeyen bambaşka bir koşul metni");
+        var (service, _, _, runs, _) = BuildFull(Baglam(kurgu));
+
+        var rapor = await UygulaAsync(service);
+
+        Assert.Equal(0, rapor.EvidenceLinksCreated);
+        Assert.Null(rapor.RunId);
+        Assert.Empty(runs.Runs);
     }
 }
 
@@ -458,6 +614,31 @@ internal sealed class FakeBackfillRepository : IRuleEvidenceBackfillRepository
         }
 
         return Task.FromResult(_kayitlar.GetValueOrDefault(opportunityId));
+    }
+
+    /// <summary>Geri almada silinen bağlantılar.</summary>
+    public List<RuleEvidenceLink> Removed { get; } = [];
+
+    public Task<int> RemoveEvidenceAsync(
+        IReadOnlyList<RuleEvidenceLink> links,
+        CancellationToken cancellationToken = default)
+    {
+        var silinen = 0;
+
+        foreach (var link in links)
+        {
+            var kural = _kayitlar.Values
+                .SelectMany(k => k.Opportunity.Rules)
+                .FirstOrDefault(r => r.Id == link.RuleId);
+
+            if (kural?.RemoveEvidence(link.EvidenceChunkId, (RuleEvidenceRole)link.Role) == true)
+            {
+                Removed.Add(link);
+                silinen++;
+            }
+        }
+
+        return Task.FromResult(silinen);
     }
 
     private IEnumerable<Guid> Sonrasi(Guid? imlec) =>

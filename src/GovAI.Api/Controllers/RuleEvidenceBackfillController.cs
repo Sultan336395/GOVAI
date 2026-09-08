@@ -5,6 +5,9 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace GovAI.Api.Controllers;
 
+/// <summary>Uygulama isteğinin gövdesi: onaylanan planın parmak izi.</summary>
+public sealed record RuleEvidenceBackfillApplyBody(string PlanHash);
+
 /// <summary>
 /// Mevcut fırsat kurallarına geriye dönük kanıt bağlama (Faz 3).
 ///
@@ -48,11 +51,28 @@ public sealed class RuleEvidenceBackfillController(RuleEvidenceBackfillService s
     /// <summary>
     /// Planı uygular. Yalnızca kanıtı güvenilir biçimde bulunan kurallara bağlantı
     /// ekler; bulunamayan kurala <b>dokunmaz</b>.
+    ///
+    /// <para>
+    /// Gövdedeki <c>planHash</c>, <c>plan</c> ucundan dönen değerle birebir aynı
+    /// olmalıdır. Bu kural sunucuda zorunludur: görülmemiş bir plan uygulanamaz.
+    /// </para>
     /// </summary>
     [HttpPost("backfill/apply")]
+    [Audited("RuleEvidenceBackfill.Applied", "Opportunity")]
     public async Task<ActionResult<RuleEvidenceBackfillReport>> Apply(
+        [FromBody] RuleEvidenceBackfillApplyBody body,
         [FromQuery] Guid? after,
         [FromQuery] int batchSize = 100,
         CancellationToken cancellationToken = default) =>
-        Ok(await service.ApplyAsync(new RuleEvidenceBackfillRequest(after, batchSize), cancellationToken));
+        Ok(await service.ApplyAsync(
+            new RuleEvidenceBackfillRequest(after, batchSize), body.PlanHash, cancellationToken));
+
+    /// <summary>
+    /// Bir bağlama çalıştırmasını geri alır: <b>yalnızca o turda kurulan</b> bağlantılar
+    /// silinir. Kural, belge, sürüm ve kanıt parçaları yerinde kalır.
+    /// </summary>
+    [HttpPost("backfill/runs/{id:guid}/undo")]
+    [Audited("RuleEvidenceBackfill.Undone", "MaintenanceRun")]
+    public async Task<ActionResult<object>> Undo(Guid id, CancellationToken cancellationToken) =>
+        Ok(new { removedLinkCount = await service.UndoAsync(id, cancellationToken) });
 }

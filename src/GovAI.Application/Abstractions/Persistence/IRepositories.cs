@@ -5,6 +5,7 @@ using GovAI.Domain.Companies;
 using GovAI.Application.Opportunities;
 using GovAI.Domain.Common;
 using GovAI.Domain.Identity;
+using GovAI.Domain.Maintenance;
 using GovAI.Domain.Notifications;
 using GovAI.Domain.Opportunities;
 using GovAI.Domain.Sources;
@@ -303,6 +304,15 @@ public interface ICatalogRepairRepository
         string? note,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Kaydı karantinadan çıkarır (geri alma). Kayıt karantinada değilse hiçbir şey
+    /// yapmaz ve <c>0</c> döner: geri alma, kendi yapmadığı bir değişikliği bozmaz.
+    /// </summary>
+    Task<int> ReleaseAsync(
+        CatalogRepairTarget target,
+        Guid recordId,
+        CancellationToken cancellationToken = default);
+
     /// <summary>Kaydın başlığını belge sürümündeki gerçek başlıkla düzeltir.</summary>
     Task<int> RetitleAsync(
         CatalogRepairTarget target,
@@ -343,6 +353,15 @@ public interface IRuleEvidenceBackfillRepository
     Task<RuleEvidenceBackfillContext?> LoadContextAsync(
         Guid opportunityId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Geri alma: <b>tam olarak verilen</b> (kural, parça, rol) üçlülerine karşılık gelen
+    /// bağlantı satırlarını siler ve silinen sayıyı döner. Listede olmayan hiçbir satıra
+    /// dokunulmaz; kural, belge, sürüm ve parçalar yerinde kalır.
+    /// </summary>
+    Task<int> RemoveEvidenceAsync(
+        IReadOnlyList<RuleEvidenceLink> links,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>Tek bir fırsatın geriye dönük bağlama bağlamı.</summary>
@@ -357,6 +376,21 @@ public sealed record RuleEvidenceBackfillContext(
 
     /// <summary>Belgenin kaynağı; yeniden ayrıştırma mesajı bunu gerektirir.</summary>
     Source? Source);
+
+/// <summary>
+/// Uygulanmış bakım işlemlerinin kaydı (Faz 3). Geri alma bu kayıtlardan beslenir.
+/// </summary>
+public interface IMaintenanceRunRepository
+{
+    Task<MaintenanceRun?> GetAsync(Guid runId, CancellationToken cancellationToken = default);
+
+    /// <summary>En yeniden eskiye; inceleme ekranı son çalıştırmaları gösterir.</summary>
+    Task<IReadOnlyList<MaintenanceRun>> ListRecentAsync(
+        int take,
+        CancellationToken cancellationToken = default);
+
+    Task AddAsync(MaintenanceRun run, CancellationToken cancellationToken = default);
+}
 
 public interface IScenarioSimulationRepository
 {

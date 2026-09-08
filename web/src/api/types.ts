@@ -1057,3 +1057,96 @@ export interface RegulationImpactAnalysis {
   contribution: AnalysisContribution
   version: AnalysisVersion
 }
+
+// ── Platform İnceleme: bakım işlemleri (Faz 3) ───────────────────────────────
+
+/** Bir onarım adımının tek kayıt üzerindeki planı. */
+export interface CatalogRepairMatch {
+  stepCode: string
+  target: 'Opportunity' | 'RegulatoryChange'
+  action: 'Quarantine' | 'RetitleFromDocument'
+  recordId: string
+  currentTitle: string
+  officialUrl: string | null
+  /** Yeniden adlandırmada belge sürümünden okunan gerçek başlık. */
+  proposedTitle: string | null
+  willChange: boolean
+  /** Değişmeyecekse sebebi. */
+  skipReason: string | null
+  affectedAssessmentCount: number
+}
+
+export interface CatalogRepairPlanReport {
+  stepCount: number
+  matchedRecordCount: number
+  willChangeCount: number
+  alreadyDoneCount: number
+  /** Uygulama isteği bunu geri gönderir; görülmemiş plan uygulanamaz. */
+  planHash: string
+  matches: CatalogRepairMatch[]
+}
+
+export interface CatalogRepairOutcome {
+  stepCode: string
+  recordId: string
+  result: string
+  affectedAssessmentCount: number
+  previousTitle: string | null
+  target: 'Opportunity' | 'RegulatoryChange'
+  action: 'Quarantine' | 'RetitleFromDocument'
+}
+
+export interface CatalogRepairReport {
+  attempted: number
+  changed: number
+  alreadyDone: number
+  outcomes: CatalogRepairOutcome[]
+  /** Geri alma bu kimlikle yapılır; hiçbir şey değişmediyse null. */
+  runId: string | null
+}
+
+export type RuleEvidenceBackfillOutcome =
+  | 'Bound'
+  | 'AlreadyBound'
+  | 'NoEvidenceFound'
+  | 'NeedsReparse'
+  | 'NeedsRedownload'
+  | 'SkippedQuarantined'
+  | 'SkippedUnverifiedSource'
+  | 'NoSourceDocument'
+  | 'NoRules'
+  | 'Failed'
+
+export interface RuleEvidenceBackfillItem {
+  opportunityId: string
+  title: string
+  outcome: RuleEvidenceBackfillOutcome
+  explanation: string
+  ruleCount: number
+  rulesAlreadyBound: number
+  rulesBound: number
+  rulesWithoutEvidence: number
+  documentVersionNumber: number | null
+  documentVersionHash: string | null
+  officialUrl: string | null
+}
+
+export interface RuleEvidenceBackfillReport {
+  applied: boolean
+  totalExamined: number
+  boundCount: number
+  alreadyBoundCount: number
+  noEvidenceCount: number
+  needsReparseCount: number
+  needsRedownloadCount: number
+  skippedQuarantinedCount: number
+  skippedUnverifiedSourceCount: number
+  noSourceDocumentCount: number
+  failedCount: number
+  evidenceLinksCreated: number
+  nextCursor: string | null
+  hasMore: boolean
+  items: RuleEvidenceBackfillItem[]
+  planHash: string
+  runId: string | null
+}

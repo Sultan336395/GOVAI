@@ -1,4 +1,5 @@
 using GovAI.Application.Abstractions.Persistence;
+using GovAI.Application.Common;
 using GovAI.Application.Sources;
 using GovAI.Domain.Common;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -22,15 +23,32 @@ public class CatalogRepairServiceTests
     private static readonly DateTimeOffset Now = new(2026, 9, 8, 12, 0, 0, TimeSpan.Zero);
 
     private static (CatalogRepairService Service, FakeCatalogRepairRepository Repo) Build(
-        params CatalogRepairCandidate[] kayitlar)
+        params CatalogRepairCandidate[] kayitlar) => BuildFull(kayitlar).Kisa;
+
+    private static (
+        (CatalogRepairService Service, FakeCatalogRepairRepository Repo) Kisa,
+        FakeMaintenanceRunRepository Runs) BuildFull(params CatalogRepairCandidate[] kayitlar)
     {
         var repo = new FakeCatalogRepairRepository(kayitlar);
+        var runs = new FakeMaintenanceRunRepository();
 
         var service = new CatalogRepairService(
-            repo, new FakeUnitOfWork(), new FixedClock(Now),
-            NullLogger<CatalogRepairService>.Instance);
+            repo, runs, new FakeUnitOfWork(), new FixedClock(Now),
+            new FakeCurrentUser(), NullLogger<CatalogRepairService>.Instance);
 
-        return (service, repo);
+        return ((service, repo), runs);
+    }
+
+    /// <summary>
+    /// Planı alır ve <b>onun özetiyle</b> uygular. Gerçek akış budur: onay, görülen
+    /// planın parmak izidir. Testlerin sabit bir dizeyle geçmesi, kapının kapalı
+    /// olduğunu değil kapının olmadığını doğrulardı.
+    /// </summary>
+    private static async Task<CatalogRepairReport> UygulaAsync(CatalogRepairService service)
+    {
+        var plan = await service.PlanAsync();
+
+        return await service.ApplyAsync(plan.PlanHash);
     }
 
     private static CatalogRepairCandidate KosgebListe(bool karantinada = false) => new(
@@ -75,7 +93,7 @@ public class CatalogRepairServiceTests
         Assert.Equal(CatalogRepairAction.Quarantine, eslesme.Action);
         Assert.True(eslesme.WillChange);
 
-        await service.ApplyAsync();
+        await UygulaAsync(service);
 
         var uygulanan = Assert.Single(repo.Quarantined);
         Assert.Equal(QuarantineReason.InvalidSourcePage, uygulanan.Reason);
@@ -88,7 +106,7 @@ public class CatalogRepairServiceTests
     {
         var (service, repo) = Build(KosgebYururlukten());
 
-        await service.ApplyAsync();
+        await UygulaAsync(service);
 
         Assert.Contains("aktif fırsat değildir", repo.Quarantined.Single().Note);
     }
@@ -98,13 +116,13 @@ public class CatalogRepairServiceTests
     {
         var (service, repo) = Build(KosgebListe(), KosgebYururlukten());
 
-        var ilk = await service.ApplyAsync();
+        var ilk = await UygulaAsync(service);
         Assert.Equal(2, ilk.Changed);
 
         // İkinci koşuda kayıtlar artık karantinada.
         repo.MarkAllQuarantined();
 
-        var ikinci = await service.ApplyAsync();
+        var ikinci = await UygulaAsync(service);
 
         Assert.Equal(0, ikinci.Changed);
         Assert.Equal(2, ikinci.AlreadyDone);
@@ -143,7 +161,7 @@ public class CatalogRepairServiceTests
         var plan = await service.PlanAsync();
         Assert.Equal(7, plan.Matches.Single().AffectedAssessmentCount);
 
-        var rapor = await service.ApplyAsync();
+        var rapor = await UygulaAsync(service);
 
         Assert.Equal(7, rapor.Outcomes.Single().AffectedAssessmentCount);
         Assert.Empty(repo.Deleted);
@@ -154,7 +172,7 @@ public class CatalogRepairServiceTests
     {
         var (service, repo) = Build(SgkSut());
 
-        await service.ApplyAsync();
+        await UygulaAsync(service);
 
         var uygulanan = Assert.Single(repo.Quarantined);
         Assert.Equal(QuarantineReason.NeedsManualReview, uygulanan.Reason);
@@ -166,7 +184,7 @@ public class CatalogRepairServiceTests
     {
         var (service, repo) = Build(SgkIlac(), SgkGayrimenkul());
 
-        var rapor = await service.ApplyAsync();
+        var rapor = await UygulaAsync(service);
 
         Assert.Equal(2, rapor.Changed);
         Assert.Equal(2, repo.Quarantined.Count);
@@ -181,7 +199,7 @@ public class CatalogRepairServiceTests
         var plan = await service.PlanAsync();
         Assert.Equal(gercek, plan.Matches.Single().ProposedTitle);
 
-        await service.ApplyAsync();
+        await UygulaAsync(service);
 
         Assert.Equal(gercek, repo.Retitled.Single().Title);
     }
@@ -196,7 +214,7 @@ public class CatalogRepairServiceTests
         Assert.False(plan.Matches.Single().WillChange);
         Assert.Contains("uydurma başlık yazılmaz", plan.Matches.Single().SkipReason);
 
-        await service.ApplyAsync();
+        await UygulaAsync(service);
         Assert.Empty(repo.Retitled);
     }
 
@@ -208,7 +226,7 @@ public class CatalogRepairServiceTests
             "ÇALIŞAN VE İŞVEREN", "https://www.sgk.gov.tr/duyuru/detay/9",
             false, "ÇALIŞAN VE İŞVEREN", 0));
 
-        await service.ApplyAsync();
+        await UygulaAsync(service);
 
         Assert.Empty(repo.Retitled);
     }
@@ -239,7 +257,7 @@ public class CatalogRepairServiceTests
         var plan = await service.PlanAsync();
 
         Assert.Empty(plan.Matches);
-        await service.ApplyAsync();
+        await UygulaAsync(service);
         Assert.Empty(repo.Quarantined);
     }
 
@@ -257,6 +275,103 @@ public class CatalogRepairServiceTests
                 Assert.False(string.IsNullOrWhiteSpace(adim.Note));
             }
         });
+    }
+
+    // ── Onay kapısı ve geri alma (Faz 3) ──────────────────────────────────
+
+    [Fact(DisplayName = "KO15. Onay özeti olmadan hiçbir kayda dokunulmaz")]
+    public async Task Onaysiz_uygulanmaz()
+    {
+        var (service, repo) = Build(KosgebListe());
+
+        await Assert.ThrowsAsync<ValidationException>(() => service.ApplyAsync(string.Empty));
+
+        Assert.Empty(repo.Quarantined);
+    }
+
+    [Fact(DisplayName = "KO16. Görülmemiş plan özeti reddedilir")]
+    public async Task Uydurma_ozet_reddedilir()
+    {
+        var (service, repo) = Build(KosgebListe());
+
+        await Assert.ThrowsAsync<ValidationException>(() => service.ApplyAsync(new string('a', 64)));
+
+        Assert.Empty(repo.Quarantined);
+    }
+
+    [Fact(DisplayName = "KO17. Plan gösterildikten sonra veri değişirse uygulama reddedilir")]
+    public async Task Bayat_plan_reddedilir()
+    {
+        var (service, repo) = Build(KosgebListe(), KosgebYururlukten());
+
+        var plan = await service.PlanAsync();
+
+        // Aradan başka bir işlem geçti: kayıtlar zaten karantinaya alınmış.
+        repo.MarkAllQuarantined();
+
+        await Assert.ThrowsAsync<ValidationException>(() => service.ApplyAsync(plan.PlanHash));
+
+        Assert.Empty(repo.Quarantined);
+    }
+
+    [Fact(DisplayName = "KO18. Uygulanan onarım geri alınabilir")]
+    public async Task Onarim_geri_alinabilir()
+    {
+        var ((service, repo), runs) = BuildFull(KosgebListe(), KosgebYururlukten());
+
+        var rapor = await UygulaAsync(service);
+
+        Assert.Equal(2, rapor.Changed);
+        Assert.NotNull(rapor.RunId);
+
+        var geri = await service.UndoAsync(rapor.RunId!.Value);
+
+        Assert.Equal(2, geri.Changed);
+        Assert.Equal(2, repo.Released.Count);
+        Assert.NotNull(runs.Runs.Single().UndoneAt);
+
+        // Kayıt SİLİNMEDİ; çalıştırma kaydı da duruyor.
+        Assert.Empty(repo.Deleted);
+        Assert.Single(runs.Runs);
+    }
+
+    [Fact(DisplayName = "KO19. Aynı çalıştırma iki kez geri alınamaz")]
+    public async Task Ikinci_geri_alma_reddedilir()
+    {
+        var (service, _) = Build(KosgebListe());
+
+        var rapor = await UygulaAsync(service);
+        await service.UndoAsync(rapor.RunId!.Value);
+
+        await Assert.ThrowsAsync<ValidationException>(() => service.UndoAsync(rapor.RunId!.Value));
+    }
+
+    [Fact(DisplayName = "KO20. Başlık düzeltmesinin eski hâli saklanır ve geri yazılır")]
+    public async Task Baslik_geri_yazilir()
+    {
+        var (service, repo) = Build(SgkMenuBasligi("2026 Yılı Prim Teşviki Duyurusu"));
+
+        var rapor = await UygulaAsync(service);
+        var uygulanan = rapor.Outcomes.Single(o => o.Result == "Uygulandı.");
+
+        // Eski başlık kayıtta artık yok; geri alma ancak saklandıysa mümkün.
+        Assert.False(string.IsNullOrWhiteSpace(uygulanan.PreviousTitle));
+
+        await service.UndoAsync(rapor.RunId!.Value);
+
+        Assert.Equal(uygulanan.PreviousTitle, repo.Retitled[^1].Title);
+    }
+
+    [Fact(DisplayName = "KO21. Hiçbir şey değişmediyse çalıştırma kaydı açılmaz")]
+    public async Task Degisiklik_yoksa_kayit_acilmaz()
+    {
+        var ((service, _), runs) = BuildFull(KosgebListe(karantinada: true));
+
+        var rapor = await UygulaAsync(service);
+
+        Assert.Equal(0, rapor.Changed);
+        Assert.Null(rapor.RunId);
+        Assert.Empty(runs.Runs);
     }
 }
 
@@ -289,7 +404,32 @@ internal sealed class FakeCatalogRepairRepository(IReadOnlyList<CatalogRepairCan
     {
         Quarantined.Add((recordId, reason, note));
 
-        return Task.FromResult(_kayitlar.FirstOrDefault(k => k.Id == recordId)?.AssessmentCount ?? 0);
+        var adet = _kayitlar.FirstOrDefault(k => k.Id == recordId)?.AssessmentCount ?? 0;
+        _kayitlar = [.. _kayitlar.Select(k => k.Id == recordId ? k with { IsQuarantined = true } : k)];
+
+        return Task.FromResult(adet);
+    }
+
+    /// <summary>Geri alma: karantinadan çıkarılan kayıtlar.</summary>
+    public List<Guid> Released { get; } = [];
+
+    public Task<int> ReleaseAsync(
+        CatalogRepairTarget target,
+        Guid recordId,
+        CancellationToken cancellationToken = default)
+    {
+        var kayit = _kayitlar.FirstOrDefault(k => k.Id == recordId);
+
+        // Karantinada değilse geri alma dokunmaz.
+        if (kayit is null || !kayit.IsQuarantined)
+        {
+            return Task.FromResult(0);
+        }
+
+        Released.Add(recordId);
+        _kayitlar = [.. _kayitlar.Select(k => k.Id == recordId ? k with { IsQuarantined = false } : k)];
+
+        return Task.FromResult(1);
     }
 
     public Task<int> RetitleAsync(

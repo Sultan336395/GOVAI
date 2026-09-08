@@ -8,6 +8,8 @@ import CompanyGroupsPage from '@/pages/CompanyGroupsPage'
 import CompanyMembersPage from '@/pages/CompanyMembersPage'
 import CompanyPage from '@/pages/CompanyPage'
 import QuarantinePage from '@/pages/QuarantinePage'
+import CatalogRepairPage from '@/pages/CatalogRepairPage'
+import RuleEvidenceBackfillPage from '@/pages/RuleEvidenceBackfillPage'
 import RegulatoryChangeDetailPage from '@/pages/RegulatoryChangeDetailPage'
 import RegulatoryChangesPage from '@/pages/RegulatoryChangesPage'
 import DashboardPage from '@/pages/DashboardPage'
@@ -47,6 +49,12 @@ function ProtectedRoutes() {
 function HomeRoute() {
   const { user } = useAuth()
 
+  // İnceleyicinin menüsünde katalog ekranı YOK; oraya yönlendirmek onu menüde
+  // bulunmayan bir sayfaya düşürürdü. Rolün ilk işi karantina incelemesidir.
+  if (user?.role === 'PlatformReviewer') {
+    return <Navigate to="/quarantine" replace />
+  }
+
   if (isPlatformRole(user?.role ?? null)) {
     return <Navigate to="/opportunities" replace />
   }
@@ -85,6 +93,10 @@ export default function App() {
         <Route path="/regulatory-changes" element={<RegulatoryChangesPage />} />
         <Route path="/regulatory-changes/:changeId" element={<RegulatoryChangeDetailPage />} />
         <Route path="/quarantine" element={<QuarantinePage />} />
+
+        {/* Faz 3 — Platform İnceleme bakım işlemleri */}
+        <Route path="/platform/catalog-repair" element={<CatalogRepairPage />} />
+        <Route path="/platform/rule-evidence" element={<RuleEvidenceBackfillPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

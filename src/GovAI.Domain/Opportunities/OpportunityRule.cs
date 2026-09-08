@@ -102,6 +102,23 @@ public class OpportunityRule : Entity
         _evidence.Add(evidence);
     }
 
+    /// <summary>
+    /// Bir kanıt bağlantısını kaldırır (toplu bağlamanın geri alınması).
+    ///
+    /// <para>
+    /// Yalnızca <b>tam eşleşen</b> üçlü kaldırılır: parça ve rol birlikte verilir.
+    /// Rolü yok saymak, aynı parçaya farklı rolle bağlı ve geri alma kapsamında
+    /// olmayan bir satırı da silerdi.
+    /// </para>
+    /// </summary>
+    /// <returns>Bir satır kaldırıldıysa <c>true</c>.</returns>
+    public bool RemoveEvidence(Guid evidenceChunkId, RuleEvidenceRole role)
+    {
+        var kayit = _evidence.FirstOrDefault(e => e.EvidenceChunkId == evidenceChunkId && e.Role == role);
+
+        return kayit is not null && _evidence.Remove(kayit);
+    }
+
     public void OverrideManually(RuleOperator @operator, string value, RuleSeverity severity, string humanReadable)
     {
         Operator = @operator;

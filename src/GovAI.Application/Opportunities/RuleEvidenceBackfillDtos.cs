@@ -59,6 +59,9 @@ public sealed record RuleEvidenceBackfillRequest(
     public int SafeBatchSize => Math.Clamp(BatchSize, 1, MaximumBatchSize);
 }
 
+/// <summary>Kurulan tek bir kural–kanıt bağlantısı; geri alma tam olarak bunu siler.</summary>
+public sealed record RuleEvidenceLink(Guid RuleId, Guid EvidenceChunkId, int Role);
+
 /// <summary>Tek bir fırsat kaydının sonucu.</summary>
 public sealed record RuleEvidenceBackfillItem(
     Guid OpportunityId,
@@ -85,7 +88,13 @@ public sealed record RuleEvidenceBackfillItem(
     string? DocumentVersionHash,
 
     /// <summary>Doğrulanmış resmî adres; doğrulanamıyorsa <c>null</c>.</summary>
-    string? OfficialUrl);
+    string? OfficialUrl,
+
+    /// <summary>
+    /// Bu turda kurulan bağlantıların tam listesi. Geri alma <b>yalnızca bunları</b>
+    /// siler; daha önce var olan bağlantılara dokunmaz.
+    /// </summary>
+    IReadOnlyList<RuleEvidenceLink>? CreatedLinks = null);
 
 /// <summary>
 /// Toplu işlemin raporu. <c>plan</c> ve <c>apply</c> aynı yapıyı döner; tek fark
@@ -113,4 +122,19 @@ public sealed record RuleEvidenceBackfillReport(
     Guid? NextCursor,
 
     bool HasMore,
-    IReadOnlyList<RuleEvidenceBackfillItem> Items);
+    IReadOnlyList<RuleEvidenceBackfillItem> Items,
+
+    /// <summary>
+    /// Bu turun parmak izi. Uygulama isteği bunu taşımak zorundadır: görülmemiş bir
+    /// plan uygulanamaz, gösterildikten sonra veri değiştiyse de tutmaz.
+    /// </summary>
+    string PlanHash = PlanFingerprintPlaceholder.Unset,
+
+    /// <summary>Geri alma bu kimlikle yapılır; hiçbir bağ kurulmadıysa <c>null</c>.</summary>
+    Guid? RunId = null);
+
+/// <summary>Kayıt varsayılanı; gerçek değer serviste hesaplanır.</summary>
+internal static class PlanFingerprintPlaceholder
+{
+    public const string Unset = "hesaplanmadi";
+}

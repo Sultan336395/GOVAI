@@ -62,6 +62,24 @@ export function buildNavigation({
 
   // Platform işletimi kiracı verisine erişemez (Policies.CompanyData onları dışarıda
   // bırakır). Şirket ekranlarını göstermek çalışmayan bağlantı üretirdi.
+  // İNCELEYİCİ TEK BİR ALAN GÖRÜR.
+  //
+  // Rolün tek işi kataloğu denetlemek ve düzeltmek; menüsünde başka bir şey olmaması
+  // hem en az yetki ilkesinin görünen yüzü hem de pratik bir kolaylıktır — hesabı
+  // devralan kişi ne yapması gerektiğini aramak zorunda kalmaz.
+  if (userRole === 'PlatformReviewer') {
+    return [
+      {
+        title: 'Platform İnceleme',
+        items: [
+          { to: '/quarantine', label: 'Karantina İnceleme', icon: 'quarantine' },
+          { to: '/platform/catalog-repair', label: 'Katalog Onarımı', icon: 'quarantine' },
+          { to: '/platform/rule-evidence', label: 'Kanıt Bağlama', icon: 'regulation' },
+        ],
+      },
+    ]
+  }
+
   if (isPlatformRole(userRole)) {
     const platform: NavGroup[] = [
       {
@@ -78,15 +96,13 @@ export function buildNavigation({
       },
     ]
 
-    // Kaynak yönetimi katalog yöneticisinin, karantina incelemesi her iki platform
-    // rolünün işidir; sunucu politikaları da böyle ayrılmıştır.
-    const system: NavItem[] = []
-
-    if (userRole === 'PlatformCatalogManager') {
-      system.push({ to: '/sources', label: 'Veri Kaynakları', icon: 'sources' })
-    }
-
-    system.push({ to: '/quarantine', label: 'Karantina İnceleme', icon: 'quarantine' })
+    // Kaynak yönetimi katalog yöneticisinin işidir; karantina incelemesi ikisinin de.
+    const system: NavItem[] = [
+      { to: '/sources', label: 'Veri Kaynakları', icon: 'sources' },
+      { to: '/quarantine', label: 'Karantina İnceleme', icon: 'quarantine' },
+      { to: '/platform/catalog-repair', label: 'Katalog Onarımı', icon: 'quarantine' },
+      { to: '/platform/rule-evidence', label: 'Kanıt Bağlama', icon: 'regulation' },
+    ]
 
     platform.push({ title: 'Platform Yönetimi', items: system })
 

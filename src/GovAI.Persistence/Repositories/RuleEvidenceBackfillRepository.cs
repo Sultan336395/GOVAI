@@ -107,4 +107,36 @@ public sealed class RuleEvidenceBackfillRepository(GovAiDbContext context)
 
         return new RuleEvidenceBackfillContext(opportunity, document, version, source);
     }
+
+    public async Task<int> RemoveEvidenceAsync(
+        IReadOnlyList<GovAI.Application.Opportunities.RuleEvidenceLink> links,
+        CancellationToken cancellationToken = default)
+    {
+        if (links.Count == 0)
+        {
+            return 0;
+        }
+
+        // Aday satırlar önce kural kimliğiyle daraltılır, sonra ÜÇLÜNÜN TAMAMI
+        // .NET tarafında eşleştirilir. Üç kolonlu bir IN sorgusunu her sağlayıcı
+        // aynı şekilde çevirmez; eksik eşleşen bir sorgu, kurulmamış bir bağlantıyı
+        // silmeye kalkardı.
+        var kuralKimlikleri = links.Select(l => l.RuleId).Distinct().ToList();
+
+        var adaylar = await context.OpportunityRuleEvidence
+            .Where(e => kuralKimlikleri.Contains(e.OpportunityRuleId))
+            .ToListAsync(cancellationToken);
+
+        var hedefler = links
+            .Select(l => (l.RuleId, l.EvidenceChunkId, l.Role))
+            .ToHashSet();
+
+        var silinecekler = adaylar
+            .Where(e => hedefler.Contains((e.OpportunityRuleId, e.EvidenceChunkId, (int)e.Role)))
+            .ToList();
+
+        context.OpportunityRuleEvidence.RemoveRange(silinecekler);
+
+        return silinecekler.Count;
+    }
 }

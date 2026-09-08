@@ -5,6 +5,7 @@ using GovAI.Domain.Auditing;
 using GovAI.Domain.Common;
 using GovAI.Domain.Companies;
 using GovAI.Domain.Identity;
+using GovAI.Domain.Maintenance;
 using GovAI.Domain.Notifications;
 using GovAI.Domain.Opportunities;
 using GovAI.Domain.Regulatory;
@@ -60,6 +61,7 @@ public class GovAiDbContext(
     public DbSet<AnalysisRun> AnalysisRuns => Set<AnalysisRun>();
 
     public DbSet<OpportunityRuleEvidence> OpportunityRuleEvidence => Set<OpportunityRuleEvidence>();
+    public DbSet<MaintenanceRun> MaintenanceRuns => Set<MaintenanceRun>();
     public DbSet<ScenarioSimulation> ScenarioSimulations => Set<ScenarioSimulation>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<AuditLogEntry> AuditLog => Set<AuditLogEntry>();

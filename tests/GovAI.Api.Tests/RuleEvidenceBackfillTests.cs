@@ -231,6 +231,24 @@ public sealed class RuleEvidenceBackfillTests(GovAiApiFactory factory)
              where r.OpportunityId == opportunityId
              select e.Id).CountAsync());
 
+    /// <summary>
+    /// Planı alır ve <b>onun özetiyle</b> uygular — gerçek akış budur. Sabit bir dizeyle
+    /// uygulamak, onay kapısının varlığını değil yokluğunu doğrulardı.
+    /// </summary>
+    private async Task<JsonElement> UygulaAsync()
+    {
+        var plan = await _catalog.GetFromJsonAsync<JsonElement>(
+            "/api/opportunities/rule-evidence/backfill/plan?batchSize=500");
+
+        var yanit = await _catalog.PostAsJsonAsync(
+            "/api/opportunities/rule-evidence/backfill/apply?batchSize=500",
+            new { planHash = plan.GetProperty("planHash").GetString() });
+
+        yanit.EnsureSuccessStatusCode();
+
+        return await yanit.Content.ReadFromJsonAsync<JsonElement>();
+    }
+
     private static JsonElement Satir(JsonElement rapor, Guid opportunityId) =>
         rapor.GetProperty("items").EnumerateArray()
             .Single(i => i.GetProperty("opportunityId").GetGuid() == opportunityId);
@@ -241,7 +259,8 @@ public sealed class RuleEvidenceBackfillTests(GovAiApiFactory factory)
     public async Task Tenant_baslatamaz()
     {
         var plan = await _tenantA.GetAsync("/api/opportunities/rule-evidence/backfill/plan");
-        var apply = await _tenantA.PostAsync("/api/opportunities/rule-evidence/backfill/apply", null);
+        var apply = await _tenantA.PostAsJsonAsync(
+            "/api/opportunities/rule-evidence/backfill/apply", new { planHash = "x" });
 
         Assert.Equal(HttpStatusCode.Forbidden, plan.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, apply.StatusCode);
@@ -271,11 +290,7 @@ public sealed class RuleEvidenceBackfillTests(GovAiApiFactory factory)
         var (opportunityId, _) = await EskiKayitKurAsync(
             "https://www.kosgeb.gov.tr/site/tr/genel/destekdetay/apply-testi");
 
-        var ilk = await _catalog.PostAsync(
-            "/api/opportunities/rule-evidence/backfill/apply?batchSize=500", null);
-
-        ilk.EnsureSuccessStatusCode();
-        var ilkRapor = await ilk.Content.ReadFromJsonAsync<JsonElement>();
+        var ilkRapor = await UygulaAsync();
 
         Assert.True(ilkRapor.GetProperty("applied").GetBoolean());
         Assert.Equal("Bound", Satir(ilkRapor, opportunityId).GetProperty("outcome").GetString());
@@ -283,11 +298,7 @@ public sealed class RuleEvidenceBackfillTests(GovAiApiFactory factory)
         var sayi = await BagSayisiAsync(opportunityId);
         Assert.True(sayi > 0);
 
-        var ikinci = await _catalog.PostAsync(
-            "/api/opportunities/rule-evidence/backfill/apply?batchSize=500", null);
-
-        ikinci.EnsureSuccessStatusCode();
-        var ikinciRapor = await ikinci.Content.ReadFromJsonAsync<JsonElement>();
+        var ikinciRapor = await UygulaAsync();
 
         Assert.Equal("AlreadyBound", Satir(ikinciRapor, opportunityId).GetProperty("outcome").GetString());
         Assert.Equal(sayi, await BagSayisiAsync(opportunityId));
@@ -306,8 +317,7 @@ public sealed class RuleEvidenceBackfillTests(GovAiApiFactory factory)
         Assert.False(kuralOnce.GetProperty("supportsAiClaims").GetBoolean());
         Assert.Empty(kuralOnce.GetProperty("evidence").EnumerateArray());
 
-        (await _catalog.PostAsync("/api/opportunities/rule-evidence/backfill/apply?batchSize=500", null))
-            .EnsureSuccessStatusCode();
+        await UygulaAsync();
 
         var sonra = await _tenantA.GetFromJsonAsync<JsonElement>($"/api/opportunities/{opportunityId}");
         var kural = sonra.GetProperty("rules").EnumerateArray().Single();
@@ -331,11 +341,7 @@ public sealed class RuleEvidenceBackfillTests(GovAiApiFactory factory)
             "https://www.kosgeb.gov.tr/site/tr/genel/destekdetay/kanitsiz-testi",
             "yıllık cirosu 50 milyon TL üzerinde olan işletmeler başvurabilir");
 
-        var apply = await _catalog.PostAsync(
-            "/api/opportunities/rule-evidence/backfill/apply?batchSize=500", null);
-
-        apply.EnsureSuccessStatusCode();
-        var rapor = await apply.Content.ReadFromJsonAsync<JsonElement>();
+        var rapor = await UygulaAsync();
 
         Assert.Equal("NoEvidenceFound", Satir(rapor, opportunityId).GetProperty("outcome").GetString());
         Assert.Equal(0, await BagSayisiAsync(opportunityId));
@@ -363,11 +369,7 @@ public sealed class RuleEvidenceBackfillTests(GovAiApiFactory factory)
             await db.SaveChangesAsync();
         }
 
-        var apply = await _catalog.PostAsync(
-            "/api/opportunities/rule-evidence/backfill/apply?batchSize=500", null);
-
-        apply.EnsureSuccessStatusCode();
-        var rapor = await apply.Content.ReadFromJsonAsync<JsonElement>();
+        var rapor = await UygulaAsync();
 
         Assert.Equal("SkippedQuarantined", Satir(rapor, opportunityId).GetProperty("outcome").GetString());
         Assert.Equal(0, await BagSayisiAsync(opportunityId));

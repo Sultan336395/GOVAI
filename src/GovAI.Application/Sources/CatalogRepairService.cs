@@ -1,6 +1,9 @@
 using GovAI.Application.Abstractions.Persistence;
 using GovAI.Application.Abstractions.Services;
+using GovAI.Application.Common;
 using GovAI.Domain.Common;
+using GovAI.Domain.Maintenance;
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
 
 namespace GovAI.Application.Sources;
@@ -32,6 +35,13 @@ public sealed record CatalogRepairPlanReport(
     int MatchedRecordCount,
     int WillChangeCount,
     int AlreadyDoneCount,
+
+    /// <summary>
+    /// Bu planın parmak izi. Uygulama isteği bunu taşımak zorundadır: kullanıcının
+    /// görmediği bir plan uygulanamaz, gösterildikten sonra veri değişmişse de tutmaz.
+    /// </summary>
+    string PlanHash,
+
     IReadOnlyList<CatalogRepairMatch> Matches);
 
 /// <summary>Uygulama sonucu; her kayıt için ne olduğu tek tek durur.</summary>
@@ -39,13 +49,26 @@ public sealed record CatalogRepairOutcome(
     string StepCode,
     Guid RecordId,
     string Result,
-    int AffectedAssessmentCount);
+    int AffectedAssessmentCount,
+
+    /// <summary>
+    /// Başlık düzeltmesinde kaydın <b>önceki</b> başlığı. Geri alma bunu geri yazar;
+    /// saklanmasaydı düzeltme tek yönlü olurdu.
+    /// </summary>
+    string? PreviousTitle = null,
+
+    CatalogRepairTarget Target = CatalogRepairTarget.Opportunity,
+
+    CatalogRepairAction Action = CatalogRepairAction.Quarantine);
 
 public sealed record CatalogRepairReport(
     int Attempted,
     int Changed,
     int AlreadyDone,
-    IReadOnlyList<CatalogRepairOutcome> Outcomes);
+    IReadOnlyList<CatalogRepairOutcome> Outcomes,
+
+    /// <summary>Geri alma bu kimlikle yapılır; hiçbir şey değişmediyse <c>null</c>.</summary>
+    Guid? RunId = null);
 
 /// <summary>
 /// Bekleyen katalog onarımlarının kuru çalıştırması ve uygulanması (Faz 3).
@@ -70,8 +93,10 @@ public sealed record CatalogRepairReport(
 /// </summary>
 public sealed class CatalogRepairService(
     ICatalogRepairRepository repository,
+    IMaintenanceRunRepository runs,
     IUnitOfWork unitOfWork,
     IDateTimeProvider clock,
+    ICurrentUser currentUser,
     ILogger<CatalogRepairService> logger)
 {
     /// <summary>Kuru çalıştırma: ne değişeceğini gösterir, hiçbir şeyi değiştirmez.</summary>
@@ -84,6 +109,7 @@ public sealed class CatalogRepairService(
             matches.Count,
             matches.Count(m => m.WillChange),
             matches.Count(m => !m.WillChange),
+            Fingerprint(matches),
             matches);
     }
 
@@ -91,13 +117,39 @@ public sealed class CatalogRepairService(
     /// Planı uygular.
     ///
     /// <para>
+    /// <paramref name="confirmedPlanHash"/> ZORUNLUDUR ve o an hesaplanan planın
+    /// parmak iziyle birebir tutmalıdır. Böylece iki şey garanti edilir: kullanıcı
+    /// uyguladığı planı <b>görmüştür</b>, ve gördüğünden beri veri <b>değişmemiştir</b>.
+    /// Tutmuyorsa hiçbir kayda dokunulmaz; kullanıcı planı yeniden görüp onaylar.
+    /// </para>
+    ///
+    /// <para>
     /// Yalnızca <c>WillChange</c> olan kayıtlara dokunulur; ikinci koşu hiçbir şey
-    /// yapmaz. Bu, "yayınla" komutundan sonra çalıştırılacak tek yazma yoludur.
+    /// yapmaz.
     /// </para>
     /// </summary>
-    public async Task<CatalogRepairReport> ApplyAsync(CancellationToken cancellationToken = default)
+    public async Task<CatalogRepairReport> ApplyAsync(
+        string confirmedPlanHash,
+        CancellationToken cancellationToken = default)
     {
         var matches = await MatchAsync(cancellationToken);
+        var guncelOzet = Fingerprint(matches);
+
+        if (string.IsNullOrWhiteSpace(confirmedPlanHash))
+        {
+            throw new ValidationException(
+                nameof(confirmedPlanHash),
+                "Onaylanan planın özeti gönderilmedi. Önce planı görüntüleyip onaylayın.");
+        }
+
+        if (!string.Equals(confirmedPlanHash, guncelOzet, StringComparison.Ordinal))
+        {
+            throw new ValidationException(
+                nameof(confirmedPlanHash),
+                "Plan, siz görüntüledikten sonra değişti. Hiçbir kayda dokunulmadı; "
+                + "planı yeniden görüntüleyip onaylayın.");
+        }
+
         var outcomes = new List<CatalogRepairOutcome>();
         var now = clock.UtcNow;
 
@@ -106,7 +158,8 @@ public sealed class CatalogRepairService(
             if (!match.WillChange)
             {
                 outcomes.Add(new CatalogRepairOutcome(
-                    match.StepCode, match.RecordId, match.SkipReason ?? "Zaten uygulanmış.", 0));
+                    match.StepCode, match.RecordId, match.SkipReason ?? "Zaten uygulanmış.", 0,
+                    null, match.Target, match.Action));
 
                 continue;
             }
@@ -125,7 +178,10 @@ public sealed class CatalogRepairService(
             };
 
             outcomes.Add(new CatalogRepairOutcome(
-                match.StepCode, match.RecordId, "Uygulandı.", etkilenen));
+                match.StepCode, match.RecordId, "Uygulandı.", etkilenen,
+                // Eski başlık geri alma için SAKLANIR; kayıtta artık yok.
+                step.Action == CatalogRepairAction.RetitleFromDocument ? match.CurrentTitle : null,
+                match.Target, match.Action));
 
             logger.LogInformation(
                 "Katalog onarımı uygulandı. Adim={StepCode} Hedef={Target} KayitId={RecordId} "
@@ -133,14 +189,111 @@ public sealed class CatalogRepairService(
                 match.StepCode, match.Target, match.RecordId, etkilenen);
         }
 
+        var degisen = outcomes.Count(o => o.Result == "Uygulandı.");
+        Guid? runId = null;
+
+        if (degisen > 0)
+        {
+            var run = new MaintenanceRun(
+                MaintenanceOperation.CatalogRepair,
+                guncelOzet,
+                JsonSerializer.Serialize(outcomes.Where(o => o.Result == "Uygulandı.").ToList()),
+                degisen,
+                currentUser.Email,
+                now);
+
+            await runs.AddAsync(run, cancellationToken);
+            runId = run.Id;
+        }
+
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return new CatalogRepairReport(
             matches.Count,
-            outcomes.Count(o => o.Result == "Uygulandı."),
+            degisen,
             outcomes.Count(o => o.Result != "Uygulandı."),
-            outcomes);
+            outcomes,
+            runId);
     }
+
+    /// <summary>
+    /// Bir onarım çalıştırmasını geri alır.
+    ///
+    /// <para>
+    /// Karantinaya alınan kayıt katalogdaki yerine döner, düzeltilen başlık eski hâline
+    /// yazılır. Çalıştırma kaydı <b>silinmez</b>, geri alındı diye damgalanır: hem onarım
+    /// hem geri alma denetlenebilir kalır.
+    /// </para>
+    ///
+    /// <para>
+    /// Yalnızca bu çalıştırmanın gerçekten değiştirdiği kayıtlara dokunulur. Aradan
+    /// başka bir işlem geçtiyse (kayıt elle karantinadan çıkarıldıysa) o kayıt sessizce
+    /// atlanır — geri alma, kendi yapmadığı bir değişikliği bozmaz.
+    /// </para>
+    /// </summary>
+    public async Task<CatalogRepairReport> UndoAsync(Guid runId, CancellationToken cancellationToken = default)
+    {
+        var run = await runs.GetAsync(runId, cancellationToken)
+                  ?? throw new NotFoundException("Bakım çalıştırması", runId);
+
+        if (run.Operation != MaintenanceOperation.CatalogRepair)
+        {
+            throw new ValidationException(nameof(runId), "Bu çalıştırma bir katalog onarımı değil.");
+        }
+
+        if (!run.CanUndo)
+        {
+            throw new ValidationException(nameof(runId), "Bu çalıştırma zaten geri alınmış.");
+        }
+
+        var uygulananlar = JsonSerializer.Deserialize<List<CatalogRepairOutcome>>(run.DetailJson) ?? [];
+        var sonuclar = new List<CatalogRepairOutcome>();
+        var now = clock.UtcNow;
+
+        foreach (var uygulanan in uygulananlar)
+        {
+            var geriAlindi = uygulanan.Action switch
+            {
+                CatalogRepairAction.Quarantine =>
+                    await repository.ReleaseAsync(uygulanan.Target, uygulanan.RecordId, cancellationToken),
+
+                CatalogRepairAction.RetitleFromDocument when uygulanan.PreviousTitle is { Length: > 0 } eski =>
+                    await repository.RetitleAsync(uygulanan.Target, uygulanan.RecordId, eski, now, cancellationToken),
+
+                _ => 0
+            };
+
+            sonuclar.Add(uygulanan with
+            {
+                Result = geriAlindi > 0 ? "Geri alındı." : "Değişmemiş; atlandı.",
+                AffectedAssessmentCount = geriAlindi
+            });
+        }
+
+        run.MarkUndone(currentUser.Email, now);
+
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        logger.LogInformation(
+            "Katalog onarımı geri alındı. CalistirmaId={RunId} KayitSayisi={Count}",
+            runId, sonuclar.Count(s => s.Result == "Geri alındı."));
+
+        return new CatalogRepairReport(
+            sonuclar.Count,
+            sonuclar.Count(s => s.Result == "Geri alındı."),
+            sonuclar.Count(s => s.Result != "Geri alındı."),
+            sonuclar,
+            runId);
+    }
+
+    /// <summary>
+    /// Planın parmak izi. Değişecek <b>her şey</b> satıra girer: adım, hedef, kayıt,
+    /// eylem, önerilen başlık ve gerçekten değişip değişmeyeceği. Eksik bir alan,
+    /// değişmiş bir planın aynı özeti üretmesine yol açardı.
+    /// </summary>
+    private static string Fingerprint(IReadOnlyList<CatalogRepairMatch> matches) =>
+        PlanFingerprint.Compute(matches.Select(m =>
+            $"{m.StepCode}|{m.Target}|{m.Action}|{m.RecordId}|{m.ProposedTitle}|{m.WillChange}"));
 
     /// <summary>
     /// Adımları kayıtlarla eşleştirir.
