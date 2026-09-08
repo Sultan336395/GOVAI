@@ -15,6 +15,33 @@ const dateFormatter = new Intl.DateTimeFormat('tr-TR', {
 export const formatCurrency = (value: number | null | undefined): string =>
   value === null || value === undefined ? '—' : currencyFormatter.format(value)
 
+/**
+ * Belgeden çıkarılmış bir tutarı kendi para birimiyle yazar.
+ *
+ * `formatCurrency` her tutarı TRY sembolüyle basar; kalemin para birimini ayrıca
+ * eklemek "₺1.500.000 TRY" gibi iki kez para birimi taşıyan bir metin üretiyordu.
+ * Avro cinsinden bir AB çağrısında ise tutar yanlış para biriminde görünürdü.
+ */
+export function formatAmount(
+  value: number | null | undefined,
+  currency: string | null | undefined,
+): string {
+  if (value === null || value === undefined) return '—'
+
+  const kod = (currency ?? 'TRY').trim().toUpperCase()
+
+  try {
+    return new Intl.NumberFormat('tr-TR', {
+      style: 'currency',
+      currency: kod,
+      maximumFractionDigits: 0,
+    }).format(value)
+  } catch {
+    // Tanınmayan kod uydurulmaz; sayı yazılır, kod olduğu gibi eklenir.
+    return `${new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 0 }).format(value)} ${kod}`
+  }
+}
+
 export const formatDate = (value: string | null | undefined): string =>
   value ? dateFormatter.format(new Date(value)) : '—'
 

@@ -9,6 +9,7 @@ import {
   NOT_PROVIDED_LABEL,
   categoryLabels,
   displayField,
+  formatAmount,
   formatCurrency,
   formatDate,
   formatPercent,
@@ -67,24 +68,6 @@ export function OpportunityDetailCard({ data }: { data: OpportunityDetail }) {
             deger={data.budget?.supportRate != null ? formatPercent(data.budget.supportRate) : null}
             durum={durum.budget}
           />
-          {data.budgetItems.map((kalem) => (
-            <Alan
-              key={`${kalem.type}-${kalem.startOffset}`}
-              ad={kalem.needsReview ? `${kalem.label} (incelenmeli)` : kalem.label}
-              deger={`${formatCurrency(kalem.amount)} ${kalem.currency}`}
-              durum="Provided"
-            />
-          ))}
-          {data.budgetRates
-            .filter((oran) => !oran.needsReview)
-            .map((oran) => (
-              <Alan
-                key={`${oran.type}-${oran.startOffset}`}
-                ad={oran.label}
-                deger={formatPercent(oran.rate)}
-                durum="Provided"
-              />
-            ))}
           <Alan
             ad="Mevzuat dayanağı"
             deger={data.legalBasis}
@@ -112,6 +95,8 @@ export function OpportunityDetailCard({ data }: { data: OpportunityDetail }) {
           {displayField(data.summary)}
         </p>
       </div>
+
+      <ButceKalemleri data={data} />
 
       <div className="card" style={{ marginBottom: 16 }}>
         <h2>Başvuru koşulları ve uygunluk kriterleri</h2>
@@ -303,6 +288,98 @@ function ResmiKaynakDugmesi({ kanit }: { kanit: OpportunityProvenance }) {
       <div className="muted" style={{ fontSize: 12, marginTop: 6, overflowWrap: 'anywhere' }}>
         {kanit.officialUrl}
       </div>
+    </div>
+  )
+}
+
+/**
+ * Belgeden çıkarılmış, türü belirlenmiş bütçe kalemleri (Faz 3).
+ *
+ * Gerçek KOSGEB belgesinde "geri ödemesiz destek üst limiti 1.500.000 TL" ile
+ * "İşletme Başına Kredi Üst Limiti: 20.000.000 TL" aynı sayfada geçiyor. Tek bir
+ * "bütçe" satırı bu ikisini birleştirir ve krediyi hibe gibi gösterir. Kredi bir
+ * borçtur; karışması başvuru kararını doğrudan yanlış yönlendirir. Bu yüzden her
+ * tutar kendi başlığı, kendi para birimi ve kendi kanıt alıntısıyla yazılır.
+ */
+function ButceKalemleri({ data }: { data: OpportunityDetail }) {
+  // Türü belirlenemeyen ORAN gösterilmez: anlamı bilinmeyen bir yüzde kullanıcıya
+  // hiçbir şey söylemez, yanlış okunma riski taşır. Tutar ise gösterilir — belgede
+  // bir rakam vardır ve danışmanın bunu bilmesi gerekir; yanına uyarısı yazılır.
+  const oranlar = data.budgetRates.filter((oran) => !oran.needsReview)
+
+  if (data.budgetItems.length === 0 && oranlar.length === 0) return null
+
+  return (
+    <div className="card" style={{ marginBottom: 16 }}>
+      <h2>Belgeden çıkarılan bütçe kalemleri</h2>
+
+      <div className="grid two">
+        {data.budgetItems.map((kalem) => (
+          <ButceSatiri
+            key={`kalem-${kalem.type}-${kalem.startOffset}`}
+            ad={kalem.label}
+            deger={formatAmount(kalem.amount, kalem.currency)}
+            alinti={kalem.excerpt}
+            baslangic={kalem.startOffset}
+            bitis={kalem.endOffset}
+            incelenmeli={kalem.needsReview}
+          />
+        ))}
+        {oranlar.map((oran) => (
+          <ButceSatiri
+            key={`oran-${oran.type}-${oran.startOffset}`}
+            ad={oran.label}
+            deger={formatPercent(oran.rate)}
+            alinti={oran.excerpt}
+            baslangic={oran.startOffset}
+            bitis={oran.endOffset}
+            incelenmeli={false}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** Tek bir bütçe kalemi: başlık, değer ve o kaleme ait kanıt alıntısı. */
+function ButceSatiri({
+  ad,
+  deger,
+  alinti,
+  baslangic,
+  bitis,
+  incelenmeli,
+}: {
+  ad: string
+  deger: string
+  alinti: string | null
+  baslangic: number
+  bitis: number
+  incelenmeli: boolean
+}) {
+  return (
+    <div style={{ marginBottom: 10 }} data-butce-kalemi={ad}>
+      <div className="muted" style={{ fontSize: 12 }}>
+        {ad}
+      </div>
+      <div>{deger}</div>
+
+      {incelenmeli ? (
+        <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
+          Bu tutarın türü resmî belgeden kesin olarak anlaşılamadı; hibe olarak kabul
+          etmeyin, belgeden doğrulayın.
+        </div>
+      ) : null}
+
+      {alinti ? (
+        <blockquote className="muted" style={{ fontSize: 12, margin: '4px 0 0', padding: 0 }}>
+          “{alinti}” <span>(belge karakter aralığı {baslangic}–{bitis})</span>
+        </blockquote>
+      ) : (
+        <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
+          {NOT_PROVIDED_LABEL}
+        </div>
+      )}
     </div>
   )
 }
