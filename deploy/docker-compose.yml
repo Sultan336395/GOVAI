@@ -99,6 +99,22 @@ services:
       Jwt__Issuer: govai
       Jwt__Audience: govai-api
       OpenAI__ApiKey: ${OPENAI_API_KEY:-}
+
+      # DeepTech analiz sağlayıcısı (Faz 3).
+      #
+      # DEĞERLER DEĞİL, YALNIZCA GEÇİŞ YAZILIDIR. Anahtar bu dosyada durmaz;
+      # sunucudaki .env dosyasından (izin 600) okunur. Üçü de boşsa uygulama
+      # kural tabanlı çalışır ve bunu ekranda açıkça söyler — eksik anahtarla
+      # "hibrit analiz aktif" gösterilmez.
+      GOVAI_AI_ENABLED: ${GOVAI_AI_ENABLED:-true}
+      GOVAI_AI_PROVIDER: ${GOVAI_AI_PROVIDER:-none}
+      GOVAI_AI_API_KEY: ${GOVAI_AI_API_KEY:-}
+      GOVAI_AI_MODEL: ${GOVAI_AI_MODEL:-}
+      GOVAI_AI_TIMEOUT_SECONDS: ${GOVAI_AI_TIMEOUT_SECONDS:-30}
+      GOVAI_AI_MAX_INPUT_TOKENS: ${GOVAI_AI_MAX_INPUT_TOKENS:-8000}
+      GOVAI_AI_MAX_OUTPUT_TOKENS: ${GOVAI_AI_MAX_OUTPUT_TOKENS:-1500}
+      GOVAI_AI_MAX_EVIDENCE_CHUNKS: ${GOVAI_AI_MAX_EVIDENCE_CHUNKS:-20}
+      GOVAI_AI_MAX_RETRIES: ${GOVAI_AI_MAX_RETRIES:-2}
       Redis__Enabled: "true"
       Redis__ConnectionString: "redis:6379"
       RabbitMq__Enabled: "true"

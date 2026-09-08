@@ -806,6 +806,34 @@ public sealed class SourceService(
         document.CollectedAt,
     };
 
+    /// <summary>
+    /// Yeniden ayrıştırma mesajı: ham içeriği <b>taşır</b>.
+    ///
+    /// <para>
+    /// Normal ayrıştırma mesajı ham içeriği taşımaz ve worker belgeyi adresinden
+    /// yeniden indirir. Bakım işlemlerinde bu istenmez: kayıt zaten veritabanında
+    /// duruyorken kaynağa yeniden gitmek gereksiz yük bindirir, adres değişmiş ya da
+    /// kaldırılmışsa da elimizdeki içerik kaybolur. Ham içerik mesajla gittiğinde
+    /// worker internete <b>hiç çıkmaz</b> (bkz. <c>parser/runner.py</c>:
+    /// <c>raw = document.get("rawContent")</c>).
+    /// </para>
+    /// </summary>
+    internal static object ReparsePayload(Source source, SourceDocument document) => new
+    {
+        DocumentId = document.Id,
+        SourceId = source.Id,
+        SourceName = source.Name,
+        SourceType = source.Type.ToString(),
+        SourceCategory = source.Category.ToString(),
+        Authority = source.Profile.Authority,
+        Jurisdiction = source.Profile.Jurisdiction,
+        document.Url,
+        document.Title,
+        document.MediaType,
+        document.CollectedAt,
+        document.RawContent
+    };
+
     private static SourceDto ToDto(Source source, bool includeOperationalDetail = true) => new(
         source.Id,
         source.Name,

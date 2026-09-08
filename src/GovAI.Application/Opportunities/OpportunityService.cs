@@ -194,67 +194,16 @@ public sealed class OpportunityService(
         // ReplaceRules sırayı korur; istek ile kural aynı indekste eşleşir.
         for (var i = 0; i < kurallar.Count && i < istekler.Count; i++)
         {
-            foreach (var (chunk, role) in MatchChunks(version.Chunks, istekler[i]))
-            {
-                kurallar[i].AttachEvidence(new OpportunityRuleEvidence(
-                    chunk.Id,
-                    version.Id,
-                    role,
-                    chunk.StartOffset,
-                    chunk.EndOffset,
-                    now,
-                    chunk.PageNumber,
-                    chunk.SectionTitle));
-            }
+            var eslesen = RuleEvidenceBinder.Match(
+                version.Chunks,
+                istekler[i].SourceExcerpt,
+                istekler[i].StartOffset,
+                istekler[i].EndOffset);
+
+            RuleEvidenceBinder.Attach(kurallar[i], version, eslesen, now);
         }
     }
 
-    /// <summary>
-    /// Bir kuralın hangi parçalara dayandığını bulur.
-    ///
-    /// <para>
-    /// Önce karakter aralığı çakışması aranır — değerin gerçekten yazdığı parça budur.
-    /// Aralık yoksa alıntı metni parçalarda aranır; bu daha zayıf bir bağdır ve
-    /// <see cref="RuleEvidenceRole.ConditionText"/> olarak işaretlenir.
-    /// </para>
-    /// </summary>
-    private static IEnumerable<(DocumentEvidenceChunk Chunk, RuleEvidenceRole Role)> MatchChunks(
-        IReadOnlyList<DocumentEvidenceChunk> chunks,
-        UpsertRuleDto rule)
-    {
-        if (rule.StartOffset is { } baslangic && rule.EndOffset is { } bitis && bitis > baslangic)
-        {
-            var cakisan = chunks
-                .Where(c => c.StartOffset < bitis && baslangic < c.EndOffset)
-                .ToList();
-
-            if (cakisan.Count > 0)
-            {
-                return cakisan.Select(c => (c, RuleEvidenceRole.ValueSource));
-            }
-        }
-
-        if (!string.IsNullOrWhiteSpace(rule.SourceExcerpt))
-        {
-            var aranan = TurkceMetin.Katla(rule.SourceExcerpt.Trim());
-
-            // Kısa alıntı yanlış parçaya bağlanabilir; asgari uzunluk şartı konur.
-            if (aranan.Length >= 20)
-            {
-                var eslesen = chunks
-                    .Where(c => TurkceMetin.Katla(c.Text).Contains(aranan, StringComparison.Ordinal)
-                                || aranan.Contains(TurkceMetin.Katla(c.Text), StringComparison.Ordinal))
-                    .ToList();
-
-                if (eslesen.Count > 0)
-                {
-                    return eslesen.Select(c => (c, RuleEvidenceRole.ConditionText));
-                }
-            }
-        }
-
-        return [];
-    }
 
     /// <summary>
     /// Hangi alanın neden boş olduğunu belirler.

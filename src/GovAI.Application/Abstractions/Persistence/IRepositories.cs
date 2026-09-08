@@ -312,6 +312,52 @@ public interface ICatalogRepairRepository
         CancellationToken cancellationToken = default);
 }
 
+/// <summary>
+/// Mevcut fırsat kayıtlarına geriye dönük kanıt bağlamanın veri erişimi (Faz 3).
+///
+/// <para>
+/// Fırsat, kaynağı, belgesi ve belgenin son sürümü tek bir bağlamda gerekir; ayrı
+/// depolardan toplamak her kayıt için dört ayrı gidiş-dönüş demekti. Katalog ortaktır,
+/// kiracı filtresi yoktur.
+/// </para>
+/// </summary>
+public interface IRuleEvidenceBackfillRepository
+{
+    /// <summary>
+    /// Kimliğe göre sıralı adaylar. <paramref name="afterOpportunityId"/> imleçtir:
+    /// işlem kesilirse kaldığı yerden devam edilir.
+    /// </summary>
+    Task<IReadOnlyList<Guid>> ListCandidateIdsAsync(
+        Guid? afterOpportunityId,
+        int take,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Bu imleçten sonra işlenecek başka kayıt var mı?</summary>
+    Task<bool> HasMoreAsync(Guid afterOpportunityId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Fırsatı kuralları ve <b>mevcut kanıt bağlantılarıyla</b>, dayandığı belgeyi son
+    /// sürümü ve parçalarıyla yükler. Kanıtlar yüklenmezse ikinci koşu mükerrer bağ
+    /// kurmaya çalışırdı.
+    /// </summary>
+    Task<RuleEvidenceBackfillContext?> LoadContextAsync(
+        Guid opportunityId,
+        CancellationToken cancellationToken = default);
+}
+
+/// <summary>Tek bir fırsatın geriye dönük bağlama bağlamı.</summary>
+public sealed record RuleEvidenceBackfillContext(
+    Opportunity Opportunity,
+
+    /// <summary>Fırsatın dayandığı belge; elle açılmış kayıtlarda <c>null</c>.</summary>
+    SourceDocument? Document,
+
+    /// <summary>Belgenin en yüksek numaralı sürümü, parçalarıyla.</summary>
+    SourceDocumentVersion? LatestVersion,
+
+    /// <summary>Belgenin kaynağı; yeniden ayrıştırma mesajı bunu gerektirir.</summary>
+    Source? Source);
+
 public interface IScenarioSimulationRepository
 {
     Task<ScenarioSimulation?> GetWithImpactsAsync(Guid simulationId, CancellationToken cancellationToken = default);

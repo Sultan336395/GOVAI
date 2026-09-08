@@ -36,6 +36,7 @@ public static class DependencyInjection
         services.AddScoped<IAssessmentRepository, AssessmentRepository>();
         services.AddScoped<IAnalysisRunRepository, AnalysisRunRepository>();
         services.AddScoped<ICatalogRepairRepository, CatalogRepairRepository>();
+        services.AddScoped<IRuleEvidenceBackfillRepository, RuleEvidenceBackfillRepository>();
         services.AddScoped<IScenarioSimulationRepository, ScenarioSimulationRepository>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
