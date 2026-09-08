@@ -158,6 +158,22 @@ public interface IRegulatoryChangeRepository
         CancellationToken cancellationToken = default);
 
     Task<RegulatoryChangeDetailDto?> GetDetailAsync(Guid changeId, CancellationToken cancellationToken = default);
+
+    /// <summary>Etki analizi için kaydın kendisi; DTO değil, kural motoruna verilecek varlık.</summary>
+    Task<RegulatoryChange?> GetAsync(Guid changeId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Kaydın dayandığı belge sürümünün kanıt parçaları.
+    ///
+    /// <para>
+    /// Etki analizi belgede <b>gerçekten yazan</b> ifadeleri arar; kanıt parçası
+    /// olmadan yükümlülük üretilemez. Sürüm kimliğiyle okunur ki belge güncellendiğinde
+    /// eski analiz eski kanıta bağlı kalsın.
+    /// </para>
+    /// </summary>
+    Task<IReadOnlyList<DocumentEvidenceChunk>> ListEvidenceAsync(
+        Guid documentVersionId,
+        CancellationToken cancellationToken = default);
 }
 
 public interface ISourceDocumentRepository

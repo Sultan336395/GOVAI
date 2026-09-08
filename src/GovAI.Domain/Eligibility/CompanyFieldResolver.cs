@@ -38,7 +38,10 @@ public static class CompanyFieldResolver
             ["Financials.Equity"] = "Özkaynak",
             ["Financials.ExportRevenue"] = "İhracat cirosu",
             ["Financials.ExportRatio"] = "İhracatın ciroya oranı (0..1)",
-            ["Financials.FiscalYear"] = "Mali verinin ait olduğu yıl"
+            ["Financials.FiscalYear"] = "Mali verinin ait olduğu yıl",
+            ["Financials.AnnualIncome"] = "Yıllık gelir (yıllık toplu mali veriden)",
+            ["Financials.AnnualExpense"] = "Yıllık gider (yıllık toplu mali veriden)",
+            ["Financials.NetProfitOrLoss"] = "Net kâr/zarar (yıllık toplu mali veriden)"
         };
 
     public static FieldValue Resolve(Company company, string field, DateOnly asOf)
@@ -78,12 +81,25 @@ public static class CompanyFieldResolver
             var f when Is(f, "Workforce.RAndDEmployeeRate") => Headcount(company, company.Workforce.RAndDEmployeeRate),
             var f when Is(f, "Workforce.DisabledEmployeeCount") => Headcount(company, company.Workforce.DisabledEmployeeCount),
 
-            var f when Is(f, "Financials.AnnualRevenue") => Money(company.Financials.AnnualRevenue),
-            var f when Is(f, "Financials.BalanceSize") => Money(company.Financials.BalanceSize),
+            // Yıllık toplu mali kayıt varsa önceliklidir: hangi yıla ait olduğu bellidir
+            // ve doğrulama durumu taşır. Yoksa tek dönemlik eski alanlara düşülür —
+            // Faz 3 öncesi girilmiş profiller bozulmadan çalışmaya devam eder.
+            var f when Is(f, "Financials.AnnualRevenue") =>
+                Annual(company, a => a.AnnualRevenue) is { IsKnown: true } yillik
+                    ? yillik
+                    : Money(company.Financials.AnnualRevenue),
+            var f when Is(f, "Financials.BalanceSize") =>
+                Annual(company, a => a.BalanceTotal) is { IsKnown: true } bilanco
+                    ? bilanco
+                    : Money(company.Financials.BalanceSize),
+            var f when Is(f, "Financials.AnnualIncome") => Annual(company, a => a.AnnualIncome),
+            var f when Is(f, "Financials.AnnualExpense") => Annual(company, a => a.AnnualExpense),
+            var f when Is(f, "Financials.NetProfitOrLoss") => Annual(company, a => a.NetProfitOrLoss),
             var f when Is(f, "Financials.Equity") => FieldValue.FromNumber(company.Financials.Equity),
             var f when Is(f, "Financials.ExportRevenue") => Money(company.Financials.ExportRevenue),
             var f when Is(f, "Financials.ExportRatio") => FieldValue.FromNumber(company.Financials.ExportRatio),
-            var f when Is(f, "Financials.FiscalYear") => FieldValue.FromNumber(company.Financials.FiscalYear),
+            var f when Is(f, "Financials.FiscalYear") =>
+                FieldValue.FromNumber(company.LatestAnnualFinancials()?.FiscalYear ?? company.Financials.FiscalYear),
 
             _ => FieldValue.Unknown()
         };
@@ -105,6 +121,22 @@ public static class CompanyFieldResolver
         company.Workforce.YoungEmployeeMaxAge is null
             ? FieldValue.Unknown()
             : Headcount(company, value);
+
+    /// <summary>
+    /// En güncel yıllık mali kayıttan bir alanı okur.
+    ///
+    /// <para>
+    /// <c>null</c> "girilmedi" demektir ve <see cref="FieldValue.Unknown"/> döner —
+    /// sıfır sayılırsa cirosu girilmemiş bir firma "cirosu 0" diye elenirdi. Net
+    /// kâr/zarar alanında sıfır <b>geçerli bir değerdir</b>; bu yüzden burada sıfır
+    /// filtrelenmez, yalnızca <c>null</c> bilinmeyen sayılır.
+    /// </para>
+    /// </summary>
+    private static FieldValue Annual(Company company, Func<AnnualFinancialRecord, decimal?> selector)
+    {
+        var kayit = company.LatestAnnualFinancials();
+        return kayit is null ? FieldValue.Unknown() : FieldValue.FromNumber(selector(kayit));
+    }
 
     private static FieldValue Money(decimal value) =>
         value == 0m ? FieldValue.Unknown() : FieldValue.FromNumber(value);

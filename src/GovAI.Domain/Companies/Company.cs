@@ -13,6 +13,7 @@ public class Company : AggregateRoot, IAuditable, ISoftDeletable, ITenantScoped
     private readonly List<CompanyCertificate> _certificates = [];
     private readonly List<CompanyInvestment> _activeInvestments = [];
     private readonly List<CompanyNaceCode> _naceCodes = [];
+    private readonly List<AnnualFinancialRecord> _annualFinancials = [];
 
     private Company()
     {
@@ -54,6 +55,19 @@ public class Company : AggregateRoot, IAuditable, ISoftDeletable, ITenantScoped
     public int PreviousSuccessfulApplications { get; private set; }
 
     public IReadOnlyCollection<CompanyNaceCode> NaceCodes => _naceCodes.AsReadOnly();
+
+    /// <summary>
+    /// Yıl bazlı toplu mali veriler (Faz 3). İsteğe bağlıdır: girilmediğinde mali
+    /// kriterler <b>bilinmiyor</b> kalır, firma elenmez.
+    /// </summary>
+    public IReadOnlyCollection<AnnualFinancialRecord> AnnualFinancials => _annualFinancials.AsReadOnly();
+
+    /// <summary>
+    /// Mali verinin kaçıncı sürümü. Profil sürümünden ayrı tutulur: mali veri
+    /// güncellendiğinde analiz tazelenmeli, ancak "profil değişti" bildirimleri
+    /// tetiklenmemelidir; ikisi farklı olaylardır ve analiz kaydı ikisini de saklar.
+    /// </summary>
+    public int FinancialDataVersion { get; private set; } = 1;
 
     public IReadOnlyCollection<CompanyLocation> Locations => _locations.AsReadOnly();
 
@@ -238,6 +252,44 @@ public class Company : AggregateRoot, IAuditable, ISoftDeletable, ITenantScoped
         _activeInvestments.AddRange(investments);
         BumpVersion();
     }
+
+    /// <summary>
+    /// Bir mali yılın toplu verisini yazar veya günceller. Aynı yıl iki kez eklenmez;
+    /// eski kayıt güncellenir, geçmiş yıllar korunur.
+    /// </summary>
+    public void UpsertAnnualFinancials(
+        int fiscalYear,
+        string currency,
+        decimal? annualRevenue,
+        decimal? annualIncome,
+        decimal? annualExpense,
+        decimal? netProfitOrLoss,
+        decimal? balanceTotal,
+        FinancialDataSource dataSource,
+        FinancialVerificationStatus verificationStatus,
+        DateTimeOffset updatedAt)
+    {
+        var existing = _annualFinancials.FirstOrDefault(f => f.FiscalYear == fiscalYear);
+
+        if (existing is null)
+        {
+            _annualFinancials.Add(new AnnualFinancialRecord(
+                fiscalYear, currency, annualRevenue, annualIncome, annualExpense,
+                netProfitOrLoss, balanceTotal, dataSource, verificationStatus, updatedAt));
+        }
+        else
+        {
+            existing.Update(
+                currency, annualRevenue, annualIncome, annualExpense,
+                netProfitOrLoss, balanceTotal, dataSource, verificationStatus, updatedAt);
+        }
+
+        FinancialDataVersion++;
+    }
+
+    /// <summary>En yeni mali yıla ait kayıt; hiç veri yoksa <c>null</c>.</summary>
+    public AnnualFinancialRecord? LatestAnnualFinancials() =>
+        _annualFinancials.Where(f => !f.IsEmpty).OrderByDescending(f => f.FiscalYear).FirstOrDefault();
 
     public void MarkSynced(DateTimeOffset syncedAt) => LastSyncedAt = syncedAt;
 

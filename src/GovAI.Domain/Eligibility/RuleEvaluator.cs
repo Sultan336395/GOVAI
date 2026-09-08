@@ -24,6 +24,7 @@ public static class RuleEvaluator
             Dimension = rule.Dimension,
             Severity = rule.Severity,
             Outcome = outcome,
+            Operator = rule.Operator,
             Requirement = rule.HumanReadable,
             ActualValue = actual.Display(),
             ExpectedValue = DescribeExpectation(rule),

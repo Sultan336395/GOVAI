@@ -1,6 +1,15 @@
-namespace GovAI.Application.Common;
+namespace GovAI.Domain.Common;
 
-/// <summary>Türkçe metin karşılaştırma yardımcıları.</summary>
+/// <summary>
+/// Türkçe metin karşılaştırma yardımcıları.
+///
+/// <para>
+/// Faz 3'te <c>GovAI.Application.Common</c> altından buraya taşındı: mevzuat etki
+/// motoru resmî belge metninde deterministik arama yapıyor ve <c>Domain</c> katmanı
+/// <c>Application</c>'a bağımlı olamaz. Kopya bir katlama yazmak, iki tarafın zamanla
+/// farklı eşleşmesi demekti — aynı belgede biri "İŞVEREN"i bulur, diğeri bulmazdı.
+/// </para>
+/// </summary>
 public static class TurkceMetin
 {
     /// <summary>

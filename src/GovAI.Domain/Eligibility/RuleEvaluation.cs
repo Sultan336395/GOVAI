@@ -19,6 +19,14 @@ public sealed record RuleEvaluation
 
     public required RuleOutcome Outcome { get; init; }
 
+    /// <summary>
+    /// Kuralın karşılaştırma operatörü. Kriter düzeyinde <b>çelişki</b> aramak için
+    /// gerekir: aynı alanı aynı operatörle sınırlayan iki koşul farklı değer bekliyorsa
+    /// belge kendi içinde tutarsızdır. Operatör olmadan "ciro ≥ 1M" ile "ciro ≤ 500K"
+    /// ayrımı yapılamaz.
+    /// </summary>
+    public RuleOperator Operator { get; init; } = RuleOperator.Equals;
+
     /// <summary>Kuralın Türkçe metni (ör. "Asgari 10 çalışan").</summary>
     public required string Requirement { get; init; }
 

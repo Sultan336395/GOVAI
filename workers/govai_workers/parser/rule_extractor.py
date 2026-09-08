@@ -54,6 +54,9 @@ ALLOWED_FIELDS: dict[str, str] = {
     "Financials.ExportRevenue": "İhracat cirosu",
     "Financials.ExportRatio": "İhracatın ciroya oranı (0..1)",
     "Financials.FiscalYear": "Mali verinin yılı",
+    "Financials.AnnualIncome": "Yıllık gelir",
+    "Financials.AnnualExpense": "Yıllık gider",
+    "Financials.NetProfitOrLoss": "Net kâr/zarar",
 }
 
 VALID_OPERATORS = {

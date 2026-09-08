@@ -1,4 +1,5 @@
 using GovAI.Application.Common;
+using GovAI.Domain.Common;
 using GovAI.Application.Reference;
 
 namespace GovAI.Application.Tests;

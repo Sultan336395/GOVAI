@@ -118,7 +118,13 @@ public sealed class CompanyConfiguration : IEntityTypeConfiguration<Company>
             .HasForeignKey(i => i.CompanyId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        UseBackingFields(builder, "NaceCodes", "Locations", "Certificates", "ActiveInvestments");
+        builder.HasMany(c => c.AnnualFinancials)
+            .WithOne()
+            .HasForeignKey(f => f.CompanyId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        UseBackingFields(
+            builder, "NaceCodes", "Locations", "Certificates", "ActiveInvestments", "AnnualFinancials");
 
         // Sorgu filtresi GovAiDbContext.ApplyTenantFilters içinde tanımlıdır
         // (yumuşak silme + kiracı sınırı birlikte).
@@ -142,6 +148,37 @@ public sealed class CompanyNaceCodeConfiguration : IEntityTypeConfiguration<Comp
         builder.Property(n => n.Code).HasMaxLength(12).IsRequired();
         builder.Property(n => n.Description).HasMaxLength(500);
         builder.HasIndex(n => new { n.CompanyId, n.Code }).IsUnique();
+    }
+}
+
+/// <summary>
+/// Yıl bazlı toplu mali veri (Faz 3).
+///
+/// <para>
+/// Tutar sütunları <b>null yapılabilir</b>: sıfır ile "girilmedi" farklı şeylerdir ve
+/// sıfır ciroyla eleme yapılırsa profili eksik firma haksız yere elenir. Kişisel veri
+/// sütunu yoktur ve eklenmemelidir.
+/// </para>
+/// </summary>
+public sealed class AnnualFinancialRecordConfiguration : IEntityTypeConfiguration<AnnualFinancialRecord>
+{
+    public void Configure(EntityTypeBuilder<AnnualFinancialRecord> builder)
+    {
+        builder.ToTable("company_annual_financials");
+        builder.HasKey(f => f.Id);
+        builder.Ignore(f => f.IsEmpty);
+
+        builder.Property(f => f.Currency).HasMaxLength(3).IsRequired();
+        builder.Property(f => f.AnnualRevenue).HasPrecision(20, 2);
+        builder.Property(f => f.AnnualIncome).HasPrecision(20, 2);
+        builder.Property(f => f.AnnualExpense).HasPrecision(20, 2);
+        builder.Property(f => f.NetProfitOrLoss).HasPrecision(20, 2);
+        builder.Property(f => f.BalanceTotal).HasPrecision(20, 2);
+        builder.Property(f => f.DataSource).HasConversion<int>();
+        builder.Property(f => f.VerificationStatus).HasConversion<int>();
+
+        // Aynı firma için aynı mali yıl iki kez tutulamaz; ikinci kayıt eskisini günceller.
+        builder.HasIndex(f => new { f.CompanyId, f.FiscalYear }).IsUnique();
     }
 }
 

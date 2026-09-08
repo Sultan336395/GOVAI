@@ -6,6 +6,7 @@ using GovAI.Domain.Common;
 using GovAI.Domain.Companies;
 using GovAI.Domain.Identity;
 using GovAI.Domain.Regulatory;
+using GovAI.Domain.Sources;
 using Microsoft.EntityFrameworkCore;
 
 namespace GovAI.Persistence.Repositories;
@@ -357,6 +358,17 @@ public sealed class QuarantineQueryRepository(GovAiDbContext context) : IQuarant
 /// </summary>
 public sealed class RegulatoryChangeRepository(GovAiDbContext context) : IRegulatoryChangeRepository
 {
+    public Task<RegulatoryChange?> GetAsync(Guid changeId, CancellationToken cancellationToken = default) =>
+        context.RegulatoryChanges.FirstOrDefaultAsync(r => r.Id == changeId, cancellationToken);
+
+    public async Task<IReadOnlyList<DocumentEvidenceChunk>> ListEvidenceAsync(
+        Guid documentVersionId,
+        CancellationToken cancellationToken = default) =>
+        await context.DocumentEvidenceChunks
+            .Where(c => c.DocumentVersionId == documentVersionId)
+            .OrderBy(c => c.SequenceNumber)
+            .ToListAsync(cancellationToken);
+
     public Task<bool> ExistsAsync(
         Guid documentVersionId,
         string contentHash,
