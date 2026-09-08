@@ -110,6 +110,31 @@ public static class BudgetLabels
     };
 }
 
+/// <summary>
+/// Kanıt parçasının gösterim bilgisi. Kanıt satırında saklanmaz, belge sürümünden
+/// okunur: metni kopyalamak iki ayrı doğruluk kaynağı yaratırdı.
+/// </summary>
+public sealed record RuleEvidenceContext(
+    string Text,
+    string TextHash,
+    int DocumentVersionNumber,
+    string? OfficialUrl);
+
+/// <summary>Kuralın dayandığı tek bir resmî kanıt parçası (Faz 3).</summary>
+public sealed record RuleEvidenceDto(
+    Guid EvidenceChunkId,
+    Guid DocumentVersionId,
+    RuleEvidenceRole Role,
+    string RoleLabel,
+    int StartOffset,
+    int EndOffset,
+    int? PageNumber,
+    string? SectionTitle,
+    string Text,
+    string TextHash,
+    string? OfficialUrl,
+    int? DocumentVersionNumber);
+
 public sealed record OpportunityRuleDto(
     Guid Id,
     string Field,
@@ -120,7 +145,21 @@ public sealed record OpportunityRuleDto(
     string HumanReadable,
     string? SourceExcerpt,
     decimal Confidence,
-    bool IsManuallyOverridden);
+    bool IsManuallyOverridden,
+    IReadOnlyList<RuleEvidenceDto> Evidence,
+    // Bu kural hakkında yapay zekâ resmî kaynağa dayalı iddia üretebilir mi?
+    bool SupportsAiClaims);
+
+/// <summary>Kanıt rolünün Türkçe karşılığı; ham enum adı ekrana çıkmaz.</summary>
+public static class RuleEvidenceLabels
+{
+    public static string Of(RuleEvidenceRole role) => role switch
+    {
+        RuleEvidenceRole.ValueSource => "Değerin geçtiği bölüm",
+        RuleEvidenceRole.ConditionText => "Koşulun geçtiği bölüm",
+        _ => "Bağlam"
+    };
+}
 
 public sealed record DocumentRequirementDto(string Code, string Name, bool IsMandatory, string? IssuingAuthority, string? Notes);
 
@@ -209,6 +248,17 @@ public sealed record UpsertOpportunityRequest
     public bool IsContinuouslyOpen { get; init; }
 }
 
+/// <summary>
+/// Ayrıştırıcıdan gelen tek bir koşul.
+///
+/// <para>
+/// <c>StartOffset</c>/<c>EndOffset</c> koşulun belge metnindeki yeridir. Worker kanıt
+/// parçalarının kimliklerini bilmez — parçalar API tarafında oluşturulur — bu yüzden
+/// bağlama sunucuda, karakter aralığı çakışmasıyla yapılır. Alanlar <c>null</c> ise
+/// kural kanıtsız kalır; deterministik motor onu kullanmaya devam eder ama yapay zekâ
+/// o kural hakkında resmî kaynağa dayalı iddia üretemez.
+/// </para>
+/// </summary>
 public sealed record UpsertRuleDto(
     string Field,
     RuleOperator Operator,
@@ -217,7 +267,9 @@ public sealed record UpsertRuleDto(
     RuleSeverity Severity,
     string HumanReadable,
     string? SourceExcerpt,
-    decimal Confidence);
+    decimal Confidence,
+    int? StartOffset = null,
+    int? EndOffset = null);
 
 /// <summary>Danışmanın tek bir kuralı elle düzeltmesi (istisna yönetimi).</summary>
 public sealed record OverrideRuleRequest(

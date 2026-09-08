@@ -126,6 +126,23 @@ public class RegulatoryChange : AggregateRoot, IAuditable
         Summary = string.IsNullOrWhiteSpace(summary) ? null : summary.Trim();
     }
 
+    /// <summary>
+    /// Başlığı belge sürümündeki gerçek başlıkla düzeltir (Faz 3 onarımı).
+    ///
+    /// <para>
+    /// Boş başlık kabul edilmez: bozuk bir başlık görülür ve düzeltilebilir, boş başlık
+    /// kaydı bulunamaz hâle getirir. SGK sayfalarında başlık menü başlığından
+    /// ("ÇALIŞAN VE İŞVEREN") alınmıştı; kaydın konusunu anlatmıyordu.
+    /// </para>
+    /// </summary>
+    public void Retitle(string title, DateTimeOffset repairedAt)
+    {
+        DomainException.ThrowIf(string.IsNullOrWhiteSpace(title), "Mevzuat başlığı boş olamaz.");
+
+        Title = title.Trim();
+        LastVerifiedAt = repairedAt;
+    }
+
     /// <summary>Resmî kaynağa karşı doğrulandı; panelde gösterilebilir.</summary>
     public void MarkVerified(DateTimeOffset verifiedAt)
     {

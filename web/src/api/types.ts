@@ -241,6 +241,25 @@ export type RuleOperator =
   | 'IsFalse'
 
 /** Fırsatın kural taslağı. C# karşılığı: OpportunityRuleDto. */
+/** Kanıtın kural içindeki kullanım türü. */
+export type RuleEvidenceRole = 'ValueSource' | 'ConditionText' | 'Supporting'
+
+/** Bir kuralın dayandığı resmî kanıt parçası; zincirin görünen halkası. */
+export interface RuleEvidence {
+  evidenceChunkId: string
+  documentVersionId: string
+  role: RuleEvidenceRole
+  roleLabel: string
+  startOffset: number
+  endOffset: number
+  pageNumber: number | null
+  sectionTitle: string | null
+  text: string
+  textHash: string
+  officialUrl: string | null
+  documentVersionNumber: number | null
+}
+
 export interface OpportunityRule {
   id: string
   field: string
@@ -252,6 +271,10 @@ export interface OpportunityRule {
   sourceExcerpt: string | null
   confidence: number
   isManuallyOverridden: boolean
+  /** Kuralın dayandığı resmî kanıt parçaları. Bir kural birden çok parçaya dayanabilir. */
+  evidence: RuleEvidence[]
+  /** Kanıt yoksa yapay zekâ bu kural hakkında resmî kaynağa dayalı iddia üretemez. */
+  supportsAiClaims: boolean
 }
 
 export interface DocumentRequirement {
@@ -790,6 +813,8 @@ export interface EvidenceChunk {
   endOffset: number
   /** Parçanın metninin SHA-256'sı; kanıtın değişmediği bununla gösterilir. */
   textHash: string
+  /** Parçanın kimliği; kural–kanıt zinciri bu alanla eşleştirilir. */
+  evidenceChunkId: string
 }
 
 export interface RegulatoryChangeDetail extends RegulatoryChangeSummary {
@@ -954,6 +979,11 @@ export interface AnalysisConfidence {
   levelLabel: string
   factors: ConfidenceFactor[]
   ruleSetVersion: string
+  /**
+   * Göstergenin başlığı: yapay zekâ çalışmadıysa "Kural tabanlı güven".
+   * "Hibrit güven" yazmak, model hiç çalışmamışken onun da doğruladığı izlenimi verir.
+   */
+  title: string
 }
 
 export interface RuleAiConflict {
@@ -971,6 +1001,10 @@ export interface AnalysisContribution {
   rejectedClaimCount: number
   conflicts: RuleAiConflict[]
   warning: string | null
+  /** "Kural tabanlı analiz" veya "Hibrit analiz". */
+  modeLabel: string
+  /** Model çalışmadıysa "Kullanılamıyor"; sıfır gösterilmez. */
+  aiConfidenceLabel: string
 }
 
 export interface AnalysisVersion {

@@ -118,12 +118,13 @@ export function OpportunityDetailCard({ data }: { data: OpportunityDetail }) {
               </thead>
               <tbody>
                 {data.rules.map((kural) => (
-                  <tr key={kural.id}>
+                  <tr key={kural.id} data-kural={kural.id}>
                     <td>{kural.humanReadable}</td>
                     <td>{kural.dimension}</td>
                     <td>{kural.severity}</td>
                     <td className="muted" style={{ fontSize: 12 }}>
                       {kural.sourceExcerpt ?? NOT_PROVIDED_LABEL}
+                      <KuralKanitlari kural={kural} />
                     </td>
                   </tr>
                 ))}
@@ -289,6 +290,47 @@ function ResmiKaynakDugmesi({ kanit }: { kanit: OpportunityProvenance }) {
         {kanit.officialUrl}
       </div>
     </div>
+  )
+}
+
+/**
+ * Bir kuralın dayandığı resmî kanıt parçaları (Faz 3).
+ *
+ * Zincir burada görünür hâle gelir: kural → kanıt parçası → belge sürümü → resmî URL.
+ * Kanıtı olmayan kural gizlenmez; "kanıt bağlanamadı" yazar ve yapay zekânın o kural
+ * hakkında konuşamayacağı söylenir. Sessizce boş bırakmak, kullanıcıya kanıt varmış
+ * gibi hissettirirdi.
+ */
+function KuralKanitlari({ kural }: { kural: OpportunityRule }) {
+  if (kural.evidence.length === 0) {
+    return (
+      <div style={{ marginTop: 4 }} data-kanit-yok={kural.id}>
+        Resmî belgede kanıt parçası bağlanamadı; bu koşul için yapay zekâ açıklaması
+        üretilmez.
+      </div>
+    )
+  }
+
+  return (
+    <ul style={{ margin: '4px 0 0', paddingLeft: 16 }} data-kanit-listesi={kural.id}>
+      {kural.evidence.map((kanit) => (
+        <li key={kanit.evidenceChunkId}>
+          {kanit.roleLabel}
+          {kanit.sectionTitle ? ` · ${kanit.sectionTitle}` : ''}
+          {kanit.pageNumber != null ? ` · s.${kanit.pageNumber}` : ''}
+          {` · karakter ${kanit.startOffset}–${kanit.endOffset}`}
+          {kanit.documentVersionNumber != null ? ` · belge v${kanit.documentVersionNumber}` : ''}
+          {kanit.officialUrl ? (
+            <>
+              {' · '}
+              <a href={kanit.officialUrl} target="_blank" rel="noreferrer noopener">
+                resmî kaynak
+              </a>
+            </>
+          ) : null}
+        </li>
+      ))}
+    </ul>
   )
 }
 

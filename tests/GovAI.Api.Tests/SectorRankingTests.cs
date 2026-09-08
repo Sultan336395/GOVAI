@@ -54,8 +54,14 @@ public sealed class SectorRankingTests(GovAiApiFactory factory)
             var db = scope.ServiceProvider.GetRequiredService<GovAiDbContext>();
 
             // Firma makine imalatçısıdır; NACE kodu olmadan sektör hiç doğrulanamaz.
+            //
+            // Koleksiyon MUTLAKA Include edilir: ReplaceNaceCodes yüklenmemiş bir listeyi
+            // temizleyip yeni satır eklerdi ve eski satır veritabanında kalırdı. Gerçek
+            // PostgreSQL bunu (company_id, code) tekil dizininde yakalar; bellek içi
+            // sağlayıcı tekil dizin uygulamadığı için hata görünmüyordu.
             var company = await db.Companies
                 .IgnoreQueryFilters()
+                .Include(c => c.NaceCodes)
                 .SingleAsync(c => c.Id == _companyId);
             company.ReplaceNaceCodes([new CompanyNaceCode("2562", isPrimary: true)]);
 

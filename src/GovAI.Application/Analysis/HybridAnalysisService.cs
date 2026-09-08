@@ -72,10 +72,7 @@ public sealed class HybridAnalysisService(
         var now = clock.UtcNow;
         var analysis = OpportunityCriteriaEvaluator.Evaluate(company, opportunity, now);
 
-        // Fırsat kuralları belge parçalarına değil kural metnine bağlı; bu aşamada
-        // yapay zekâya verilecek ayrı bir kanıt kümesi yok. Kanıtsız model çağrısı
-        // yapılmaz: iddia kanıt kimliğine bağlanamazsa zaten reddedilirdi.
-        var evidence = Array.Empty<AnalysisEvidence>();
+        var evidence = await BuildOpportunityEvidenceAsync(opportunity, analysis, cancellationToken);
 
         var versions = Versions(company, opportunity.SourceDocumentId, evidence);
         var mevcut = await runs.FindByIdempotencyKeyAsync(
@@ -107,6 +104,7 @@ public sealed class HybridAnalysisService(
             company.TenantId, AnalysisKind.Opportunity, companyId, opportunityId,
             versions, correlationId, now, cancellationToken);
 
+        run.RecordTokenUsage(merged.PromptTokens, merged.CompletionTokens);
         run.CompleteOpportunity(
             final.Score.Value,
             final.Confidence.Value,
@@ -195,6 +193,7 @@ public sealed class HybridAnalysisService(
             company.TenantId, AnalysisKind.Regulation, companyId, regulatoryChangeId,
             versions, correlationId, now, cancellationToken);
 
+        run.RecordTokenUsage(merged.PromptTokens, merged.CompletionTokens);
         run.CompleteRegulation(
             final.Confidence.Value,
             final.Confidence.Level,
@@ -206,6 +205,77 @@ public sealed class HybridAnalysisService(
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Map(final, change.Title, merged, run);
+    }
+
+    /// <summary>
+    /// Fırsat analizinde modele verilecek kanıt kümesi (Faz 3 — Aşama 2 tamamlaması).
+    ///
+    /// <para>
+    /// Yalnızca kriterlerin gerçekten dayandığı parçalar gönderilir; belgenin tamamı
+    /// değil. İki sebep: modelin ilgisiz metinden iddia üretmesini engellemek ve
+    /// gönderilen metin miktarını sınırlı tutmak.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>Karantinadaki veya kaynağı doğrulanmamış belgenin parçası kanıt sayılmaz.</b>
+    /// İçeriğine güvenilmeyen bir belgeden çıkarılan iddia, kullanıcıya resmî bilgi
+    /// gibi görünür ve en tehlikeli hata biçimi budur.
+    /// </para>
+    /// </summary>
+    private async Task<IReadOnlyList<AnalysisEvidence>> BuildOpportunityEvidenceAsync(
+        Opportunity opportunity,
+        CompanyOpportunityAnalysis analysis,
+        CancellationToken cancellationToken)
+    {
+        if (!opportunity.IsPublishable)
+        {
+            return [];
+        }
+
+        var provenance = await opportunities.GetProvenanceAsync(opportunity.Id, cancellationToken);
+
+        // Kaynak yapılandırması doğrulanmamışsa parçaların hangi belgeden geldiği
+        // güvenilir değildir; model bu metne dayanarak konuşamaz.
+        if (provenance is null || !provenance.SourceVerified)
+        {
+            return [];
+        }
+
+        var context = await opportunities.GetRuleEvidenceContextAsync(opportunity.Id, cancellationToken);
+        if (context.Count == 0)
+        {
+            return [];
+        }
+
+        var kullanilan = analysis.Criteria
+            .SelectMany(c => c.Evidence)
+            .Where(e => e.EvidenceChunkId is not null && e.DocumentVersionId is not null)
+            .GroupBy(e => e.EvidenceChunkId!.Value)
+            .Select(g => g.First())
+            .ToList();
+
+        var sonuc = new List<AnalysisEvidence>();
+        var sira = 0;
+
+        foreach (var kanit in kullanilan)
+        {
+            if (!context.TryGetValue(kanit.EvidenceChunkId!.Value, out var bilgi)
+                || string.IsNullOrWhiteSpace(bilgi.Text))
+            {
+                continue;
+            }
+
+            sonuc.Add(new AnalysisEvidence
+            {
+                EvidenceChunkId = kanit.EvidenceChunkId!.Value,
+                DocumentVersionId = kanit.DocumentVersionId!.Value,
+                Text = bilgi.Text,
+                SectionTitle = kanit.Locator,
+                SequenceNumber = ++sira
+            });
+        }
+
+        return sonuc;
     }
 
     /// <summary>

@@ -167,5 +167,17 @@ public sealed record AiAnalysisOutput
     /// <summary>Durumun Türkçe açıklaması; hata metni ham hâliyle loglanmaz.</summary>
     public string? StatusNote { get; init; }
 
+    /// <summary>
+    /// Modelin tükettiği giriş/çıkış token sayısı.
+    ///
+    /// <para>
+    /// Yalnızca <b>miktar</b> tutulur; prompt ve cevap içeriği tutulmaz. Maliyet
+    /// hesabı ve kullanım takibi bu sayılarla yapılır.
+    /// </para>
+    /// </summary>
+    public int? PromptTokens { get; init; }
+
+    public int? CompletionTokens { get; init; }
+
     public bool IsUsable => Status == AiAnalysisStatus.Succeeded;
 }

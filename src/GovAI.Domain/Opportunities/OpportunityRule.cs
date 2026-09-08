@@ -9,6 +9,8 @@ namespace GovAI.Domain.Opportunities;
 /// </summary>
 public class OpportunityRule : Entity
 {
+    private readonly List<OpportunityRuleEvidence> _evidence = [];
+
     private OpportunityRule()
     {
     }
@@ -62,6 +64,43 @@ public class OpportunityRule : Entity
 
     /// <summary>Danışman kuralı elle düzelttiyse otomatik yeniden çıkarımda korunur.</summary>
     public bool IsManuallyOverridden { get; private set; }
+
+    /// <summary>
+    /// Kuralın dayandığı resmî kanıt parçaları. Bir kural birden çok parçaya
+    /// dayanabilir; bu yüzden tek bir kolon değil ilişki tutulur.
+    /// </summary>
+    public IReadOnlyCollection<OpportunityRuleEvidence> Evidence => _evidence.AsReadOnly();
+
+    /// <summary>
+    /// Bu kural hakkında yapay zekâ resmî kaynağa dayalı iddia üretebilir mi?
+    ///
+    /// <para>
+    /// Kanıtsız eski kurallar deterministik motorda kullanılmaya devam eder — onları
+    /// silmek, doğrulanmış bilgiyi kaybetmek olurdu. Ama kanıt parçası olmadan modelin
+    /// "belgede şöyle yazıyor" demesi doğrulanamaz; bu yüzden o kural yapay zekâ
+    /// iddiasına kapalıdır.
+    /// </para>
+    /// </summary>
+    public bool SupportsAiClaims => _evidence.Any(e => e.IsCitable);
+
+    /// <summary>
+    /// Kanıt bağlantısı ekler. Aynı parça aynı rolle iki kez bağlanmaz: yeniden
+    /// ayrıştırma mükerrer satır üretmemelidir.
+    /// </summary>
+    public void AttachEvidence(OpportunityRuleEvidence evidence)
+    {
+        ArgumentNullException.ThrowIfNull(evidence);
+
+        var zatenVar = _evidence.Any(e =>
+            e.EvidenceChunkId == evidence.EvidenceChunkId && e.Role == evidence.Role);
+
+        if (zatenVar)
+        {
+            return;
+        }
+
+        _evidence.Add(evidence);
+    }
 
     public void OverrideManually(RuleOperator @operator, string value, RuleSeverity severity, string humanReadable)
     {

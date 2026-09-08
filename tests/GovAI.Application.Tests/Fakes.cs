@@ -153,6 +153,14 @@ internal sealed class FakeOpportunityRepository : IOpportunityRepository
     /// <summary>Testte kanıt zinciri sunulmaz; sağlanırsa doğrudan döner.</summary>
     public OpportunityProvenanceDto? Provenance { get; set; }
 
+    /// <summary>Kural kanıtlarının gösterim bilgisi; test kurulumu doldurabilir.</summary>
+    public Dictionary<Guid, RuleEvidenceContext> RuleEvidenceContext { get; } = [];
+
+    public Task<IReadOnlyDictionary<Guid, RuleEvidenceContext>> GetRuleEvidenceContextAsync(
+        Guid opportunityId,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyDictionary<Guid, RuleEvidenceContext>>(RuleEvidenceContext);
+
     public Task<OpportunityProvenanceDto?> GetProvenanceAsync(
         Guid opportunityId,
         CancellationToken cancellationToken = default) =>

@@ -3,6 +3,7 @@ using System;
 using GovAI.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace GovAI.Persistence.Migrations
 {
     [DbContext(typeof(GovAiDbContext))]
-    partial class GovAiDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260908131555_KuralKanitBaglantisi")]
+    partial class KuralKanitBaglantisi
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -44,10 +47,6 @@ namespace GovAI.Persistence.Migrations
                     b.Property<DateTimeOffset?>("CompletedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("completed_at");
-
-                    b.Property<int?>("CompletionTokens")
-                        .HasColumnType("integer")
-                        .HasColumnName("completion_tokens");
 
                     b.Property<decimal?>("Confidence")
                         .HasPrecision(6, 4)
@@ -129,10 +128,6 @@ namespace GovAI.Persistence.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)")
                         .HasColumnName("prompt_template_hash");
-
-                    b.Property<int?>("PromptTokens")
-                        .HasColumnType("integer")
-                        .HasColumnName("prompt_tokens");
 
                     b.Property<string>("PromptVersion")
                         .HasMaxLength(40)
@@ -2491,13 +2486,6 @@ namespace GovAI.Persistence.Migrations
                         .HasForeignKey("ParentCompanyId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_companies_companies_parent_company_id");
-
-                    b.HasOne("GovAI.Domain.Identity.Tenant", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_companies_tenants_tenant_id");
 
                     b.OwnsOne("GovAI.Domain.Companies.CompanyContact", "Contact", b1 =>
                         {

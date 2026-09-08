@@ -86,20 +86,44 @@ public static class DependencyInjection
             }
         });
 
-        // Faz 3: analiz sağlayıcısı YALNIZCA yapılandırma varsa bağlanır. Yapılandırma
-        // yoksa ağ istemcisi hiç kurulmaz; sistem kural tabanlı çalışır ve analiz
-        // kaydına "AIUnavailable" yazar. Anahtarsız bir HTTP istemcisi kaydetmek,
-        // her analizde başarısız bir istek denemesi ve yanıltıcı hata logu demekti.
+        AddAnalysisAi(services, configuration);
+    }
+
+    /// <summary>
+    /// DeepTech analiz sağlayıcısı (Faz 3).
+    ///
+    /// <para>
+    /// Yapılandırma <b>ortam değişkenlerinden</b> okunur (<c>GOVAI_AI_*</c>). Anahtar,
+    /// model adı ve sınırlar koda gömülmez. Yapılandırma eksikse ağ istemcisi hiç
+    /// kurulmaz: anahtarsız bir istemci her analizde başarısız bir istek denemesi ve
+    /// yanıltıcı hata logu üretirdi.
+    /// </para>
+    ///
+    /// <para>
+    /// Devre kesici <b>singleton</b>: durum istekler arasında paylaşılmalı. Scoped
+    /// olsaydı her istek kendi sayacıyla başlar ve devre hiç açılmazdı.
+    /// </para>
+    /// </summary>
+    private static void AddAnalysisAi(IServiceCollection services, IConfiguration configuration)
+    {
+        var options = AnalysisAiOptions.FromEnvironment(configuration);
+
+        services.AddSingleton(options);
+
         if (!options.IsConfigured)
         {
             services.AddSingleton<IAnalysisAiProvider, UnavailableAnalysisAiProvider>();
             return;
         }
 
+        services.AddSingleton<AiCircuitBreaker>();
+
         services.AddHttpClient<IAnalysisAiProvider, OpenAiAnalysisProvider>(client =>
         {
             client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + "/");
             client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+
+            // Anahtar YALNIZCA istek başlığına konur; hiçbir log satırına girmez.
             client.DefaultRequestHeaders.Authorization =
                 new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", options.ApiKey);
         });

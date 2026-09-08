@@ -78,6 +78,21 @@ public static class EfMigrationTarget
     public const string ProductionDatabase = "govai";
 
     /// <summary>
+    /// Geçici test veritabanı adının taşımak zorunda olduğu işaret.
+    ///
+    /// <para>
+    /// Ad denetimi bilinçli olarak katı: "test niyetiyle çalıştırdım ama gerçek
+    /// veritabanına gitti" hatası, adı okuyan bir kilit olmadan önlenemez. Port
+    /// denetimi tek başına yetmez — aynı Postgres örneğinde hem gerçek hem geçici
+    /// veritabanı bulunabilir.
+    /// </para>
+    /// </summary>
+    public const string TestDatabaseMarker = "_test";
+
+    /// <summary>Geçici test hedefi için beyan edilecek ortam adı.</summary>
+    public const string EphemeralTestEnvironmentName = "EphemeralTest";
+
+    /// <summary>
     /// Aynı makineye / aynı Postgres'e ulaşan sunucu adları.
     ///
     /// <para>
@@ -120,7 +135,14 @@ public static class EfMigrationTarget
         /// <summary>5180 — müşterinin canlı verisi.</summary>
         Production,
 
-        /// <summary>Bunların dışında bir hedef (ör. geçici test veritabanı).</summary>
+        /// <summary>
+        /// Geçici test veritabanı. Adı <see cref="TestDatabaseMarker"/> içermek
+        /// <b>zorundadır</b>: yanlış hedefe migration uygulamanın en olası yolu, test
+        /// niyetiyle çalıştırılan bir komutun gerçek bir veritabanına gitmesidir.
+        /// </summary>
+        EphemeralTest,
+
+        /// <summary>Bunların dışında bir hedef.</summary>
         Other,
     }
 
@@ -224,7 +246,48 @@ public static class EfMigrationTarget
             return TargetEnvironment.Preview;
         }
 
+        // Adı test işareti taşıyan veritabanı geçici test hedefi sayılır. Korunan
+        // portlarda olamaz: orada "govai_test" adlı bir veritabanı da olsa aynı
+        // sunucudur ve yanlışlıkla gerçek şemaya dokunma riski sürer.
+        if (database.Contains(TestDatabaseMarker, StringComparison.OrdinalIgnoreCase)
+            && port != ProductionPort
+            && port != PreviewPort)
+        {
+            return TargetEnvironment.EphemeralTest;
+        }
+
         return TargetEnvironment.Other;
+    }
+
+    /// <summary>
+    /// Geçici test hedefi için güvenlik kilidi.
+    ///
+    /// <para>
+    /// Betikler ve testler bunu doğrudan çağırır: bağlantı test hedefi <b>değilse</b>
+    /// açıklayıcı bir hatayla durur. Böylece "izole test veritabanında çalıştırıyorum"
+    /// diyen bir komut, gerçekte üretim ya da önizleme veritabanına bağlıysa hiçbir şey
+    /// yapamaz.
+    /// </para>
+    /// </summary>
+    public static void RequireEphemeralTestTarget(string connectionString)
+    {
+        if (!TryDescribe(connectionString, out var host, out var port, out var database, out var error))
+        {
+            throw new EfMigrationTargetException(
+                $"Test hedefi çözümlenemedi: {error} "
+                + "(Bağlantı dizesinin kendisi güvenlik gereği gösterilmez.)");
+        }
+
+        var ortam = Classify(host, port, database, SystemResolver);
+
+        if (ortam != TargetEnvironment.EphemeralTest)
+        {
+            throw new EfMigrationTargetException(
+                $"Bu komut yalnızca geçici test veritabanında çalışır. Çözülen hedef: "
+                + $"{host}:{port}/{database} [{Etiket(ortam)}]. "
+                + $"Test veritabanının adı '{TestDatabaseMarker}' içermeli ve portu "
+                + $"{ProductionPort} veya {PreviewPort} OLMAMALIDIR.");
+        }
     }
 
     /// <summary>Sunucu adı, bilinen yerel/container adlarından biri mi?</summary>
@@ -309,6 +372,7 @@ public static class EfMigrationTarget
         TargetEnvironment.ModelOnly => "model-only",
         TargetEnvironment.Preview => "önizleme",
         TargetEnvironment.Production => "ÜRETİM (5180)",
+        TargetEnvironment.EphemeralTest => "geçici test veritabanı",
         _ => "diğer",
     };
 

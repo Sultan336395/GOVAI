@@ -396,6 +396,111 @@ public class HybridAnalysisServiceTests
         }
     }
 
+    [Fact(DisplayName = "A23. Yapay zekâ kapalıyken hibrit güven gösterilmez")]
+    public async Task Model_yokken_hibrit_guven_gosterilmez()
+    {
+        var (service, company, opportunity, _, _) =
+            BuildWithRuns(new FakeAnalysisAiProvider(configured: false));
+
+        var sonuc = await service.AnalyzeOpportunityAsync(company.Id, opportunity.Id);
+
+        // Sayı aynı sayı; ADI farklı. "Hibrit güven: Yüksek" yazmak, model hiç
+        // çalışmamışken onun da doğruladığı izlenimini verir.
+        Assert.Equal("Kural tabanlı güven", sonuc.Confidence.Title);
+        Assert.Equal("Kural tabanlı analiz", sonuc.Contribution.ModeLabel);
+        Assert.Equal("Kullanılamıyor", sonuc.Contribution.AiConfidenceLabel);
+    }
+
+    [Fact(DisplayName = "A24. Yapay zekâ katkısı varken hibrit etiketleri kullanılır")]
+    public async Task Model_varken_hibrit_etiketi()
+    {
+        var changes = new FakeRegulatoryChangeRepository();
+        var (change, chunk) = changes.SeedWithEvidence("İşverenler bildirmek zorundadır.", Now);
+
+        var gecerli = new AiAnalysisOutput
+        {
+            Status = AiAnalysisStatus.Succeeded,
+            Claims =
+            [
+                new AiClaim
+                {
+                    ClaimType = AiClaimType.Clarification,
+                    CriterionCode = CriterionCatalog.RegulationObligations,
+                    EvidenceChunkId = chunk.Id,
+                    Quote = "İşverenler bildirmek zorundadır",
+                    Explanation = "Belge işverenlere bildirim yükümlülüğü getiriyor.",
+                    Confidence = 0.9m
+                }
+            ],
+            ModelProvider = "fake",
+            ModelName = "fake-deterministic"
+        };
+
+        var (service, company, _, _, _) = BuildWithRuns(new FakeAnalysisAiProvider(gecerli), changes);
+
+        var sonuc = await service.AnalyzeRegulationAsync(company.Id, change.Id);
+
+        Assert.Equal("Hibrit güven", sonuc.Confidence.Title);
+        Assert.Equal("Hibrit analiz", sonuc.Contribution.ModeLabel);
+        Assert.NotEqual("Kullanılamıyor", sonuc.Contribution.AiConfidenceLabel);
+    }
+
+    [Fact(DisplayName = "A25. Zorunlu kriter bilinmiyorsa sonuç 'Uygun' değil 'Doğrulanamadı' olur")]
+    public async Task Zorunlu_unknown_dogrulanamadi_uretir()
+    {
+        var (service, company, opportunity, _, _) = BuildWithRuns(profilsiz: true);
+
+        var sonuc = await service.AnalyzeOpportunityAsync(company.Id, opportunity.Id);
+
+        Assert.NotEqual(EligibilityVerdict.Eligible, sonuc.Verdict);
+        Assert.Equal("Doğrulanamadı", sonuc.VerdictLabel);
+    }
+
+    [Fact(DisplayName = "A26. Aynı analiz için ikinci model çağrısı yapılmaz")]
+    public async Task Ikinci_model_cagrisi_yapilmaz()
+    {
+        var saglayici = new SayanAiProvider();
+        var changes = new FakeRegulatoryChangeRepository();
+        var (change, _) = changes.SeedWithEvidence("İşverenler bildirmek zorundadır.", Now);
+
+        var (service, company, _, _, _) = BuildWithRuns(saglayici, changes);
+
+        await service.AnalyzeRegulationAsync(company.Id, change.Id);
+        await service.AnalyzeRegulationAsync(company.Id, change.Id);
+        await service.AnalyzeRegulationAsync(company.Id, change.Id);
+
+        // Sürümler aynı: idempotency anahtarı tutuyor, model bir kez çağrılıyor.
+        Assert.Equal(1, saglayici.CallCount);
+    }
+
+    [Fact(DisplayName = "A27. Kural kanıtı olmayan fırsat için modele istek gönderilmez")]
+    public async Task Kanitsiz_firsatta_model_cagrilmaz()
+    {
+        // Fırsat kuralları kanıt parçasına bağlı değil: gönderilecek kanıt yok, dolayısıyla
+        // her iddia zaten reddedilirdi. Boşuna istek yapmak maliyet üretir.
+        var saglayici = new SayanAiProvider();
+        var (service, company, opportunity, _, _) = BuildWithRuns(saglayici);
+
+        await service.AnalyzeOpportunityAsync(company.Id, opportunity.Id);
+
+        Assert.Equal(0, saglayici.CallCount);
+    }
+
+    [Fact(DisplayName = "A28. Kaynağı doğrulanmamış belgenin parçası modele gönderilmez")]
+    public async Task Dogrulanmamis_kaynak_kaniti_gonderilmez()
+    {
+        // Kanıt bağlantısı olsa bile kaynak doğrulanmamışsa parçaların hangi belgeden
+        // geldiği güvenilir değildir. Modelin böyle bir metne dayanarak konuşması,
+        // kullanıcıya doğrulanmamış içeriği resmî bilgi gibi gösterirdi.
+        var saglayici = new SayanAiProvider();
+        var (service, company, opportunity, _, _) = BuildWithRuns(saglayici);
+
+        // FakeOpportunityRepository künye sunmuyor → SourceVerified doğrulanamıyor.
+        await service.AnalyzeOpportunityAsync(company.Id, opportunity.Id);
+
+        Assert.Equal(0, saglayici.CallCount);
+    }
+
     private static (HybridAnalysisService Service, Company Company, Opportunity Opportunity,
         FakeRegulatoryChangeRepository Changes, FakeAnalysisRunRepository Runs) BuildWithRuns(
         IAnalysisAiProvider? provider = null,
@@ -563,4 +668,29 @@ internal sealed class FakeRegulatoryChangeRepository : IRegulatoryChangeReposito
 
     public Task<RegulatoryChangeDetailDto?> GetDetailAsync(Guid changeId, CancellationToken cancellationToken = default) =>
         Task.FromResult<RegulatoryChangeDetailDto?>(null);
+}
+
+/// <summary>Kaç kez çağrıldığını sayan sahte sağlayıcı; mükerrer çağrı testleri için.</summary>
+internal sealed class SayanAiProvider : IAnalysisAiProvider
+{
+    public int CallCount { get; private set; }
+
+    public string ProviderName => "fake-counting";
+
+    public bool IsConfigured => true;
+
+    public Task<AiAnalysisOutput> AnalyzeAsync(
+        AnalysisAiRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        CallCount++;
+
+        return Task.FromResult(new AiAnalysisOutput
+        {
+            Status = AiAnalysisStatus.Succeeded,
+            Claims = [],
+            ModelProvider = "fake-counting",
+            ModelName = "fake-deterministic"
+        });
+    }
 }

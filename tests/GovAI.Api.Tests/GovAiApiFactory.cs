@@ -9,6 +9,7 @@ using GovAI.Domain.Notifications;
 using GovAI.Domain.Opportunities;
 using GovAI.Domain.Sources;
 using GovAI.Persistence;
+using GovAI.Persistence.Design;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -56,7 +57,17 @@ public sealed class GovAiApiFactory : WebApplicationFactory<Program>
     /// <summary>Worker'ın kullandığı sınırlı veri toplama kimliği.</summary>
     public const string SystemIngestEmail = "worker@govai.test";
 
-    private readonly string _databaseName = $"govai-tests-{Guid.CreateVersion7()}";
+    /// <summary>
+    /// Geçici test veritabanının adı.
+    ///
+    /// <para>
+    /// Ad <c>_test</c> işaretini taşır: migration güvenlik kilidi
+    /// (<c>EfMigrationTarget.RequireEphemeralTestTarget</c>) bu işareti arar ve
+    /// taşımayan bir hedefe şema yazılmasını engeller. Her fabrika örneği kendi
+    /// veritabanını açar ve sonunda yalnızca onu düşürür.
+    /// </para>
+    /// </summary>
+    private readonly string _databaseName = $"govai_test_{Guid.CreateVersion7():N}";
 
     public TenantFixture TenantA { get; } = new("Kiracı A", "kiraci-a", "a@govai.test", "1111111111");
     public TenantFixture TenantB { get; } = new("Kiracı B", "kiraci-b", "b@govai.test", "2222222222");
@@ -166,6 +177,22 @@ public sealed class GovAiApiFactory : WebApplicationFactory<Program>
     /// Ayarlanmamışsa bellek içi sağlayıcı kullanılır, böylece veritabanı olmayan
     /// makinelerde de <c>dotnet test</c> çalışmaya devam eder.
     /// </summary>
+    /// <summary>
+    /// Testler gerçek PostgreSQL'e karşı mı koşuyor?
+    ///
+    /// <para>
+    /// Bazı garantiler yalnızca gerçek veritabanında ölçülebilir: yabancı anahtar
+    /// uygulanması, tekil indeks ve <c>jsonb</c> sütununun metni ayrıştırıp yeniden
+    /// serileştirmesi. Bellek içi sağlayıcı bunların hiçbirini yapmaz. O testler
+    /// GEVŞETİLMEZ; ölçülemedikleri koşuda atlanır ve sebebi yazılır.
+    /// </para>
+    /// </summary>
+    public static bool UsesRealPostgres => PostgresHost is not null;
+
+    /// <summary>Gerçek PostgreSQL koşulmuyorsa atlama sebebi.</summary>
+    public const string PostgresOnlySkipReason =
+        "Bu garanti yalnızca gerçek PostgreSQL'de ölçülebilir; GOVAI_TEST_POSTGRES ayarlayın.";
+
     private static string? PostgresHost =>
         Environment.GetEnvironmentVariable("GOVAI_TEST_POSTGRES") is { Length: > 0 } value ? value : null;
 
@@ -180,8 +207,15 @@ public sealed class GovAiApiFactory : WebApplicationFactory<Program>
         using var scope = Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<GovAiDbContext>();
 
-        // Migration çalıştırılmaz; şema doğrudan modelden kurulur ve test sonunda düşürülür.
-        context.Database.EnsureCreated();
+        // Hedefin gerçekten geçici bir test veritabanı olduğu ŞEMA YAZILMADAN ÖNCE
+        // doğrulanır. Yanlış bir GOVAI_TEST_POSTGRES değeri (ör. üretim portu) burada
+        // durur; testler gerçek bir veritabanına dokunamaz.
+        EfMigrationTarget.RequireEphemeralTestTarget(context.Database.GetConnectionString()!);
+
+        // Şema MIGRATION'LARLA kurulur, modelden değil. Böylece migration zincirinin
+        // sıfırdan çalıştığı ve uygulamanın o şema üzerinde gerçekten çalıştığı aynı
+        // koşuda doğrulanır — modelden kurulan şema migration hatalarını gizlerdi.
+        context.Database.Migrate();
     }
 
     private bool _databaseDropped;

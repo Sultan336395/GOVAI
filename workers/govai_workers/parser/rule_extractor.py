@@ -83,6 +83,15 @@ class ExtractedRule:
     humanReadable: str  # noqa: N815 - API sözleşmesi camelCase
     sourceExcerpt: str | None = None  # noqa: N815
     confidence: float = 0.5
+    #: Koşulun belge metnindeki karakter aralığı.
+    #:
+    #: Worker kanıt parçalarının kimliklerini bilmez — parçalar API tarafında
+    #: oluşturulur. Bu yüzden koşul ile kanıt arasındaki bağ sunucuda, aralık
+    #: çakışmasıyla kurulur. ``None`` ise kural kanıtsız kalır: deterministik motor
+    #: onu kullanmaya devam eder, yapay zekâ o kural için resmî kaynağa dayalı iddia
+    #: üretemez.
+    startOffset: int | None = None  # noqa: N815
+    endOffset: int | None = None  # noqa: N815
 
 
 @dataclass(slots=True)
@@ -138,6 +147,8 @@ def extract_deterministic(text: str, title: str = "") -> list[ExtractedRule]:
             humanReadable=f"Asgari {match.group('count')} çalışan şartı.",
             sourceExcerpt=_excerpt(text, match.start(), match.end()),
             confidence=1.0,
+            startOffset=match.start(),
+            endOffset=match.end(),
         ))
 
     if match := _MAX_EMPLOYEE.search(text):
@@ -150,6 +161,8 @@ def extract_deterministic(text: str, title: str = "") -> list[ExtractedRule]:
             humanReadable=f"En fazla {match.group('count')} çalışan şartı.",
             sourceExcerpt=_excerpt(text, match.start(), match.end()),
             confidence=1.0,
+            startOffset=match.start(),
+            endOffset=match.end(),
         ))
 
     if match := _WOMEN_RATE.search(text):
@@ -163,6 +176,8 @@ def extract_deterministic(text: str, title: str = "") -> list[ExtractedRule]:
             humanReadable=f"Kadın çalışan oranı en az %{match.group('rate')} olmalıdır.",
             sourceExcerpt=_excerpt(text, match.start(), match.end()),
             confidence=0.9,
+            startOffset=match.start(),
+            endOffset=match.end(),
         ))
 
     if regions := sorted({m.group(0).upper() for m in _NUTS2.finditer(text)}):
@@ -177,6 +192,8 @@ def extract_deterministic(text: str, title: str = "") -> list[ExtractedRule]:
             ),
             sourceExcerpt=_excerpt(text, *_first_span(_NUTS2, text)),
             confidence=0.85,
+            startOffset=_first_span(_NUTS2, text)[0],
+            endOffset=_first_span(_NUTS2, text)[1],
         ))
 
     if certs := sorted({f"ISO{m.group('number')}" for m in _ISO_CERT.finditer(text)}):
@@ -189,6 +206,8 @@ def extract_deterministic(text: str, title: str = "") -> list[ExtractedRule]:
             humanReadable=f"Şu belgeler puanlamada dikkate alınır: {', '.join(certs)}.",
             sourceExcerpt=_excerpt(text, *_first_span(_ISO_CERT, text)),
             confidence=0.8,
+            startOffset=_first_span(_ISO_CERT, text)[0],
+            endOffset=_first_span(_ISO_CERT, text)[1],
         ))
 
     # Sektör kuralı en sona eklenir; diğer kalıplar metinde birebir yazan koşullardır,

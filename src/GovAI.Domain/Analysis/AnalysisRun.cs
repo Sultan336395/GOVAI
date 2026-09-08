@@ -133,6 +133,14 @@ public class AnalysisRun : AggregateRoot, IAuditable, ITenantScoped
     /// <summary>Hata durumunun Türkçe açıklaması. Ham istisna metni ve secret yazılmaz.</summary>
     public string? ErrorNote { get; private set; }
 
+    /// <summary>
+    /// Modelin tükettiği giriş token sayısı. Maliyet takibi için tutulur;
+    /// <b>prompt ve model cevabının kendisi kaydedilmez</b>.
+    /// </summary>
+    public int? PromptTokens { get; private set; }
+
+    public int? CompletionTokens { get; private set; }
+
     /// <summary>0–100 uygunluk puanı; mevzuat analizinde <c>null</c>.</summary>
     public decimal? Score { get; private set; }
 
@@ -154,6 +162,13 @@ public class AnalysisRun : AggregateRoot, IAuditable, ITenantScoped
     public string? CreatedBy { get; set; }
     public DateTimeOffset? UpdatedAt { get; set; }
     public string? UpdatedBy { get; set; }
+
+    /// <summary>Model kullanıldıysa tüketim miktarını kaydeder.</summary>
+    public void RecordTokenUsage(int? promptTokens, int? completionTokens)
+    {
+        PromptTokens = promptTokens;
+        CompletionTokens = completionTokens;
+    }
 
     public void CompleteOpportunity(
         decimal score,

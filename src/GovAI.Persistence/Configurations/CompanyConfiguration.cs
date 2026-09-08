@@ -73,6 +73,19 @@ public sealed class CompanyConfiguration : IEntityTypeConfiguration<Company>
         builder.HasIndex(c => new { c.TenantId, c.TaxNumber }).IsUnique();
         builder.HasIndex(c => c.TenantId);
 
+        // Kiracı ilişkisi MODELDE de tanımlı olmalı.
+        //
+        // Yabancı anahtar veritabanında zaten vardı (MultiCompanyFoundation migration'ı
+        // ham SQL ile ekliyor) ama EF modeli onu bilmiyordu. Sonucu gerçek PostgreSQL
+        // koşusunda ortaya çıktı: EF, bağımlılığı bilmediği için şirketi kiracıdan ÖNCE
+        // yazmayı deneyebiliyor ve veritabanı 23503 ile reddediyor. Bellek içi sağlayıcı
+        // yabancı anahtar uygulamadığı için hata yıllarca görünmedi.
+        builder.HasOne<Tenant>()
+            .WithMany()
+            .HasForeignKey(c => c.TenantId)
+            .HasConstraintName("fk_companies_tenants_tenant_id")
+            .OnDelete(DeleteBehavior.Cascade);
+
         builder.OwnsOne(c => c.Workforce, workforce =>
         {
             workforce.Property(w => w.EmployeeCount).HasColumnName("employee_count");

@@ -124,11 +124,17 @@ function Baslik({
         }}
       >
         <h2 style={{ margin: 0 }}>{baslik}</h2>
-        <div>
+        <div style={{ textAlign: 'right' }}>
           <strong>{durum}</strong>
-          <span className="muted" style={{ marginLeft: 8, fontSize: 12 }}>
-            Güven: {confidence.levelLabel} ({formatPercent(confidence.value)})
-          </span>
+          <div className="muted" style={{ fontSize: 12 }} data-alan="guven-ozeti">
+            {/* Başlık sunucudan gelir: model çalışmadıysa "Kural tabanlı güven" yazar.
+                "Hibrit güven" yazmak, model hiç çalışmamışken onun da doğruladığı
+                izlenimini verir — kullanıcının alabileceği en yanıltıcı mesaj. */}
+            {confidence.title}: {confidence.levelLabel} ({formatPercent(confidence.value)})
+          </div>
+          <div className="muted" style={{ fontSize: 12 }} data-alan="analiz-turu">
+            {contribution.modeLabel} · Yapay zekâ güveni: {contribution.aiConfidenceLabel}
+          </div>
         </div>
       </div>
 

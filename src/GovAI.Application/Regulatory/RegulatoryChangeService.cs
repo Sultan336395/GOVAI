@@ -31,7 +31,10 @@ public sealed record EvidenceChunkDto(
     /// Parçanın metninin SHA-256'sı. Kanıtın sonradan değişmediği bununla gösterilir:
     /// belge yeniden indirilip aynı aralık çıkarıldığında hash tutmalıdır.
     /// </summary>
-    string TextHash = "");
+    string TextHash = "",
+    // Parçanın kimliği. Kural–kanıt zinciri bu alanla kurulur: kuralın kanıt
+    // bağlantısındaki evidenceChunkId burada karşılığını bulur.
+    Guid EvidenceChunkId = default);
 
 /// <summary>Mevzuat detayı: künye, belge sürümü ve kanıt bölümleri.</summary>
 public sealed record RegulatoryChangeDetailDto(

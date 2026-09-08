@@ -58,6 +58,8 @@ public class GovAiDbContext(
     public DbSet<EligibilityAssessment> Assessments => Set<EligibilityAssessment>();
 
     public DbSet<AnalysisRun> AnalysisRuns => Set<AnalysisRun>();
+
+    public DbSet<OpportunityRuleEvidence> OpportunityRuleEvidence => Set<OpportunityRuleEvidence>();
     public DbSet<ScenarioSimulation> ScenarioSimulations => Set<ScenarioSimulation>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<AuditLogEntry> AuditLog => Set<AuditLogEntry>();

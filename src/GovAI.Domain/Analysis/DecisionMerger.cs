@@ -33,6 +33,11 @@ public sealed record MergedAnalysis
     /// <summary>Kabul edilen iddiaların kanıtla doğrulanma oranı; güven bileşenini besler.</summary>
     public decimal? AiEvidenceAgreement { get; init; }
 
+    /// <summary>Model tüketimi; analiz kaydına yazılır, içerik yazılmaz.</summary>
+    public int? PromptTokens { get; init; }
+
+    public int? CompletionTokens { get; init; }
+
     public IReadOnlyList<ValidatedClaim> AcceptedClaims =>
         Claims.Where(c => c.Accepted).ToList();
 
@@ -101,7 +106,9 @@ public static class DecisionMerger
                 Claims = [],
                 Conflicts = [],
                 AiStatus = ai.Status,
-                AiEvidenceAgreement = null
+                AiEvidenceAgreement = null,
+                PromptTokens = ai.PromptTokens,
+                CompletionTokens = ai.CompletionTokens
             };
         }
 
@@ -167,7 +174,9 @@ public static class DecisionMerger
             Claims = validated,
             Conflicts = conflicts,
             AiStatus = ai.Status,
-            AiEvidenceAgreement = validated.Count == 0 ? null : (decimal)kabulEdilen / validated.Count
+            AiEvidenceAgreement = validated.Count == 0 ? null : (decimal)kabulEdilen / validated.Count,
+            PromptTokens = ai.PromptTokens,
+            CompletionTokens = ai.CompletionTokens
         };
     }
 

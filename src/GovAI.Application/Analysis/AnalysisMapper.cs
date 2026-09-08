@@ -38,7 +38,7 @@ public static class AnalysisMapper
                 analysis.Score.HasMandatoryFailure,
                 analysis.Score.MissingDataEffect,
                 analysis.Score.RuleSetVersion),
-            ToDto(analysis.Confidence),
+            ToDto(analysis.Confidence, merged.HasAiContribution),
             analysis.Criteria.Select(ToDto).ToList(),
             analysis.Met.Select(ToDto).ToList(),
             analysis.NotMet.Select(ToDto).ToList(),
@@ -60,7 +60,7 @@ public static class AnalysisMapper
             impact.EvaluatedAt,
             impact.Impact,
             AnalysisLabels.Of(impact.Impact),
-            ToDto(impact.Confidence),
+            ToDto(impact.Confidence, merged.HasAiContribution),
             impact.Criteria.Select(ToDto).ToList(),
             impact.OpenQuestions,
             CompanyRegulationImpact.LegalDisclaimer,
@@ -101,7 +101,12 @@ public static class AnalysisMapper
             merged.Conflicts
                 .Select(c => new RuleAiConflictDto(c.CriterionCode, c.RuleOutcome, c.ClaimType, c.Note))
                 .ToList(),
-            uyarilar.Count == 0 ? null : string.Join(" ", uyarilar));
+            uyarilar.Count == 0 ? null : string.Join(" ", uyarilar),
+            merged.HasAiContribution ? AnalysisLabels.HybridModeLabel : AnalysisLabels.RulesOnlyModeLabel,
+            // Model çalışmadıysa sayı DEĞİL, "Kullanılamıyor" yazar.
+            merged.HasAiContribution && merged.AiEvidenceAgreement is { } uyum
+                ? $"{uyum:P0}"
+                : AnalysisLabels.AiConfidenceUnavailable);
     }
 
     public static AnalysisVersionDto ToDto(AnalysisRun run) =>
@@ -119,7 +124,11 @@ public static class AnalysisMapper
             run.CompletedAt,
             run.Status);
 
-    public static ConfidenceDto ToDto(ConfidenceAssessment confidence) =>
+    /// <summary>
+    /// Güven göstergesi. Başlık, modelin gerçekten katkı verip vermediğine göre
+    /// değişir: model çalışmadıysa bu sayı <b>kural tabanlı güvendir</b>.
+    /// </summary>
+    public static ConfidenceDto ToDto(ConfidenceAssessment confidence, bool hasAiContribution = false) =>
         new(
             confidence.Value,
             confidence.Level,
@@ -127,7 +136,10 @@ public static class AnalysisMapper
             confidence.Factors
                 .Select(f => new ConfidenceFactorDto(f.Code, f.Name, f.Value, f.Weight, f.Explanation, f.NotMeasured))
                 .ToList(),
-            confidence.RuleSetVersion);
+            confidence.RuleSetVersion,
+            hasAiContribution
+                ? AnalysisLabels.HybridConfidenceTitle
+                : AnalysisLabels.RulesOnlyConfidenceTitle);
 
     public static CriterionResultDto ToDto(CriterionResult criterion) =>
         new(

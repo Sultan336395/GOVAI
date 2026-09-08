@@ -241,6 +241,10 @@ public sealed class AnalysisRunConfiguration : IEntityTypeConfiguration<Analysis
         builder.Property(r => r.IdempotencyKey).HasMaxLength(64).IsRequired();
         builder.Property(r => r.ErrorNote).HasMaxLength(1000);
 
+        // Yalnızca miktar saklanır; prompt ve cevap içeriği için kolon YOKTUR.
+        builder.Property(r => r.PromptTokens);
+        builder.Property(r => r.CompletionTokens);
+
         builder.Property(r => r.Score).HasPrecision(6, 2);
         builder.Property(r => r.Confidence).HasPrecision(6, 4);
         builder.Property(r => r.ResultJson).HasColumnType("jsonb");

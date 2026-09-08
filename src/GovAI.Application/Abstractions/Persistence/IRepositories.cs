@@ -65,6 +65,19 @@ public interface IOpportunityRepository
         Guid opportunityId,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Kural–kanıt bağlantılarının gösterim bilgisi: parça metni, özeti, belge sürüm
+    /// numarası ve resmî adres.
+    ///
+    /// <para>
+    /// Ayrı sorgu, çünkü bu bilgi kanıt satırında <b>saklanmaz</b>. Metni kopyalamak,
+    /// belge yeniden ayrıştırıldığında iki farklı doğruluk kaynağı yaratırdı.
+    /// </para>
+    /// </summary>
+    Task<IReadOnlyDictionary<Guid, RuleEvidenceContext>> GetRuleEvidenceContextAsync(
+        Guid opportunityId,
+        CancellationToken cancellationToken = default);
+
     Task AddAsync(Opportunity opportunity, CancellationToken cancellationToken = default);
 
     void Remove(Opportunity opportunity);
@@ -249,6 +262,54 @@ public interface IAnalysisRunRepository
         CancellationToken cancellationToken = default);
 
     Task AddAsync(AnalysisRun run, CancellationToken cancellationToken = default);
+}
+
+/// <summary>Onarım adaylarından biri: fırsat ya da mevzuat kaydı.</summary>
+public sealed record CatalogRepairCandidate(
+    Guid Id,
+    CatalogRepairTarget Target,
+    string Title,
+    string? OfficialUrl,
+    bool IsQuarantined,
+
+    /// <summary>Kaydın dayandığı belge sürümündeki gerçek başlık; yoksa <c>null</c>.</summary>
+    string? DocumentTitle,
+
+    /// <summary>Bu kayda bağlı değerlendirme sayısı; karantinada yeniden değerlendirmeye düşer.</summary>
+    int AssessmentCount);
+
+/// <summary>
+/// Katalog onarımının veri erişimi (Faz 3).
+///
+/// <para>
+/// Ayrı arayüz, çünkü onarım hem fırsat hem mevzuat kataloğuna dokunuyor ve ikisini
+/// tek sorguda birleştirmesi gerekiyor. Mevcut depoların hiçbirine ait değil.
+/// </para>
+/// </summary>
+public interface ICatalogRepairRepository
+{
+    /// <summary>Karantinada olsun olmasın tüm onarım adayları; eşleştirme serviste yapılır.</summary>
+    Task<IReadOnlyList<CatalogRepairCandidate>> ListRepairCandidatesAsync(
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Kaydı karantinaya alır ve bağlı değerlendirmeleri "yeniden değerlendirilmeli"
+    /// olarak işaretler. Değerlendirmeler SİLİNMEZ. Etkilenen sayıyı döner.
+    /// </summary>
+    Task<int> QuarantineAsync(
+        CatalogRepairTarget target,
+        Guid recordId,
+        QuarantineReason reason,
+        string? note,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Kaydın başlığını belge sürümündeki gerçek başlıkla düzeltir.</summary>
+    Task<int> RetitleAsync(
+        CatalogRepairTarget target,
+        Guid recordId,
+        string title,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default);
 }
 
 public interface IScenarioSimulationRepository

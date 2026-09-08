@@ -3,6 +3,7 @@ using GovAI.Application.Abstractions.Services;
 using GovAI.Application.Common;
 using GovAI.Domain.Common;
 using GovAI.Domain.Opportunities;
+using GovAI.Domain.Sources;
 using Microsoft.Extensions.Logging;
 
 namespace GovAI.Application.Opportunities;
@@ -14,6 +15,7 @@ namespace GovAI.Application.Opportunities;
 public sealed class OpportunityService(
     IOpportunityRepository opportunities,
     ISourceRepository sources,
+    ISourceDocumentRepository documents,
     IUnitOfWork unitOfWork,
     IDateTimeProvider clock,
     IEventPublisher events,
@@ -44,8 +46,9 @@ public sealed class OpportunityService(
         }
 
         var provenance = await opportunities.GetProvenanceAsync(opportunityId, cancellationToken);
+        var evidenceContext = await opportunities.GetRuleEvidenceContextAsync(opportunityId, cancellationToken);
 
-        return ToDetail(opportunity, clock.UtcNow, provenance);
+        return ToDetail(opportunity, clock.UtcNow, provenance, evidenceContext);
     }
 
     /// <summary>
@@ -116,6 +119,7 @@ public sealed class OpportunityService(
             : new BudgetRange(request.Budget.MinAmount, request.Budget.MaxAmount, request.Budget.Currency, request.Budget.SupportRate));
 
         opportunity.ReplaceRules(request.Rules.Select(ToDomain), request.RuleExtractionConfidence);
+        await BindRuleEvidenceAsync(opportunity, request, cancellationToken);
         opportunity.ReplaceDocumentChecklist(request.DocumentChecklist.Select(ToDomain));
 
         // Faz 2: bulunamayan alanlar tahmin edilmez, durumları kaydedilir.
@@ -144,6 +148,112 @@ public sealed class OpportunityService(
             cancellationToken);
 
         return ToDetail(opportunity, clock.UtcNow);
+    }
+
+    /// <summary>
+    /// Ayrıştırılmış kuralları belgedeki kanıt parçalarına bağlar (Faz 3).
+    ///
+    /// <para>
+    /// Bağlama <b>sunucuda</b> yapılır çünkü worker kanıt parçalarının kimliklerini
+    /// bilmez — parçalar bu API tarafından oluşturulur. Worker yalnızca koşulun metindeki
+    /// karakter aralığını bildirir; eşleşme aralık çakışmasıyla, o başarısız olursa
+    /// alıntı metniyle kurulur.
+    /// </para>
+    ///
+    /// <para>
+    /// Aralığı da alıntısı da tutmayan kural <b>kanıtsız kalır ve silinmez</b>: eski
+    /// kayıtlar ve elle girilmiş kurallar deterministik motorda çalışmaya devam eder.
+    /// Yalnızca yapay zekâ o kural hakkında "belgede yazıyor" diyemez.
+    /// </para>
+    /// </summary>
+    private async Task BindRuleEvidenceAsync(
+        Opportunity opportunity,
+        UpsertOpportunityRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (request.SourceDocumentId is null || opportunity.Rules.Count == 0)
+        {
+            return;
+        }
+
+        var document = await documents.GetWithVersionsAsync(request.SourceDocumentId.Value, cancellationToken);
+
+        var version = document?.Versions
+            .OrderByDescending(v => v.VersionNumber)
+            .FirstOrDefault();
+
+        if (version is null || version.Chunks.Count == 0)
+        {
+            return;
+        }
+
+        var now = clock.UtcNow;
+        var istekler = request.Rules.ToList();
+        var kurallar = opportunity.Rules.ToList();
+
+        // ReplaceRules sırayı korur; istek ile kural aynı indekste eşleşir.
+        for (var i = 0; i < kurallar.Count && i < istekler.Count; i++)
+        {
+            foreach (var (chunk, role) in MatchChunks(version.Chunks, istekler[i]))
+            {
+                kurallar[i].AttachEvidence(new OpportunityRuleEvidence(
+                    chunk.Id,
+                    version.Id,
+                    role,
+                    chunk.StartOffset,
+                    chunk.EndOffset,
+                    now,
+                    chunk.PageNumber,
+                    chunk.SectionTitle));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Bir kuralın hangi parçalara dayandığını bulur.
+    ///
+    /// <para>
+    /// Önce karakter aralığı çakışması aranır — değerin gerçekten yazdığı parça budur.
+    /// Aralık yoksa alıntı metni parçalarda aranır; bu daha zayıf bir bağdır ve
+    /// <see cref="RuleEvidenceRole.ConditionText"/> olarak işaretlenir.
+    /// </para>
+    /// </summary>
+    private static IEnumerable<(DocumentEvidenceChunk Chunk, RuleEvidenceRole Role)> MatchChunks(
+        IReadOnlyList<DocumentEvidenceChunk> chunks,
+        UpsertRuleDto rule)
+    {
+        if (rule.StartOffset is { } baslangic && rule.EndOffset is { } bitis && bitis > baslangic)
+        {
+            var cakisan = chunks
+                .Where(c => c.StartOffset < bitis && baslangic < c.EndOffset)
+                .ToList();
+
+            if (cakisan.Count > 0)
+            {
+                return cakisan.Select(c => (c, RuleEvidenceRole.ValueSource));
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(rule.SourceExcerpt))
+        {
+            var aranan = TurkceMetin.Katla(rule.SourceExcerpt.Trim());
+
+            // Kısa alıntı yanlış parçaya bağlanabilir; asgari uzunluk şartı konur.
+            if (aranan.Length >= 20)
+            {
+                var eslesen = chunks
+                    .Where(c => TurkceMetin.Katla(c.Text).Contains(aranan, StringComparison.Ordinal)
+                                || aranan.Contains(TurkceMetin.Katla(c.Text), StringComparison.Ordinal))
+                    .ToList();
+
+                if (eslesen.Count > 0)
+                {
+                    return eslesen.Select(c => (c, RuleEvidenceRole.ConditionText));
+                }
+            }
+        }
+
+        return [];
     }
 
     /// <summary>
@@ -257,10 +367,39 @@ public sealed class OpportunityService(
         opportunity.Rules.Count,
         opportunity.DocumentChecklist.Count);
 
+    /// <summary>
+    /// Kanıt bağlantısını ekran sözleşmesine çevirir. Bağlam verilmediyse metin ve özet
+    /// boş kalır — uydurulmaz; bağlantının kendisi (parça kimliği, sürüm, aralık) yine
+    /// de görünür.
+    /// </summary>
+    private static RuleEvidenceDto ToEvidenceDto(
+        OpportunityRuleEvidence evidence,
+        IReadOnlyDictionary<Guid, RuleEvidenceContext>? context)
+    {
+        var bulunan = context is not null && context.TryGetValue(evidence.EvidenceChunkId, out var bilgi)
+            ? bilgi
+            : null;
+
+        return new RuleEvidenceDto(
+            evidence.EvidenceChunkId,
+            evidence.DocumentVersionId,
+            evidence.Role,
+            RuleEvidenceLabels.Of(evidence.Role),
+            evidence.StartOffset,
+            evidence.EndOffset,
+            evidence.PageNumber,
+            evidence.SectionTitle,
+            bulunan?.Text ?? string.Empty,
+            bulunan?.TextHash ?? string.Empty,
+            bulunan?.OfficialUrl,
+            bulunan?.DocumentVersionNumber);
+    }
+
     public static OpportunityDetailDto ToDetail(
         Opportunity opportunity,
         DateTimeOffset now,
-        OpportunityProvenanceDto? provenance = null) => new(
+        OpportunityProvenanceDto? provenance = null,
+        IReadOnlyDictionary<Guid, RuleEvidenceContext>? evidenceContext = null) => new(
         opportunity.Id,
         opportunity.Title,
         opportunity.Publisher,
@@ -284,7 +423,10 @@ public sealed class OpportunityService(
         opportunity.RuleExtractionConfidence,
         opportunity.IsReviewedByConsultant,
         opportunity.Rules.Select(r => new OpportunityRuleDto(
-            r.Id, r.Field, r.Operator, r.Value, r.Dimension, r.Severity, r.HumanReadable, r.SourceExcerpt, r.Confidence, r.IsManuallyOverridden)).ToList(),
+            r.Id, r.Field, r.Operator, r.Value, r.Dimension, r.Severity, r.HumanReadable,
+            r.SourceExcerpt, r.Confidence, r.IsManuallyOverridden,
+            r.Evidence.Select(e => ToEvidenceDto(e, evidenceContext)).ToList(),
+            r.SupportsAiClaims)).ToList(),
         opportunity.DocumentChecklist.Select(d => new DocumentRequirementDto(d.Code, d.Name, d.IsMandatory, d.IssuingAuthority, d.Notes)).ToList(),
         new FieldAvailabilityDto(
             opportunity.FieldAvailability.Deadline.ToString(),

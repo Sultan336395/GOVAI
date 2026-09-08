@@ -99,6 +99,59 @@ public sealed class OpportunityRuleConfiguration : IEntityTypeConfiguration<Oppo
 
         builder.HasIndex(r => r.OpportunityId);
         builder.HasIndex(r => r.Dimension);
+
+        builder.Ignore(r => r.SupportsAiClaims);
+
+        builder.HasMany(r => r.Evidence)
+            .WithOne()
+            .HasForeignKey(e => e.OpportunityRuleId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Metadata
+            .FindNavigation(nameof(OpportunityRule.Evidence))!
+            .SetPropertyAccessMode(PropertyAccessMode.Field);
+    }
+}
+
+/// <summary>
+/// Kural–kanıt bağlantısı (Faz 3).
+///
+/// <para>
+/// Tekil indeks (kural, parça, rol) mükerrer bağlantıyı <b>veritabanı düzeyinde</b>
+/// engeller. Uygulama katmanı zaten kontrol ediyor; bu kısıt yeniden ayrıştırma iki kez
+/// çalıştığında son savunmadır.
+/// </para>
+///
+/// <para>
+/// Kanıt parçasına foreign key <c>Restrict</c>: bir parça silinmek istenirse önce ona
+/// dayanan kural bağlantıları temizlenmelidir. Cascade olsaydı belge yeniden
+/// ayrıştırıldığında kuralların dayanağı sessizce yok olur, kullanıcı "kanıt yok"
+/// görürdü.
+/// </para>
+/// </summary>
+public sealed class OpportunityRuleEvidenceConfiguration : IEntityTypeConfiguration<OpportunityRuleEvidence>
+{
+    public void Configure(EntityTypeBuilder<OpportunityRuleEvidence> builder)
+    {
+        builder.ToTable("opportunity_rule_evidence");
+        builder.HasKey(e => e.Id);
+        builder.Ignore(e => e.IsCitable);
+
+        builder.Property(e => e.Role).HasConversion<int>();
+        builder.Property(e => e.SectionTitle).HasMaxLength(500);
+
+        builder.HasIndex(e => new { e.OpportunityRuleId, e.EvidenceChunkId, e.Role }).IsUnique();
+        builder.HasIndex(e => e.DocumentVersionId);
+
+        builder.HasOne<DocumentEvidenceChunk>()
+            .WithMany()
+            .HasForeignKey(e => e.EvidenceChunkId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne<SourceDocumentVersion>()
+            .WithMany()
+            .HasForeignKey(e => e.DocumentVersionId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }
 

@@ -434,7 +434,7 @@ public sealed class RegulatoryChangeRepository(GovAiDbContext context) : IRegula
             .OrderBy(c => c.SequenceNumber)
             .Select(c => new EvidenceChunkDto(
                 c.SequenceNumber, c.PageNumber, c.SectionTitle, c.ParagraphNumber,
-                c.Text, c.StartOffset, c.EndOffset, c.TextHash))
+                c.Text, c.StartOffset, c.EndOffset, c.TextHash, c.Id))
             .ToList() ?? [];
 
         return new RegulatoryChangeDetailDto(

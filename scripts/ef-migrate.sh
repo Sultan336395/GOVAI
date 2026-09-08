@@ -10,6 +10,7 @@
 #   scripts/ef-migrate.sh model-only  migrations add YeniMigration
 #   scripts/ef-migrate.sh preview     database update
 #   scripts/ef-migrate.sh preview     migrations list
+#   scripts/ef-migrate.sh test        database update   (GOVAI_TEST_POSTGRES gerekir)
 #
 # 5180 (müşterinin canlı veritabanı) bilerek desteklenmez. Oraya gerçekten çalışmak
 # gerekiyorsa önce yedek al, sonra değişkenleri elle ver:
@@ -64,8 +65,33 @@ case "$HEDEF" in
     export GOVAI_EF_ENVIRONMENT="Preview"
     ;;
 
+  test|gecici-test)
+    # Geçici, izole test veritabanı. Adres GOVAI_TEST_POSTGRES ile verilir; ad
+    # denetimi EfMigrationTarget.RequireEphemeralTestTarget tarafından yapılır:
+    # veritabanı adı "_test" içermeli ve port 5432/15437 OLMAMALIDIR. Böylece
+    # "test çalıştırıyorum" diyen bir komut gerçek veritabanına ulaşamaz.
+    if [[ -z "${GOVAI_TEST_POSTGRES:-}" ]]; then
+      echo "HATA: GOVAI_TEST_POSTGRES tanımlı değil." >&2
+      echo "Örnek: export GOVAI_TEST_POSTGRES='Host=127.0.0.1;Port=55432;Username=postgres;Password=...'" >&2
+      exit 1
+    fi
+
+    VERITABANI="${GOVAI_TEST_DATABASE:-govai_migration_test}"
+
+    case "$VERITABANI" in
+      *_test*) ;;
+      *)
+        echo "HATA: test veritabanının adı '_test' içermelidir; gelen: $VERITABANI" >&2
+        exit 1
+        ;;
+    esac
+
+    export GOVAI_EF_CONNECTION_STRING="${GOVAI_TEST_POSTGRES};Database=${VERITABANI}"
+    export GOVAI_EF_ENVIRONMENT="EphemeralTest"
+    ;;
+
   *)
-    echo "HATA: bilinmeyen hedef '$HEDEF'. Geçerli değerler: model-only, preview" >&2
+    echo "HATA: bilinmeyen hedef '$HEDEF'. Geçerli değerler: model-only, preview, test" >&2
     exit 1
     ;;
 esac

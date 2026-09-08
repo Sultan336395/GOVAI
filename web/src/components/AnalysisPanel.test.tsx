@@ -47,6 +47,8 @@ const MODELSIZ_KATKI: AnalysisContribution = {
   rejectedClaimCount: 0,
   conflicts: [],
   warning: 'Bu sonuç yalnızca resmî belgedeki kurallara göre hesaplandı; yapay zekâ açıklaması yok.',
+  modeLabel: 'Kural tabanlı analiz',
+  aiConfidenceLabel: 'Kullanılamıyor',
 }
 
 function kriter(over: Partial<CriterionResult> = {}): CriterionResult {
@@ -178,6 +180,7 @@ const ANALIZ: OpportunityAnalysis = {
       },
     ],
     ruleSetVersion: '2026.09.1',
+    title: 'Kural tabanlı güven',
   },
   criteria: [SAGLANAN, SAGLANMAYAN, EKSIK, CELISKILI],
   met: [SAGLANAN],
@@ -238,7 +241,7 @@ describe('Fırsat analiz paneli', () => {
 
     expect(screen.getByText('Uygunluk analizi')).toBeTruthy()
     expect(screen.getByText('Şartlı uygun')).toBeTruthy()
-    expect(document.body.textContent).toContain('Güven: Orta')
+    expect(document.body.textContent).toContain('Kural tabanlı güven: Orta')
     expect(document.body.textContent).toContain('63.4')
   })
 
@@ -336,7 +339,7 @@ describe('Fırsat analiz paneli', () => {
 
     render(<OpportunityAnalysisPanel data={dusuk} />)
 
-    expect(document.body.textContent).toContain('Güven: Düşük')
+    expect(document.body.textContent).toContain('Kural tabanlı güven: Düşük')
     expect(document.querySelector('[data-uyari="analiz"]')!.textContent).toContain(
       'kesin kabul edilmemelidir',
     )
@@ -400,6 +403,8 @@ describe('Fırsat analiz paneli', () => {
         rejectedClaimCount: 1,
         conflicts: [],
         warning: null,
+        modeLabel: 'Hibrit analiz',
+        aiConfidenceLabel: '%100',
       },
     }
 
@@ -497,6 +502,72 @@ describe('Mevzuat etki paneli', () => {
   })
 })
 
+describe('Güven göstergesi', () => {
+  it('AP25. Yapay zekâ kapalıyken "hibrit güven" gösterilmez', () => {
+    render(<OpportunityAnalysisPanel data={ANALIZ} />)
+
+    const govde = document.body.textContent ?? ''
+
+    // Sayı aynı sayı; ADI farklı. "Hibrit güven: Orta" yazmak, model hiç çalışmamışken
+    // onun da doğruladığı izlenimini verir.
+    expect(govde).toContain('Kural tabanlı güven')
+    expect(govde).not.toContain('Hibrit güven')
+  })
+
+  it('AP26. Yapay zekâ kapalıyken analiz türü ve YZ güveni açıkça yazar', () => {
+    render(<OpportunityAnalysisPanel data={ANALIZ} />)
+
+    const tur = document.querySelector('[data-alan="analiz-turu"]')!
+
+    expect(tur.textContent).toContain('Kural tabanlı analiz')
+    expect(tur.textContent).toContain('Yapay zekâ güveni: Kullanılamıyor')
+    // Sıfır YAZILMAZ: "model baktı ve güvenmedi" ile "model hiç bakmadı" ayrı şeyler.
+    expect(tur.textContent).not.toContain('Yapay zekâ güveni: %0')
+  })
+
+  it('AP27. Yapay zekâ katkısı varken hibrit etiketleri görünür', () => {
+    const hibrit: OpportunityAnalysis = {
+      ...ANALIZ,
+      confidence: { ...ANALIZ.confidence, title: 'Hibrit güven' },
+      contribution: {
+        hasAiContribution: true,
+        aiStatus: 'Succeeded',
+        aiStatusLabel: 'Yapay zekâ açıklaması eklendi',
+        aiExplanations: ['Belge imalat sektörünü hedefliyor.'],
+        rejectedClaimCount: 0,
+        conflicts: [],
+        warning: null,
+        modeLabel: 'Hibrit analiz',
+        aiConfidenceLabel: '%80',
+      },
+    }
+
+    render(<OpportunityAnalysisPanel data={hibrit} />)
+
+    const govde = document.body.textContent ?? ''
+
+    expect(govde).toContain('Hibrit güven')
+    expect(govde).toContain('Hibrit analiz')
+    expect(govde).toContain('Yapay zekâ güveni: %80')
+  })
+
+  it('AP28. Zorunlu kriteri bilinmeyen analiz kesin "Uygun" göstermez', () => {
+    const dogrulanamadi: OpportunityAnalysis = {
+      ...ANALIZ,
+      verdict: 'Indeterminate',
+      verdictLabel: 'Doğrulanamadı',
+      missing: [{ ...EKSIK, isMandatory: true }],
+    }
+
+    render(<OpportunityAnalysisPanel data={dogrulanamadi} />)
+
+    const govde = document.body.textContent ?? ''
+
+    expect(govde).toContain('Doğrulanamadı')
+    expect(govde).not.toContain('Şartlı uygun')
+  })
+})
+
 describe('Mobil görünüm', () => {
   /** 375 px genişlik: iPhone SE/12 mini sınıfı, sahadaki en dar ekran. */
   function mobilYap() {
@@ -531,6 +602,18 @@ describe('Mobil görünüm', () => {
     fireEvent.click(within(kutu).getByRole('button', { name: 'Bu sonuç neden çıktı?' }))
 
     expect(document.querySelector('[data-gerekce="GEOGRAPHY"]')!.textContent).toContain('TR62')
+  })
+
+  it('AP24b. Mobilde analiz türü ve güven başlığı görünür', () => {
+    mobilYap()
+    render(<OpportunityAnalysisPanel data={ANALIZ} />)
+
+    expect(document.querySelector('[data-alan="guven-ozeti"]')!.textContent).toContain(
+      'Kural tabanlı güven',
+    )
+    expect(document.querySelector('[data-alan="analiz-turu"]')!.textContent).toContain(
+      'Kullanılamıyor',
+    )
   })
 
   it('AP24. Mobilde uyarı metni kırpılmaz', () => {

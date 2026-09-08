@@ -49,8 +49,43 @@ public sealed class OpportunityRepository(GovAiDbContext context) : IOpportunity
     public Task<Opportunity?> GetWithRulesAsync(Guid opportunityId, CancellationToken cancellationToken = default) =>
         context.Opportunities
             .Include(o => o.Rules)
+            .ThenInclude(r => r.Evidence)
             .Include(o => o.DocumentChecklist)
             .FirstOrDefaultAsync(o => o.Id == opportunityId, cancellationToken);
+
+    /// <summary>
+    /// Kural kanıtlarının gösterim bilgisi. Tek sorguda çekilir: her kanıt için ayrı
+    /// sorgu, kural sayısı arttıkça N+1 üretirdi.
+    /// </summary>
+    public async Task<IReadOnlyDictionary<Guid, RuleEvidenceContext>> GetRuleEvidenceContextAsync(
+        Guid opportunityId,
+        CancellationToken cancellationToken = default)
+    {
+        var kayitlar = await (
+            from kural in context.Set<OpportunityRule>()
+            join kanit in context.OpportunityRuleEvidence on kural.Id equals kanit.OpportunityRuleId
+            join parca in context.DocumentEvidenceChunks on kanit.EvidenceChunkId equals parca.Id
+            join surum in context.Set<SourceDocumentVersion>() on kanit.DocumentVersionId equals surum.Id
+            where kural.OpportunityId == opportunityId
+            select new
+            {
+                parca.Id,
+                parca.Text,
+                parca.TextHash,
+                surum.VersionNumber,
+                surum.CanonicalUrl
+            }).ToListAsync(cancellationToken);
+
+        return kayitlar
+            .GroupBy(k => k.Id)
+            .ToDictionary(
+                g => g.Key,
+                g => new RuleEvidenceContext(
+                    g.First().Text,
+                    g.First().TextHash,
+                    g.First().VersionNumber,
+                    g.First().CanonicalUrl));
+    }
 
     public async Task<IReadOnlyList<Opportunity>> ListForEvaluationAsync(
         DateTimeOffset asOf,
@@ -199,7 +234,7 @@ public sealed class OpportunityRepository(GovAiDbContext context) : IOpportunity
             .OrderBy(c => c.SequenceNumber)
             .Select(c => new EvidenceChunkDto(
                 c.SequenceNumber, c.PageNumber, c.SectionTitle, c.ParagraphNumber,
-                c.Text, c.StartOffset, c.EndOffset, c.TextHash))
+                c.Text, c.StartOffset, c.EndOffset, c.TextHash, c.Id))
             .ToList() ?? [];
 
         return new OpportunityProvenanceDto(

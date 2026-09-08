@@ -80,6 +80,12 @@ public static class OpportunityCriteriaEvaluator
             .GroupBy(e => CriterionCatalog.CriterionOfField(e.Field), StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => (IReadOnlyList<RuleEvaluation>)g.ToList(), StringComparer.OrdinalIgnoreCase);
 
+        // Kural kimliği -> resmî kanıt bağlantıları. Kriter kanıtı böylece belgedeki
+        // GERÇEK parçaya bağlanır; yapay zekâ iddiası doğrulanabilir hâle gelir.
+        var evidenceByRule = opportunity.Rules.ToDictionary(
+            r => r.Id,
+            r => (IReadOnlyList<OpportunityRuleEvidence>)r.Evidence.ToList());
+
         var criteria = new List<CriterionResult>();
 
         foreach (var code in CriterionCatalog.OpportunityCriteria)
@@ -90,9 +96,9 @@ public static class OpportunityCriteriaEvaluator
             {
                 CriterionCatalog.ApplicationWindow => ApplicationWindowCriterion(opportunity, asOf, rules),
                 CriterionCatalog.SupportType => SupportTypeCriterion(opportunity, rules),
-                CriterionCatalog.MandatoryDocuments => DocumentCriterion(group, outcome.DocumentChecklist, rules),
-                CriterionCatalog.YoungEmployees => YoungEmployeeCriterion(company, opportunity, group, rules),
-                _ => FromRules(code, group, rules)
+                CriterionCatalog.MandatoryDocuments => DocumentCriterion(group, outcome.DocumentChecklist, rules, evidenceByRule),
+                CriterionCatalog.YoungEmployees => YoungEmployeeCriterion(company, opportunity, group, rules, evidenceByRule),
+                _ => FromRules(code, group, rules, evidenceByRule)
             });
         }
 
@@ -125,7 +131,8 @@ public static class OpportunityCriteriaEvaluator
     private static CriterionResult FromRules(
         string code,
         IReadOnlyList<RuleEvaluation> evaluations,
-        AnalysisRuleSet rules)
+        AnalysisRuleSet rules,
+        IReadOnlyDictionary<Guid, IReadOnlyList<OpportunityRuleEvidence>>? evidenceByRule = null)
     {
         var definition = CriterionCatalog.Get(code);
         var decisive = evaluations
@@ -147,7 +154,8 @@ public static class OpportunityCriteriaEvaluator
                     : "Çağrı metninde bu başlıkta bir koşul bulunamadı.",
                 impact: bonusMet ? 1m : 0m,
                 evaluations: evaluations,
-                rules: rules);
+                rules: rules,
+                evidenceByRule: evidenceByRule);
         }
 
         if (TryFindConflict(decisive, out var conflictNote))
@@ -160,7 +168,8 @@ public static class OpportunityCriteriaEvaluator
                 AnalysisRuleSet.ConflictCredit,
                 evaluations,
                 rules,
-                explanation: $"{conflictNote} Sonuç doğrulanmadan kesin kabul edilmemelidir.");
+                explanation: $"{conflictNote} Sonuç doğrulanmadan kesin kabul edilmemelidir.",
+                evidenceByRule: evidenceByRule);
         }
 
         var unmet = decisive.Where(e => e.Outcome == RuleOutcome.NotSatisfied).ToList();
@@ -176,7 +185,8 @@ public static class OpportunityCriteriaEvaluator
                 + string.Join("; ", unmet.Select(e => $"{e.Requirement} (firma: {e.ActualValue}, beklenen: {e.ExpectedValue})")),
                 impact,
                 evaluations,
-                rules);
+                rules,
+                evidenceByRule: evidenceByRule);
         }
 
         var unknown = decisive.Where(e => e.Outcome == RuleOutcome.Unknown).ToList();
@@ -192,7 +202,8 @@ public static class OpportunityCriteriaEvaluator
                 AnalysisRuleSet.UnknownCredit,
                 evaluations,
                 rules,
-                explanation: "Şu alanlar doldurulmadan bu kriter karara bağlanamaz: " + string.Join(", ", fields) + ".");
+                explanation: "Şu alanlar doldurulmadan bu kriter karara bağlanamaz: " + string.Join(", ", fields) + ".",
+                evidenceByRule: evidenceByRule);
         }
 
         var satisfiedStrength = decisive.Average(e => e.Strength);
@@ -204,7 +215,8 @@ public static class OpportunityCriteriaEvaluator
             $"{decisive.Count} koşulun tamamı firmanın verisiyle karşılanıyor.",
             satisfiedStrength,
             evaluations,
-            rules);
+            rules,
+            evidenceByRule: evidenceByRule);
     }
 
     /// <summary>
@@ -376,13 +388,14 @@ public static class OpportunityCriteriaEvaluator
     private static CriterionResult DocumentCriterion(
         IReadOnlyList<RuleEvaluation> evaluations,
         IReadOnlyList<DocumentCheckResult> checklist,
-        AnalysisRuleSet rules)
+        AnalysisRuleSet rules,
+        IReadOnlyDictionary<Guid, IReadOnlyList<OpportunityRuleEvidence>>? evidenceByRule = null)
     {
         var definition = CriterionCatalog.Get(CriterionCatalog.MandatoryDocuments);
 
         if (checklist.Count == 0)
         {
-            return FromRules(CriterionCatalog.MandatoryDocuments, evaluations, rules);
+            return FromRules(CriterionCatalog.MandatoryDocuments, evaluations, rules, evidenceByRule);
         }
 
         var zorunlu = checklist.Where(d => d.IsMandatory).ToList();
@@ -400,7 +413,8 @@ public static class OpportunityCriteriaEvaluator
                     : $"İstenen {zorunlu.Count} zorunlu belgenin tamamı firmada mevcut.",
                 1m,
                 evaluations,
-                rules);
+                rules,
+                evidenceByRule: evidenceByRule);
         }
 
         var oran = zorunlu.Count == 0 ? 0m : (decimal)(zorunlu.Count - eksik.Count) / zorunlu.Count;
@@ -413,7 +427,8 @@ public static class OpportunityCriteriaEvaluator
             + string.Join(", ", eksik.Select(d => d.Name)) + ".",
             oran,
             evaluations,
-            rules);
+            rules,
+            evidenceByRule: evidenceByRule);
     }
 
     /// <summary>
@@ -432,7 +447,8 @@ public static class OpportunityCriteriaEvaluator
         Company company,
         Opportunity opportunity,
         IReadOnlyList<RuleEvaluation> evaluations,
-        AnalysisRuleSet rules)
+        AnalysisRuleSet rules,
+        IReadOnlyDictionary<Guid, IReadOnlyList<OpportunityRuleEvidence>>? evidenceByRule = null)
     {
         var definition = CriterionCatalog.Get(CriterionCatalog.YoungEmployees);
 
@@ -459,10 +475,11 @@ public static class OpportunityCriteriaEvaluator
                 rules,
                 explanation: $"Firmanın genç çalışan sayısı {company.Workforce.YoungEmployeeMaxAge} yaş "
                     + $"tanımıyla girilmiş. Çağrının {istenenYas:0} yaş tanımına göre yeniden sayılması gerekir; "
-                    + "mevcut sayı bu çağrı için ne yeterli ne yetersiz sayılabilir.");
+                    + "mevcut sayı bu çağrı için ne yeterli ne yetersiz sayılabilir.",
+                evidenceByRule: evidenceByRule);
         }
 
-        return FromRules(CriterionCatalog.YoungEmployees, evaluations, rules);
+        return FromRules(CriterionCatalog.YoungEmployees, evaluations, rules, evidenceByRule);
     }
 
     private static CriterionResult Build(
@@ -474,12 +491,10 @@ public static class OpportunityCriteriaEvaluator
         IReadOnlyList<RuleEvaluation> evaluations,
         AnalysisRuleSet rules,
         string? explanation = null,
-        IReadOnlyList<CriterionEvidence>? evidence = null)
+        IReadOnlyList<CriterionEvidence>? evidence = null,
+        IReadOnlyDictionary<Guid, IReadOnlyList<OpportunityRuleEvidence>>? evidenceByRule = null)
     {
-        var kanit = evidence ?? evaluations
-            .Where(e => !string.IsNullOrWhiteSpace(e.SourceExcerpt))
-            .Select(e => new CriterionEvidence { Excerpt = e.SourceExcerpt!, Locator = e.Requirement })
-            .ToList();
+        var kanit = evidence ?? BuildEvidence(evaluations, evidenceByRule);
 
         return new CriterionResult
         {
@@ -499,6 +514,57 @@ public static class OpportunityCriteriaEvaluator
     }
 
     /// <summary>
+    /// Kriterin kanıt listesi.
+    ///
+    /// <para>
+    /// Kuralın resmî kanıt bağlantısı varsa <b>gerçek parça kimliği</b> kullanılır;
+    /// kullanıcı ve yapay zekâ katmanı belgedeki tam yeri görebilir. Bağlantı yoksa
+    /// yalnızca kuralın alıntı metni kalır — bu kanıt kimliği taşımaz ve yapay zekâ
+    /// o kural hakkında resmî kaynağa dayalı iddia üretemez.
+    /// </para>
+    /// </summary>
+    private static IReadOnlyList<CriterionEvidence> BuildEvidence(
+        IReadOnlyList<RuleEvaluation> evaluations,
+        IReadOnlyDictionary<Guid, IReadOnlyList<OpportunityRuleEvidence>>? evidenceByRule)
+    {
+        var sonuc = new List<CriterionEvidence>();
+
+        foreach (var evaluation in evaluations)
+        {
+            var baglantilar = evidenceByRule is not null
+                && evidenceByRule.TryGetValue(evaluation.RuleId, out var bulunan)
+                ? bulunan
+                : [];
+
+            var citable = baglantilar.Where(b => b.IsCitable).ToList();
+
+            if (citable.Count > 0)
+            {
+                sonuc.AddRange(citable.Select(b => new CriterionEvidence
+                {
+                    EvidenceChunkId = b.EvidenceChunkId,
+                    DocumentVersionId = b.DocumentVersionId,
+                    Excerpt = evaluation.SourceExcerpt ?? evaluation.Requirement,
+                    Locator = b.SectionTitle ?? $"Karakter {b.StartOffset}–{b.EndOffset}"
+                }));
+
+                continue;
+            }
+
+            if (!string.IsNullOrWhiteSpace(evaluation.SourceExcerpt))
+            {
+                sonuc.Add(new CriterionEvidence
+                {
+                    Excerpt = evaluation.SourceExcerpt,
+                    Locator = evaluation.Requirement
+                });
+            }
+        }
+
+        return sonuc;
+    }
+
+    /// <summary>
     /// Nihai uygunluk kararı. Mevcut motorun kararıyla uyumlu kalır; yalnızca kriter
     /// düzeyinde ortaya çıkan çelişki ve zorunlu başarısızlık bilgisini ekler.
     /// </summary>
@@ -514,6 +580,15 @@ public static class OpportunityCriteriaEvaluator
         // Çelişkili kanıt kesin karar vermeyi engeller: belge kendi içinde tutarsızsa
         // "uygun" demek de "uygun değil" demek de dayanaksızdır.
         if (criteria.Any(c => c.Outcome == CriterionOutcome.ConflictingEvidence))
+        {
+            return EligibilityVerdict.Indeterminate;
+        }
+
+        // ZORUNLU bir kriter bilinmiyorsa sonuç kesin "Uygun" OLAMAZ — puan yüksek
+        // olsa bile. Aksi hâlde firma, sağlayıp sağlamadığı bilinmeyen bir engelleyici
+        // koşula rağmen "uygunsunuz" görür ve başvurusu reddedilir. Eksik veri firmayı
+        // elemez ama kesin onay da vermez; doğru cevap "doğrulanamadı"dır.
+        if (criteria.Any(c => c.IsMandatory && c.Outcome == CriterionOutcome.Unknown))
         {
             return EligibilityVerdict.Indeterminate;
         }

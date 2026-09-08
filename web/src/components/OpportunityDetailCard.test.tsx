@@ -45,6 +45,7 @@ const KANIT: OpportunityProvenance = {
       startOffset: 0,
       endOffset: 78,
       textHash: 'c'.repeat(64),
+      evidenceChunkId: '01a05d9e-0000-7000-a000-0000000000e1',
     },
   ],
 }
@@ -78,6 +79,8 @@ const FIRSAT: OpportunityDetail = {
       sourceExcerpt: 'İhale, İdare binasında yapılacaktır.',
       confidence: 0.9,
       isManuallyOverridden: false,
+      evidence: [],
+      supportsAiClaims: false,
     },
   ],
   documentChecklist: [
@@ -450,6 +453,108 @@ describe('Fırsat detay ekranı', () => {
     render(<OpportunityDetailCard data={alintisiz} />)
 
     expect(kalemKutusu('Hibe üst limiti').textContent).toContain('Resmî kaynakta belirtilmemiş')
+  })
+
+  it('W20. Kuralın kanıt zinciri ekranda görünür', () => {
+    const kanitli: OpportunityDetail = {
+      ...FIRSAT,
+      rules: [
+        {
+          ...FIRSAT.rules[0],
+          evidence: [
+            {
+              evidenceChunkId: '01a05d9e-0000-7000-a000-0000000000e1',
+              documentVersionId: '01a05d9e-0000-7000-a000-0000000000d1',
+              role: 'ValueSource',
+              roleLabel: 'Değerin geçtiği bölüm',
+              startOffset: 60,
+              endOffset: 152,
+              pageNumber: 2,
+              sectionTitle: 'Başvuru Şartları',
+              text: 'İhale, İdare binasında yapılacaktır.',
+              textHash: 'd'.repeat(64),
+              officialUrl: 'https://www.resmigazete.gov.tr/ilan/1',
+              documentVersionNumber: 3,
+            },
+          ],
+          supportsAiClaims: true,
+        },
+      ],
+    }
+
+    render(<OpportunityDetailCard data={kanitli} />)
+
+    const liste = document.querySelector('[data-kanit-listesi]')!
+
+    // Zincirin görünen halkaları: rol, bölüm, sayfa, aralık, belge sürümü, resmî adres.
+    expect(liste.textContent).toContain('Değerin geçtiği bölüm')
+    expect(liste.textContent).toContain('Başvuru Şartları')
+    expect(liste.textContent).toContain('s.2')
+    expect(liste.textContent).toContain('60–152')
+    expect(liste.textContent).toContain('belge v3')
+
+    const baglanti = within(liste as HTMLElement).getByRole('link', { name: 'resmî kaynak' })
+    expect(baglanti.getAttribute('href')).toBe('https://www.resmigazete.gov.tr/ilan/1')
+  })
+
+  it('W21. Bir kural birden fazla kanıta bağlanabilir', () => {
+    const cokKanit: OpportunityDetail = {
+      ...FIRSAT,
+      rules: [
+        {
+          ...FIRSAT.rules[0],
+          evidence: [
+            {
+              evidenceChunkId: '01a05d9e-0000-7000-a000-0000000000e1',
+              documentVersionId: '01a05d9e-0000-7000-a000-0000000000d1',
+              role: 'ValueSource',
+              roleLabel: 'Değerin geçtiği bölüm',
+              startOffset: 10,
+              endOffset: 40,
+              pageNumber: null,
+              sectionTitle: 'Koşullar',
+              text: 'Birinci kanıt.',
+              textHash: 'e'.repeat(64),
+              officialUrl: null,
+              documentVersionNumber: 1,
+            },
+            {
+              evidenceChunkId: '01a05d9e-0000-7000-a000-0000000000e2',
+              documentVersionId: '01a05d9e-0000-7000-a000-0000000000d1',
+              role: 'ConditionText',
+              roleLabel: 'Koşulun geçtiği bölüm',
+              startOffset: 200,
+              endOffset: 260,
+              pageNumber: null,
+              sectionTitle: 'Ek Açıklama',
+              text: 'İkinci kanıt.',
+              textHash: 'f'.repeat(64),
+              officialUrl: null,
+              documentVersionNumber: 1,
+            },
+          ],
+          supportsAiClaims: true,
+        },
+      ],
+    }
+
+    render(<OpportunityDetailCard data={cokKanit} />)
+
+    const maddeler = document.querySelectorAll('[data-kanit-listesi] li')
+
+    expect(maddeler.length).toBe(2)
+    expect(maddeler[0].textContent).toContain('Değerin geçtiği bölüm')
+    expect(maddeler[1].textContent).toContain('Koşulun geçtiği bölüm')
+  })
+
+  it('W22. Kanıtsız kural gizlenmez; yapay zekânın konuşamayacağı söylenir', () => {
+    render(<OpportunityDetailCard data={FIRSAT} />)
+
+    // Kural ekranda duruyor — deterministik motor onu kullanmaya devam ediyor.
+    expect(screen.getAllByText('İhale yeri Mersin ilidir.').length).toBeGreaterThan(0)
+
+    const uyari = document.querySelector('[data-kanit-yok]')!
+    expect(uyari.textContent).toContain('yapay zekâ açıklaması üretilmez')
   })
 
   it('W19. Eski tek bütçe alanlı kayıtlar ekranı bozmaz', () => {

@@ -58,12 +58,23 @@ public sealed record ConfidenceFactorDto(
     string Explanation,
     bool NotMeasured);
 
+/// <summary>
+/// Güven göstergesi.
+///
+/// <para>
+/// <c>Title</c> bilinçli olarak ayrı bir alan: yapay zekâ kapalıyken bu sayı
+/// <b>kural tabanlı güvendir</b>, hibrit güven değildir. "Hibrit güven: Yüksek"
+/// yazmak, model hiç çalışmamışken kullanıcıya modelin de doğruladığı izlenimi verir —
+/// ürünün verebileceği en yanıltıcı mesaj budur.
+/// </para>
+/// </summary>
 public sealed record ConfidenceDto(
     decimal Value,
     ConfidenceLevel Level,
     string LevelLabel,
     IReadOnlyList<ConfidenceFactorDto> Factors,
-    string RuleSetVersion);
+    string RuleSetVersion,
+    string Title);
 
 /// <summary>
 /// Kural ile yapay zekânın katkısını AYRI gösteren blok.
@@ -86,7 +97,11 @@ public sealed record AnalysisContributionDto(
     // Kural ile modelin çeliştiği noktalar; kural sonucu korunur.
     IReadOnlyList<RuleAiConflictDto> Conflicts,
     // Model yoksa veya güven düşükse ekranda gösterilecek uyarı.
-    string? Warning);
+    string? Warning,
+    // Analizin türü: "Kural tabanlı analiz" veya "Hibrit analiz".
+    string ModeLabel,
+    // Yapay zekâ güveni. Model çalışmadıysa "Kullanılamıyor" yazar; sayı gösterilmez.
+    string AiConfidenceLabel);
 
 public sealed record RuleAiConflictDto(
     string CriterionCode,
@@ -185,7 +200,9 @@ public static class AnalysisLabels
         EligibilityVerdict.Eligible => "Uygun",
         EligibilityVerdict.ConditionallyEligible => "Şartlı uygun",
         EligibilityVerdict.NotEligible => "Uygun değil",
-        _ => "Belirsiz"
+        // Analiz ekranında "Belirsiz" yerine "Doğrulanamadı": kullanıcı ne yapması
+        // gerektiğini anlamalı. Belirsizlik bir durum değil, kapatılacak bir eksiktir.
+        _ => "Doğrulanamadı"
     };
 
     /// <summary>
@@ -193,4 +210,26 @@ public static class AnalysisLabels
     /// diye yazamasın; sistemde o tahmini yapacak geçmiş başvuru sonucu verisi yoktur.
     /// </summary>
     public const string ScoreLabel = "Uygunluk puanı";
+
+    /// <summary>Model çalışmadığında analiz türünün adı.</summary>
+    public const string RulesOnlyModeLabel = "Kural tabanlı analiz";
+
+    /// <summary>Model çalıştığında analiz türünün adı.</summary>
+    public const string HybridModeLabel = "Hibrit analiz";
+
+    /// <summary>Model çalışmadığında güven göstergesinin başlığı.</summary>
+    public const string RulesOnlyConfidenceTitle = "Kural tabanlı güven";
+
+    /// <summary>Model çalıştığında güven göstergesinin başlığı.</summary>
+    public const string HybridConfidenceTitle = "Hibrit güven";
+
+    /// <summary>
+    /// Model çalışmadığında yapay zekâ güveninin karşılığı.
+    ///
+    /// <para>
+    /// Sayı gösterilmez. Sıfır yazmak "model baktı ve güvenmedi" demektir; oysa model
+    /// hiç çalışmamıştır. İki durum kullanıcıyı zıt yönlere iter.
+    /// </para>
+    /// </summary>
+    public const string AiConfidenceUnavailable = "Kullanılamıyor";
 }
