@@ -93,24 +93,38 @@ public static class ConfidenceCalculator
             $"Koşullar belgeden otomatik çıkarıldı; çıkarım güveni {value:0.00}.");
     }
 
+    /// <summary>
+    /// Şirket profili doluluğu — yalnızca <b>firma verisine dayanan</b> kriterler üzerinden.
+    ///
+    /// <para>
+    /// Başvuru dönemi ve destek türü kriterleri tamamen belgeden gelir; firma profili
+    /// bomboş olsa da sağlanırlar. Onlar da sayıldığında profili hiç doldurulmamış bir
+    /// firma "üç kriterden biri tamam" diye %33 doluluk alıyor ve güven Orta'ya
+    /// çıkıyordu. Ölçünün adı "profil doluluğu"; belgeden gelen bir cevabın profili
+    /// doldurmuş sayılması ölçüyü yanlış okutur.
+    /// </para>
+    /// </summary>
     private static ConfidenceFactor ProfileCompleteness(
         Company company,
         IReadOnlyList<CriterionResult> criteria,
         AnalysisRuleSet rules)
     {
-        if (criteria.Count == 0)
+        var firmaVerisine_dayanan = criteria.Where(c => c.CompanyFields.Count > 0).ToList();
+
+        if (firmaVerisine_dayanan.Count == 0)
         {
             return Factor(ConfidenceFactors.ProfileCompleteness, company.ProfileCompletionPercentage / 100m, rules,
-                $"Firma profili %{company.ProfileCompletionPercentage} dolu.");
+                $"Çağrı firma profiline dayanan koşul içermiyor; profil doluluğu %{company.ProfileCompletionPercentage}.");
         }
 
-        var eksik = criteria.Count(c => c.Outcome == CriterionOutcome.Unknown);
-        var oran = 1m - ((decimal)eksik / criteria.Count);
+        var eksik = firmaVerisine_dayanan.Count(c => c.Outcome == CriterionOutcome.Unknown);
+        var oran = 1m - ((decimal)eksik / firmaVerisine_dayanan.Count);
 
         return Factor(ConfidenceFactors.ProfileCompleteness, oran, rules,
             eksik == 0
                 ? "Bu çağrının sorduğu tüm alanlar firma profilinde dolu."
-                : $"{criteria.Count} kriterden {eksik} tanesi firma verisi eksik olduğu için karara bağlanamadı.");
+                : $"Firma verisine dayanan {firmaVerisine_dayanan.Count} kriterden {eksik} tanesi "
+                  + "profil eksikliği nedeniyle karara bağlanamadı.");
     }
 
     /// <summary>

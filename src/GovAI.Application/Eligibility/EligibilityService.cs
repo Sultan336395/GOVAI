@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text.Json;
 using GovAI.Application.Abstractions.Persistence;
 using GovAI.Application.Abstractions.Services;
+using GovAI.Application.Analysis;
 using GovAI.Application.Common;
 using GovAI.Domain.Assessments;
 using GovAI.Domain.Common;
@@ -29,6 +30,7 @@ public sealed class EligibilityService(
     CompanyAccessGuard access,
     IDateTimeProvider clock,
     IAiExplanationClient ai,
+    AnalysisInvalidationService analysisInvalidation,
     ILogger<EligibilityService> logger)
 {
     private static readonly JsonSerializerOptions DetailJsonOptions = new()
@@ -131,6 +133,10 @@ public sealed class EligibilityService(
         {
             assessment.Supersede();
         }
+
+        // Fırsatın belgesi değiştiğinde DeepTech analizleri de eskir. Eski analiz
+        // korunur; yeni sürümle yeniden çalıştırıldığında yenisi üretilir.
+        await analysisInvalidation.InvalidateForTargetAsync(opportunityId, cancellationToken);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 

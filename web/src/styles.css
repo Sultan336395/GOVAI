@@ -110,6 +110,24 @@ a.link-button:focus-visible {
   outline-offset: 2px;
 }
 
+/* Metin görünümlü düğme ("Bu sonuç neden çıktı?"). <a> değil <button>: burada bir
+   gezinme yok, aynı sayfada bir bölüm açılıyor. */
+button.inline-link {
+  font: inherit;
+  font-size: 12px;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--primary);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+button.inline-link:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 input,
 select {
   font: inherit;

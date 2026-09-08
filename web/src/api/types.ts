@@ -858,3 +858,168 @@ export interface ManualImportResult {
   sourceName: string
   note: string
 }
+
+// ───────────────────────── DeepTech analiz (Faz 3) ─────────────────────────
+
+/**
+ * Kriter sonucu. Beş değerlidir: "bilmiyorum" ile "hayır" ve "belgede çelişki var"
+ * ayrı şeylerdir. Kullanıcı üçüne farklı tepki verir — biri veri tamamlamayı, biri
+ * başvurudan vazgeçmeyi, biri resmî kaynaktan doğrulamayı gerektirir.
+ */
+export type CriterionOutcome =
+  | 'Met'
+  | 'NotMet'
+  | 'Unknown'
+  | 'NotApplicable'
+  | 'ConflictingEvidence'
+
+export type ScoreGroup =
+  | 'Mandatory'
+  | 'SectorNace'
+  | 'ScaleAndFinancials'
+  | 'Geography'
+  | 'Workforce'
+  | 'Timing'
+  | 'DocumentsAndConditions'
+
+export type ConfidenceLevel = 'Low' | 'Medium' | 'High'
+
+export type AiAnalysisStatus = 'AIUnavailable' | 'Succeeded' | 'InvalidOutput' | 'Error'
+
+export type RegulationImpact =
+  | 'Unknown'
+  | 'Applicable'
+  | 'NotApplicable'
+  | 'PotentiallyApplicable'
+
+export interface CriterionEvidence {
+  evidenceChunkId: string | null
+  documentVersionId: string | null
+  excerpt: string
+  locator: string | null
+}
+
+export interface CriterionResult {
+  code: string
+  name: string
+  isMandatory: boolean
+  outcome: CriterionOutcome
+  outcomeLabel: string
+  rationale: string
+  companyFields: string[]
+  evidence: CriterionEvidence[]
+  scoreImpact: number
+  missingOrConflictExplanation: string | null
+  ruleSetVersion: string
+  group: ScoreGroup
+  groupName: string
+}
+
+export interface ScoreComponent {
+  group: ScoreGroup
+  name: string
+  value: number
+  weight: number
+  contribution: number
+  criterionCount: number
+  metCount: number
+  notMetCount: number
+  unknownCount: number
+  conflictCount: number
+  rationale: string
+}
+
+export interface ExplainableScore {
+  value: number
+  /** Her zaman "Uygunluk puanı"; hiçbir yerde kazanma ihtimali yazmaz. */
+  label: string
+  components: ScoreComponent[]
+  hasMandatoryFailure: boolean
+  missingDataEffect: number
+  ruleSetVersion: string
+}
+
+export interface ConfidenceFactor {
+  code: string
+  name: string
+  value: number
+  weight: number
+  explanation: string
+  notMeasured: boolean
+}
+
+export interface AnalysisConfidence {
+  value: number
+  level: ConfidenceLevel
+  levelLabel: string
+  factors: ConfidenceFactor[]
+  ruleSetVersion: string
+}
+
+export interface RuleAiConflict {
+  criterionCode: string
+  ruleOutcome: CriterionOutcome
+  claimType: string
+  note: string
+}
+
+export interface AnalysisContribution {
+  hasAiContribution: boolean
+  aiStatus: AiAnalysisStatus
+  aiStatusLabel: string
+  aiExplanations: string[]
+  rejectedClaimCount: number
+  conflicts: RuleAiConflict[]
+  warning: string | null
+}
+
+export interface AnalysisVersion {
+  analysisRunId: string
+  companyProfileVersion: number
+  financialDataVersion: number
+  ruleSetVersion: string
+  promptVersion: string | null
+  modelProvider: string | null
+  modelName: string | null
+  outputSchemaVersion: string | null
+  correlationId: string
+  startedAt: string
+  completedAt: string | null
+  status: string
+}
+
+export interface OpportunityAnalysis {
+  companyId: string
+  opportunityId: string
+  opportunityTitle: string
+  evaluatedAt: string
+  verdict: EligibilityVerdict
+  verdictLabel: string
+  sectorFit: SectorFit
+  score: ExplainableScore
+  confidence: AnalysisConfidence
+  criteria: CriterionResult[]
+  met: CriterionResult[]
+  notMet: CriterionResult[]
+  missing: CriterionResult[]
+  conflicting: CriterionResult[]
+  ruleSetVersion: string
+  contribution: AnalysisContribution
+  version: AnalysisVersion
+}
+
+export interface RegulationImpactAnalysis {
+  companyId: string
+  regulatoryChangeId: string
+  regulationTitle: string
+  evaluatedAt: string
+  impact: RegulationImpact
+  impactLabel: string
+  confidence: AnalysisConfidence
+  criteria: CriterionResult[]
+  openQuestions: string[]
+  legalDisclaimer: string
+  ruleSetVersion: string
+  contribution: AnalysisContribution
+  version: AnalysisVersion
+}

@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { api } from '@/api/client'
 import type { DocumentCheck, RuleEvaluation } from '@/api/types'
 import { EmptyState, ErrorBox, Loading, SectorFitBadge, VerdictBadge } from '@/components/Common'
+import { OpportunityAnalysisPanel } from '@/components/AnalysisPanel'
 import { OpportunityDetailCard } from '@/components/OpportunityDetailCard'
 import { formatDate, formatPercent } from '@/lib/format'
 
@@ -22,6 +23,15 @@ export default function EligibilityDetailPage() {
     queryKey: ['opportunity', data?.opportunityId],
     queryFn: () => api.getOpportunity(data!.opportunityId),
     enabled: Boolean(data?.opportunityId),
+  })
+
+  // DeepTech analizi ayrı uçtan gelir: kriter kriter sonuç, kırılımlı puan ve
+  // güven seviyesi. Uç POST'tur çünkü sürümlü bir analiz kaydı yazar; aynı
+  // sürümlerle çağrıldığında yeni kayıt oluşmaz.
+  const analiz = useQuery({
+    queryKey: ['analysis', data?.companyId, data?.opportunityId],
+    queryFn: () => api.analyzeOpportunity(data!.companyId, data!.opportunityId),
+    enabled: Boolean(data?.companyId && data?.opportunityId),
   })
 
   const generateSummary = useMutation({
@@ -57,6 +67,8 @@ export default function EligibilityDetailPage() {
           </div>
         </div>
       </div>
+
+      {analiz.data ? <OpportunityAnalysisPanel data={analiz.data} /> : null}
 
       {firsat.data ? <OpportunityDetailCard data={firsat.data} /> : null}
 

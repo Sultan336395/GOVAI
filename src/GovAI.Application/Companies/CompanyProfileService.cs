@@ -1,5 +1,6 @@
 using GovAI.Application.Abstractions.Persistence;
 using GovAI.Application.Abstractions.Services;
+using GovAI.Application.Analysis;
 using GovAI.Application.Common;
 using GovAI.Domain.Companies;
 using GovAI.Domain.Common;
@@ -21,6 +22,7 @@ public sealed class CompanyProfileService(
     IDateTimeProvider clock,
     IEventPublisher events,
     ICacheService cache,
+    AnalysisInvalidationService analysisInvalidation,
     ILogger<CompanyProfileService> logger)
 {
     public async Task<IReadOnlyList<CompanySummaryDto>> ListAsync(CancellationToken cancellationToken = default)
@@ -86,6 +88,7 @@ public sealed class CompanyProfileService(
         if (company.ProfileVersion != previousVersion)
         {
             await QueueRescoringAsync(company.Id, cancellationToken);
+            await analysisInvalidation.InvalidateForCompanyAsync(company.Id, cancellationToken);
         }
 
         return ToDetail(company);
@@ -148,6 +151,7 @@ public sealed class CompanyProfileService(
         if (changed)
         {
             await QueueRescoringAsync(company.Id, cancellationToken);
+            await analysisInvalidation.InvalidateForCompanyAsync(company.Id, cancellationToken);
         }
 
         logger.LogInformation(

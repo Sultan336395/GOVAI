@@ -1,6 +1,7 @@
 using System.Text.Json;
 using GovAI.Application.Abstractions.Persistence;
 using GovAI.Application.Abstractions.Services;
+using GovAI.Application.Analysis;
 using GovAI.Application.Common;
 using GovAI.Application.Reference;
 using GovAI.Domain.Common;
@@ -28,6 +29,7 @@ public sealed class CompanyRegistryService(
     CompanyAccessGuard access,
     IDateTimeProvider clock,
     IEventPublisher events,
+    AnalysisInvalidationService analysisInvalidation,
     ILogger<CompanyRegistryService> logger)
 {
     // ══════════════════════ Şirketlerim ══════════════════════
@@ -224,6 +226,12 @@ public sealed class CompanyRegistryService(
         // hesaplanmış hâlde kaldı ve düzeltmenin işe yaramadığını sandı. Sektör artık
         // sıralamanın birincil ölçütü olduğu için bu sessiz eskime kabul edilemez.
         await QueueRescoringAsync(companyId, cancellationToken);
+
+        // DeepTech analizleri de eskidi. Kayıt SİLİNMEZ; yalnızca "güncel" işareti
+        // kalkar, böylece ekran eski profile göre hesaplanmış bir sonucu geçerli gibi
+        // göstermez.
+        await analysisInvalidation.InvalidateForCompanyAsync(companyId, cancellationToken);
+        await unitOfWork.SaveChangesAsync(cancellationToken);
 
         var membership = await memberships.GetAsync(RequireUser(), companyId, cancellationToken);
         return ToMyCompany(company, membership!, null, null);

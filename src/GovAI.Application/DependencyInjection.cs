@@ -34,6 +34,7 @@ public static class DependencyInjection
         services.AddScoped<Regulatory.RegulatoryChangeService>();
         services.AddScoped<EligibilityService>();
         services.AddScoped<Analysis.HybridAnalysisService>();
+        services.AddScoped<Analysis.AnalysisInvalidationService>();
         services.AddScoped<ScenarioSimulationService>();
         services.AddScoped<ReportingService>();
         services.AddScoped<NotificationService>();

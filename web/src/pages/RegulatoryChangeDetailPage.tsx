@@ -1,7 +1,9 @@
 import { Link, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/api/client'
+import { RegulationImpactPanel } from '@/components/AnalysisPanel'
 import { ErrorBox, InfoBox, Loading } from '@/components/Common'
+import { useCompanies } from '@/app/contexts'
 import {
   changeTypeLabels,
   parseStatusLabels,
@@ -18,10 +20,19 @@ import { formatDate, NOT_PROVIDED_LABEL } from '@/lib/format'
 export default function RegulatoryChangeDetailPage() {
   const { changeId } = useParams<{ changeId: string }>()
 
+  const { selectedCompanyId } = useCompanies()
+
   const { data, isLoading, error } = useQuery({
     queryKey: ['regulatory-change', changeId],
     queryFn: () => api.getRegulatoryChange(changeId!),
     enabled: Boolean(changeId),
+  })
+
+  // Etki analizi seçili firmaya göre değişir; firma seçilmemişse istenmez.
+  const etki = useQuery({
+    queryKey: ['regulation-impact', selectedCompanyId, changeId],
+    queryFn: () => api.analyzeRegulation(selectedCompanyId!, changeId!),
+    enabled: Boolean(selectedCompanyId && changeId),
   })
 
   if (isLoading) return <Loading />
@@ -56,9 +67,14 @@ export default function RegulatoryChangeDetailPage() {
         </div>
       </div>
 
-      <InfoBox>
-        Şirket etkisi DeepTech analiz motoru tarafından değerlendirilecektir.
-      </InfoBox>
+      {etki.data ? (
+        <RegulationImpactPanel data={etki.data} />
+      ) : (
+        <InfoBox>
+          Etki analizi için önce bir firma seçin. Sonuç seçili firmanın profiline göre
+          hesaplanır.
+        </InfoBox>
+      )}
 
       <div className="card" style={{ marginBottom: 16 }}>
         <h2 style={{ marginTop: 0 }}>Künye</h2>

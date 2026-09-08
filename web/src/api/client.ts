@@ -1,4 +1,6 @@
 import type {
+  OpportunityAnalysis,
+  RegulationImpactAnalysis,
   ActiveCompanyResult,
   CompanyDetail,
   CompanyGroup,
@@ -165,6 +167,24 @@ export const api = {
   ) =>
     request<PagedResult<OpportunityMatch>>(
       `/api/eligibility/companies/${companyId}/matches${query(params)}`,
+    ),
+
+  // ---- DeepTech analiz (Faz 3) ----
+
+  /**
+   * Şirket–fırsat analizi. POST'tur çünkü sonuç üretir ve sürümlü bir analiz kaydı
+   * yazar; aynı sürümlerle çağrıldığında yeni kayıt oluşmaz (idempotent).
+   */
+  analyzeOpportunity: (companyId: string, opportunityId: string) =>
+    request<OpportunityAnalysis>(
+      `/api/analysis/companies/${companyId}/opportunities/${opportunityId}`,
+      { method: 'POST' },
+    ),
+
+  analyzeRegulation: (companyId: string, regulatoryChangeId: string) =>
+    request<RegulationImpactAnalysis>(
+      `/api/analysis/companies/${companyId}/regulations/${regulatoryChangeId}`,
+      { method: 'POST' },
     ),
 
   // ---- referans katalogları (form önerileri) ----
