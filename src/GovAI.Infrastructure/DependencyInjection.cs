@@ -85,6 +85,24 @@ public static class DependencyInjection
                     new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", options.ApiKey);
             }
         });
+
+        // Faz 3: analiz sağlayıcısı YALNIZCA yapılandırma varsa bağlanır. Yapılandırma
+        // yoksa ağ istemcisi hiç kurulmaz; sistem kural tabanlı çalışır ve analiz
+        // kaydına "AIUnavailable" yazar. Anahtarsız bir HTTP istemcisi kaydetmek,
+        // her analizde başarısız bir istek denemesi ve yanıltıcı hata logu demekti.
+        if (!options.IsConfigured)
+        {
+            services.AddSingleton<IAnalysisAiProvider, UnavailableAnalysisAiProvider>();
+            return;
+        }
+
+        services.AddHttpClient<IAnalysisAiProvider, OpenAiAnalysisProvider>(client =>
+        {
+            client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + "/");
+            client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+            client.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", options.ApiKey);
+        });
     }
 
     private static void AddCache(IServiceCollection services, IConfiguration configuration)

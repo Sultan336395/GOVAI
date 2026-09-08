@@ -1,3 +1,4 @@
+using GovAI.Domain.Analysis;
 using GovAI.Domain.Assessments;
 using GovAI.Domain.Auditing;
 using GovAI.Domain.Companies;
@@ -214,6 +215,40 @@ public interface IAssessmentRepository
 
     /// <summary>Yeni hesaplama öncesi eski kayıtları geçmişe alır.</summary>
     Task SupersedePreviousAsync(Guid companyId, Guid opportunityId, CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// Analiz çalıştırmalarının deposu (Faz 3).
+///
+/// <para>
+/// Eski analizler silinmez; yeni analiz üretildiğinde eskisinin "güncel" işareti
+/// kalkar. Mükerrer mesaj koruması idempotency anahtarı üzerinden yapılır.
+/// </para>
+/// </summary>
+public interface IAnalysisRunRepository
+{
+    /// <summary>Aynı sürümlerle üretilmiş tamamlanmış analiz; varsa yenisi üretilmez.</summary>
+    Task<AnalysisRun?> FindByIdempotencyKeyAsync(
+        string idempotencyKey,
+        CancellationToken cancellationToken = default);
+
+    Task<AnalysisRun?> GetLatestAsync(
+        AnalysisKind kind,
+        Guid companyId,
+        Guid targetId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Bir hedefin (fırsat/mevzuat) tüm güncel analizleri; sürüm değişince geçersizlenir.</summary>
+    Task<IReadOnlyList<AnalysisRun>> ListLatestForTargetAsync(
+        Guid targetId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Bir firmanın tüm güncel analizleri; profil değişince geçersizlenir.</summary>
+    Task<IReadOnlyList<AnalysisRun>> ListLatestForCompanyAsync(
+        Guid companyId,
+        CancellationToken cancellationToken = default);
+
+    Task AddAsync(AnalysisRun run, CancellationToken cancellationToken = default);
 }
 
 public interface IScenarioSimulationRepository

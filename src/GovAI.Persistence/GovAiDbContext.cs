@@ -1,3 +1,4 @@
+using GovAI.Domain.Analysis;
 using GovAI.Application.Abstractions.Services;
 using GovAI.Domain.Assessments;
 using GovAI.Domain.Auditing;
@@ -55,6 +56,8 @@ public class GovAiDbContext(
     public DbSet<RegulatoryChange> RegulatoryChanges => Set<RegulatoryChange>();
     public DbSet<Opportunity> Opportunities => Set<Opportunity>();
     public DbSet<EligibilityAssessment> Assessments => Set<EligibilityAssessment>();
+
+    public DbSet<AnalysisRun> AnalysisRuns => Set<AnalysisRun>();
     public DbSet<ScenarioSimulation> ScenarioSimulations => Set<ScenarioSimulation>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<AuditLogEntry> AuditLog => Set<AuditLogEntry>();
@@ -138,6 +141,9 @@ public class GovAiDbContext(
 
         modelBuilder.Entity<ScenarioSimulation>()
             .HasQueryFilter(s => s.TenantId == _tenantId);
+
+        modelBuilder.Entity<AnalysisRun>()
+            .HasQueryFilter(r => r.TenantId == _tenantId);
 
         modelBuilder.Entity<Notification>()
             .HasQueryFilter(n => n.TenantId == _tenantId);

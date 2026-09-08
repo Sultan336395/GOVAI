@@ -1,3 +1,4 @@
+using GovAI.Domain.Analysis;
 using GovAI.Application.Abstractions.Persistence;
 using GovAI.Domain.Assessments;
 using GovAI.Domain.Auditing;
@@ -311,4 +312,41 @@ public sealed class AuditLogRepository(GovAiDbContext context) : IAuditLogReposi
 
         return new PagedResult<AuditLogEntry>(items, total, query.Page, query.PageSize);
     }
+}
+
+/// <summary>Analiz çalıştırma kayıtları (Faz 3). Kiracı filtresi context'te uygulanır.</summary>
+public sealed class AnalysisRunRepository(GovAiDbContext context) : IAnalysisRunRepository
+{
+    public Task<AnalysisRun?> FindByIdempotencyKeyAsync(
+        string idempotencyKey,
+        CancellationToken cancellationToken = default) =>
+        context.AnalysisRuns
+            .FirstOrDefaultAsync(r => r.IdempotencyKey == idempotencyKey, cancellationToken);
+
+    public Task<AnalysisRun?> GetLatestAsync(
+        AnalysisKind kind,
+        Guid companyId,
+        Guid targetId,
+        CancellationToken cancellationToken = default) =>
+        context.AnalysisRuns
+            .Where(r => r.Kind == kind && r.CompanyId == companyId && r.TargetId == targetId && r.IsLatest)
+            .OrderByDescending(r => r.StartedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<AnalysisRun>> ListLatestForTargetAsync(
+        Guid targetId,
+        CancellationToken cancellationToken = default) =>
+        await context.AnalysisRuns
+            .Where(r => r.TargetId == targetId && r.IsLatest)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<AnalysisRun>> ListLatestForCompanyAsync(
+        Guid companyId,
+        CancellationToken cancellationToken = default) =>
+        await context.AnalysisRuns
+            .Where(r => r.CompanyId == companyId && r.IsLatest)
+            .ToListAsync(cancellationToken);
+
+    public async Task AddAsync(AnalysisRun run, CancellationToken cancellationToken = default) =>
+        await context.AnalysisRuns.AddAsync(run, cancellationToken);
 }

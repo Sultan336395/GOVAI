@@ -1,3 +1,4 @@
+using GovAI.Domain.Analysis;
 using GovAI.Domain.Assessments;
 using GovAI.Domain.Auditing;
 using GovAI.Domain.Companies;
@@ -201,5 +202,51 @@ public sealed class AuditLogEntryConfiguration : IEntityTypeConfiguration<AuditL
         builder.HasIndex(a => a.OccurredAt);
         builder.HasIndex(a => new { a.EntityType, a.EntityId });
         builder.HasIndex(a => a.UserEmail);
+    }
+}
+
+/// <summary>
+/// Analiz çalıştırma kaydı (Faz 3).
+///
+/// <para>
+/// Idempotency anahtarı <b>tekil</b>: aynı sürümlerle gelen ikinci mesaj veritabanı
+/// düzeyinde de mükerrer kayıt açamaz. Uygulama katmanı önce arar; yarış durumunda
+/// bu kısıt son savunmadır.
+/// </para>
+/// </summary>
+public sealed class AnalysisRunConfiguration : IEntityTypeConfiguration<AnalysisRun>
+{
+    public void Configure(EntityTypeBuilder<AnalysisRun> builder)
+    {
+        builder.ToTable("analysis_runs");
+        builder.HasKey(r => r.Id);
+        builder.Ignore(r => r.DomainEvents);
+
+        builder.Property(r => r.Kind).HasConversion<int>();
+        builder.Property(r => r.Status).HasConversion<int>();
+        builder.Property(r => r.AiStatus).HasConversion<int>();
+        builder.Property(r => r.Verdict).HasConversion<int>();
+        builder.Property(r => r.Impact).HasConversion<int>();
+        builder.Property(r => r.ConfidenceLevel).HasConversion<int>();
+
+        builder.Property(r => r.DocumentVersionsCsv).HasMaxLength(2000);
+        builder.Property(r => r.RuleSetVersion).HasMaxLength(40).IsRequired();
+        builder.Property(r => r.PromptVersion).HasMaxLength(40);
+        builder.Property(r => r.PromptTemplateHash).HasMaxLength(64);
+        builder.Property(r => r.ModelProvider).HasMaxLength(60);
+        builder.Property(r => r.ModelName).HasMaxLength(120);
+        builder.Property(r => r.ModelParameters).HasMaxLength(500);
+        builder.Property(r => r.OutputSchemaVersion).HasMaxLength(40);
+        builder.Property(r => r.CorrelationId).HasMaxLength(80).IsRequired();
+        builder.Property(r => r.IdempotencyKey).HasMaxLength(64).IsRequired();
+        builder.Property(r => r.ErrorNote).HasMaxLength(1000);
+
+        builder.Property(r => r.Score).HasPrecision(6, 2);
+        builder.Property(r => r.Confidence).HasPrecision(6, 4);
+        builder.Property(r => r.ResultJson).HasColumnType("jsonb");
+
+        builder.HasIndex(r => r.IdempotencyKey).IsUnique();
+        builder.HasIndex(r => new { r.CompanyId, r.TargetId, r.IsLatest });
+        builder.HasIndex(r => new { r.TargetId, r.IsLatest });
     }
 }

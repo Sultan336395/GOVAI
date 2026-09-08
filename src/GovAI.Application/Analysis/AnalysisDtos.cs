@@ -65,6 +65,50 @@ public sealed record ConfidenceDto(
     IReadOnlyList<ConfidenceFactorDto> Factors,
     string RuleSetVersion);
 
+/// <summary>
+/// Kural ile yapay zekânın katkısını AYRI gösteren blok.
+///
+/// <para>
+/// Tek bir açıklama metni verilseydi kullanıcı hangi cümlenin deterministik kuraldan,
+/// hangisinin modelden geldiğini ayırt edemezdi. Ürünün savunma hattı tam olarak bu
+/// ayrımdır: karar kuraldan çıkar, model yalnızca anlatır.
+/// </para>
+/// </summary>
+public sealed record AnalysisContributionDto(
+    // Model çalıştı ve en az bir iddiası kanıtla doğrulandı mı?
+    bool HasAiContribution,
+    AiAnalysisStatus AiStatus,
+    string AiStatusLabel,
+    // Kanıtla doğrulanmış, kullanıcıya gösterilebilir yapay zekâ açıklamaları.
+    IReadOnlyList<string> AiExplanations,
+    // Kanıtsız veya yetkisiz oldukları için ELENEN iddia sayısı.
+    int RejectedClaimCount,
+    // Kural ile modelin çeliştiği noktalar; kural sonucu korunur.
+    IReadOnlyList<RuleAiConflictDto> Conflicts,
+    // Model yoksa veya güven düşükse ekranda gösterilecek uyarı.
+    string? Warning);
+
+public sealed record RuleAiConflictDto(
+    string CriterionCode,
+    CriterionOutcome RuleOutcome,
+    AiClaimType ClaimType,
+    string Note);
+
+/// <summary>Analizin sürüm künyesi; "bu sonuç neden çıktı" sorusunun altyapısı.</summary>
+public sealed record AnalysisVersionDto(
+    Guid AnalysisRunId,
+    int CompanyProfileVersion,
+    int FinancialDataVersion,
+    string RuleSetVersion,
+    string? PromptVersion,
+    string? ModelProvider,
+    string? ModelName,
+    string? OutputSchemaVersion,
+    string CorrelationId,
+    DateTimeOffset StartedAt,
+    DateTimeOffset? CompletedAt,
+    AnalysisRunStatus Status);
+
 /// <summary>Şirket–fırsat analizinin ekran sözleşmesi.</summary>
 public sealed record OpportunityAnalysisDto(
     Guid CompanyId,
@@ -82,8 +126,12 @@ public sealed record OpportunityAnalysisDto(
     IReadOnlyList<CriterionResultDto> Missing,
     IReadOnlyList<CriterionResultDto> Conflicting,
     string RuleSetVersion,
-    // Yapay zekâ katkısı var mı? Yoksa arayüz "kural tabanlı sonuç" uyarısı gösterir.
-    bool HasAiContribution);
+    AnalysisContributionDto Contribution,
+    AnalysisVersionDto Version)
+{
+    // Ekranların doğrudan okuduğu kısayol; sözleşme tek yerde tanımlı kalsın.
+    public bool HasAiContribution => Contribution.HasAiContribution;
+}
 
 /// <summary>Şirket–mevzuat etki analizinin ekran sözleşmesi.</summary>
 public sealed record RegulationImpactDto(
@@ -98,7 +146,11 @@ public sealed record RegulationImpactDto(
     IReadOnlyList<string> OpenQuestions,
     string LegalDisclaimer,
     string RuleSetVersion,
-    bool HasAiContribution);
+    AnalysisContributionDto Contribution,
+    AnalysisVersionDto Version)
+{
+    public bool HasAiContribution => Contribution.HasAiContribution;
+}
 
 /// <summary>Kriter ve etki sonuçlarının Türkçe karşılıkları.</summary>
 public static class AnalysisLabels
@@ -118,6 +170,14 @@ public static class AnalysisLabels
         RegulationImpact.NotApplicable => "Firmayı kapsamıyor",
         RegulationImpact.PotentiallyApplicable => "Kapsaması muhtemel",
         _ => "Kapsam belirlenemedi"
+    };
+
+    public static string Of(AiAnalysisStatus status) => status switch
+    {
+        AiAnalysisStatus.Succeeded => "Yapay zekâ açıklaması eklendi",
+        AiAnalysisStatus.InvalidOutput => "Yapay zekâ çıktısı geçersiz; kullanılmadı",
+        AiAnalysisStatus.Error => "Yapay zekâ hatası; kural sonuçları korundu",
+        _ => "Yapay zekâ kullanılamadı"
     };
 
     public static string Of(EligibilityVerdict verdict) => verdict switch
