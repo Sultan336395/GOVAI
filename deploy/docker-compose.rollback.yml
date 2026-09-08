@@ -1,7 +1,11 @@
 # GOVAI geri dönüş katmanı.
 #
 # KULLANIM (yalnızca yayın başarısız olduğunda):
-#   docker compose -p govai -f docker-compose.yml -f docker-compose.rollback.yml up -d
+#   docker compose -p govai -f docker-compose.yml -f docker-compose.rollback.yml \
+#     -f docker-compose.limits.yml up -d --no-deps api web collector parser scoring scheduler
+#
+# SERVİS ADLARI AÇIKÇA VERİLİR: adsız `up -d` veri servislerini de kapsar ve
+# postgres/redis/rabbitmq yeniden oluşturulur. Bunlar yayın kapsamı dışındadır.
 #
 # NE YAPAR: Derlemeyi devre dışı bırakır ve her servisi, yayından ÖNCE çalıştığı
 # kanıtlanmış değişmez etikete sabitler. `image:` verildiğinde compose `build:`
@@ -9,44 +13,49 @@
 #
 # NEDEN DEĞİŞMEZ ETİKET: yayın öncesi tüm imajlar yalnızca `latest` etiketliydi.
 # Yeniden derleme `latest`i üzerine yazar ve eski imaj isimsiz kalır — geri dönüş
-# imkânsızlaşır. 05.09.2026'da çalışan imajlara `3e9b9ab` etiketi verildi:
+# imkânsızlaşır.
 #
-#   govai-api:3e9b9ab         65f56c20c633
-#   govai-web:3e9b9ab         4e39c60828df
-#   govai-collector:3e9b9ab   6ff445f02897
-#   govai-parser:3e9b9ab      1018d5eabf92
-#   govai-scoring:3e9b9ab     2347365d5b0c
-#   govai-scheduler:3e9b9ab   097c29fed5d4
+# ── 08.09.2026 · Faz 3 yayını öncesi çalışan sürüm ────────────────────────────
+#
+#   govai-api:b13f0c2      633ca2f37016
+#   govai-web:b13f0c2      bec48dd2b21d
+#   govai-worker:b13f0c2   99385885ff89
+#
+# DÖRT WORKER AYNI İMAJI PAYLAŞIR. Bu dosya eskiden her worker'ı ayrı bir imaj
+# adına (`govai-collector:…`, `govai-parser:…`) sabitliyordu; o adlar artık
+# üretilmiyor ve geri dönüş, imaj bulunamadığı için temel dosyanın `build:`
+# bölümüne düşerek SUNUCUDA DERLEME başlatırdı. Geri dönüşün kendisi arıza
+# üretmemelidir.
+#
+# ÖNCEKİ SÜRÜM (05.09.2026, artık geçerli değil): 3e9b9ab. O etiketli imajlar
+# silinmedi; gerekirse bu dosyanın bir kopyasıyla hedeflenebilirler.
 #
 # VERİTABANI: Bu dosya veritabanına DOKUNMAZ. Geri dönüş otomatik restore İÇERMEZ —
-# şema geriye uyumlu olduğu sürece eski uygulama mevcut veriyle çalışır. Veri
-# uyumsuzluğu görülürse yedekle karşılaştırılır ve ayrıca onay istenir.
+# Faz 3 migration'larının tamamı eklemelidir (yeni tablo ve yeni nullable kolonlar),
+# bu yüzden b13f0c2 imajı yeni şemayla çalışmaya devam eder. Veri uyumsuzluğu
+# görülürse doğrulanmış yedekle karşılaştırılır ve ayrıca onay istenir.
 
 services:
   api:
-    image: govai-api:3e9b9ab
+    image: govai-api:b13f0c2
     pull_policy: never
 
   web:
-    image: govai-web:3e9b9ab
+    image: govai-web:b13f0c2
     pull_policy: never
 
   collector:
-    image: govai-collector:3e9b9ab
+    image: govai-worker:b13f0c2
     pull_policy: never
 
   parser:
-    image: govai-parser:3e9b9ab
+    image: govai-worker:b13f0c2
     pull_policy: never
 
   scoring:
-    image: govai-scoring:3e9b9ab
+    image: govai-worker:b13f0c2
     pull_policy: never
 
   scheduler:
-    image: govai-scheduler:3e9b9ab
+    image: govai-worker:b13f0c2
     pull_policy: never
-
-  # postgres, rabbitmq ve redis zaten sürümü sabitlenmiş resmî imajlardır
-  # (postgres:17-alpine, rabbitmq:4-management-alpine, redis:7-alpine);
-  # geri dönüşte değişmezler ve burada yeniden tanımlanmalarına gerek yoktur.
