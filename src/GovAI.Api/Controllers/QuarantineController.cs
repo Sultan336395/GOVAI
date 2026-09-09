@@ -38,6 +38,21 @@ public sealed class QuarantineController(QuarantineService service) : Controller
         CancellationToken cancellationToken) =>
         Ok(await service.ListQuarantinedAsync(cancellationToken));
 
+    /// <summary>
+    /// Tek bir belgenin tam incelemesi: künye, sürüm listesi, ayrıştırma durumu ve
+    /// metin önizlemesi.
+    ///
+    /// <para>
+    /// Karantinadan çıkarma kararı başlık ve adrese bakarak verilemez; inceleyicinin
+    /// belgenin ne dediğini görmesi gerekir. <b>Salt okurdur</b>, hiçbir şey değiştirmez.
+    /// </para>
+    /// </summary>
+    [HttpGet("{documentId:guid}")]
+    public async Task<ActionResult<QuarantinedDocumentDetailDto>> Get(
+        Guid documentId,
+        CancellationToken cancellationToken) =>
+        Ok(await service.GetDocumentAsync(documentId, cancellationToken));
+
     /// <summary>Kaydı reddeder: karantinaya alır. Silmez.</summary>
     [HttpPost("{documentId:guid}/reject")]
     [Audited("Quarantine.Rejected", "SourceDocument", RouteKey = "documentId")]

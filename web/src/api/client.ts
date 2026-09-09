@@ -27,6 +27,7 @@ import type {
   ManualImportResult,
   NaceOption,
   QuarantinedDocument,
+  QuarantinedDocumentDetail,
   CatalogRepairPlanReport,
   CatalogRepairReport,
   RuleEvidenceBackfillReport,
@@ -392,6 +393,10 @@ export const api = {
       `/api/opportunities/rule-evidence/backfill/runs/${runId}/undo`,
       { method: 'POST' },
     ),
+
+  /** Bir belgenin tam incelemesi: künye, sürümler, ayrıştırma durumu, metin. */
+  getQuarantinedDocument: (documentId: string) =>
+    request<QuarantinedDocumentDetail>(`/api/quarantine/${documentId}`),
 
   approveQuarantined: (documentId: string) =>
     request<void>(`/api/quarantine/${documentId}/approve`, { method: 'POST' }),

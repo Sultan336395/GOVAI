@@ -207,20 +207,15 @@ export default function QuarantinePage() {
               {data.map((item) => (
                 <tr key={item.documentId}>
                   <td>
-                    {/* Belgeden bir fırsat türemişse başlık detaya götürür: inceleyici
-                        "bu kayıt gerçekte ne?" sorusunu resmî siteye gitmeden cevaplar.
-                        Türememişse (mevzuat belgesi, ayrıştırılamamış kayıt) düz metin
-                        kalır — çalışmayan bağlantı göstermeyiz. */}
-                    {item.opportunityId ? (
-                      <Link
-                        to={`/platform/opportunities/${item.opportunityId}`}
-                        data-alan="detay"
-                      >
-                        <strong>{item.title}</strong>
-                      </Link>
-                    ) : (
+                    {/* Başlık HER ZAMAN belge incelemesine götürür.
+                        İlk sürümde fırsat detayına bağlanıyordu ve hiç görünmüyordu:
+                        karantina belge sisteme GİRERKEN uygulanıyor, yani fırsat kaydı
+                        henüz oluşmamış oluyor. Üretimdeki karantina kayıtlarının
+                        hiçbirinde fırsat yoktu. İnceleyicinin ihtiyacı zaten belgenin
+                        kendisi — metni, sürümleri ve ayrıştırma durumu. */}
+                    <Link to={`/platform/documents/${item.documentId}`} data-alan="detay">
                       <strong>{item.title}</strong>
-                    )}
+                    </Link>
                     {item.titleRepaired ? (
                       <div className="muted" style={{ fontSize: 12 }}>
                         Başlık bozuk karakter kümesiyle kaydedilmişti; burada onarılmış

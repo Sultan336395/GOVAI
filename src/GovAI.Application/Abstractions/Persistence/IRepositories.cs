@@ -120,6 +120,15 @@ public interface IQuarantineQueryRepository
     Task<IReadOnlyList<QuarantinedDocumentDto>> ListQuarantinedAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Tek bir belgenin tam incelemesi: künye, sürüm listesi ve metin önizlemesi.
+    /// Belge yoksa <c>null</c>. Karantinada olma şartı YOKTUR — inceleyici serbest
+    /// bıraktığı kaydı da açabilmelidir.
+    /// </summary>
+    Task<QuarantinedDocumentDetailDto?> GetDocumentDetailAsync(
+        Guid documentId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Bu belgeye dayanan değerlendirmeleri "yeniden değerlendirilmeli" olarak işaretler.
     /// Kayıtlar SİLİNMEZ; yalnızca güncelliğini yitirdiği bildirilir.
     /// </summary>

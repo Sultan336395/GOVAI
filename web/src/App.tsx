@@ -11,6 +11,7 @@ import QuarantinePage from '@/pages/QuarantinePage'
 import CatalogRepairPage from '@/pages/CatalogRepairPage'
 import RuleEvidenceBackfillPage from '@/pages/RuleEvidenceBackfillPage'
 import PlatformOpportunityPage from '@/pages/PlatformOpportunityPage'
+import PlatformDocumentPage from '@/pages/PlatformDocumentPage'
 import RegulatoryChangeDetailPage from '@/pages/RegulatoryChangeDetailPage'
 import RegulatoryChangesPage from '@/pages/RegulatoryChangesPage'
 import DashboardPage from '@/pages/DashboardPage'
@@ -102,6 +103,7 @@ export default function App() {
           path="/platform/opportunities/:opportunityId"
           element={<PlatformOpportunityPage />}
         />
+        <Route path="/platform/documents/:documentId" element={<PlatformDocumentPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

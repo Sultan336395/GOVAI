@@ -253,6 +253,94 @@ public sealed class QuarantineQueryRepository(GovAiDbContext context) : IQuarant
             .ToList();
     }
 
+    public async Task<QuarantinedDocumentDetailDto?> GetDocumentDetailAsync(
+        Guid documentId,
+        CancellationToken cancellationToken = default)
+    {
+        var belge = await context.SourceDocuments
+            .AsNoTracking()
+            .Where(d => d.Id == documentId)
+            .Join(context.Sources, d => d.SourceId, s => s.Id, (d, s) => new { Belge = d, Kaynak = s })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (belge is null)
+        {
+            return null;
+        }
+
+        var surumler = await context.SourceDocumentVersions
+            .AsNoTracking()
+            .Where(v => v.SourceDocumentId == documentId)
+            .OrderByDescending(v => v.VersionNumber)
+            .Select(v => new DocumentVersionDto(
+                v.Id,
+                v.VersionNumber,
+                v.RetrievedAt,
+                v.HttpStatusCode,
+                v.MediaType,
+                v.Charset,
+                v.CanonicalUrl,
+                v.RawContentHash,
+                v.ParseStatus,
+                v.RequiresOcr,
+                v.ParseError,
+                v.PageCount,
+                v.Chunks.Count,
+                v.Title))
+            .ToListAsync(cancellationToken);
+
+        // Metin en son sürümden alınır: inceleyici kaydın GÜNCEL hâline bakar.
+        // Ayrıştırılmamışsa belgenin kendi normalize metnine düşülür; o da yoksa
+        // ham içerik gösterilir — hiçbiri yoksa ekran "metin yok" der.
+        var metin = await context.SourceDocumentVersions
+            .AsNoTracking()
+            .Where(v => v.SourceDocumentId == documentId)
+            .OrderByDescending(v => v.VersionNumber)
+            .Select(v => v.NormalizedText ?? v.RawContent)
+            .FirstOrDefaultAsync(cancellationToken)
+            ?? belge.Belge.NormalizedText
+            ?? belge.Belge.RawContent;
+
+        var limit = QuarantinedDocumentDetailDto.TextPreviewLimit;
+
+        var onizleme = string.IsNullOrEmpty(metin)
+            ? null
+            : metin[..Math.Min(metin.Length, limit)];
+
+        var firsatId = await context.Opportunities
+            .IgnoreQueryFilters()
+            .Where(o => o.SourceDocumentId == documentId && !o.IsDeleted)
+            .Select(o => (Guid?)o.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var mevzuatId = await context.RegulatoryChanges
+            .Where(r => r.SourceDocumentId == documentId)
+            .Select(r => (Guid?)r.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        // Başlık YALNIZCA görüntüleme için onarılır; ham belge değiştirilmez.
+        return new QuarantinedDocumentDetailDto(
+            belge.Belge.Id,
+            TurkceMojibake.Onar(belge.Belge.Title),
+            belge.Belge.Url,
+            belge.Belge.CanonicalUrl,
+            belge.Kaynak.Id,
+            belge.Kaynak.Name,
+            belge.Kaynak.Profile.OfficialDomain,
+            belge.Belge.QuarantineReason,
+            belge.Belge.QuarantineNote,
+            belge.Belge.Status,
+            belge.Belge.ProcessingError,
+            belge.Belge.Origin,
+            belge.Belge.CollectedAt,
+            belge.Belge.MediaType,
+            onizleme,
+            metin?.Length ?? 0,
+            surumler,
+            firsatId,
+            mevzuatId);
+    }
+
     public async Task<int> MarkAssessmentsForReevaluationAsync(
         Guid documentId,
         CancellationToken cancellationToken = default)

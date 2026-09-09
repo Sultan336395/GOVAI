@@ -1155,3 +1155,55 @@ export interface RuleEvidenceBackfillReport {
   planHash: string
   runId: string | null
 }
+
+// ── Platform İnceleme: belge incelemesi (Faz 3) ──────────────────────────────
+
+export interface DocumentVersion {
+  versionId: string
+  versionNumber: number
+  retrievedAt: string
+  httpStatusCode: number
+  mediaType: string
+  charset: string | null
+  canonicalUrl: string
+  /** Ham gövdenin SHA-256'sı; kanıt zinciri buna dayanır. */
+  rawContentHash: string
+  parseStatus: DocumentParseStatus
+  requiresOcr: boolean
+  parseError: string | null
+  pageCount: number | null
+  chunkCount: number
+  title: string | null
+}
+
+export interface QuarantinedDocumentDetail {
+  documentId: string
+  title: string
+  url: string
+  canonicalUrl: string | null
+  sourceId: string
+  sourceName: string
+  officialDomain: string | null
+  reason: QuarantineReason
+  note: string | null
+  status: DocumentProcessingStatus
+  processingError: string | null
+  origin: DocumentOrigin
+  collectedAt: string
+  mediaType: string
+  /** Ayrıştırılmış metin; uzun belgelerde kırpılır. */
+  textPreview: string | null
+  textLength: number
+  /** Metin kırpıldıysa ekran bunu kullanıcıya söyler. */
+  textTruncated: boolean
+  versions: DocumentVersion[]
+  opportunityId: string | null
+  regulatoryChangeId: string | null
+}
+
+export type DocumentProcessingStatus =
+  | 'Raw'
+  | 'Parsed'
+  | 'RulesExtracted'
+  | 'Failed'
+  | 'Discarded'

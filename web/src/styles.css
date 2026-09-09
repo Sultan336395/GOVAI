@@ -870,3 +870,47 @@ tbody tr:hover {
     max-width: 240px;
   }
 }
+
+/* Belge incelemesi (Platform İnceleme).
+   Ham belge metni uzun ve satır yapısı anlamlıdır: kırpmadan, boşlukları koruyarak
+   ama sayfayı yana kaydırmadan gösterilir. */
+.belge-metni {
+  max-height: 32rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-muted, #f8fafc);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* Künye listesi: etiket–değer çiftleri. Dar ekranda alt alta iner. */
+.kv {
+  display: grid;
+  grid-template-columns: minmax(8rem, max-content) 1fr;
+  gap: 0.4rem 1rem;
+  margin: 0;
+}
+
+.kv dt {
+  font-weight: 600;
+  color: var(--muted, #64748b);
+}
+
+.kv dd {
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .kv {
+    grid-template-columns: 1fr;
+    gap: 0.15rem;
+  }
+
+  .kv dd {
+    margin-bottom: 0.5rem;
+  }
+}

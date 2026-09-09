@@ -224,6 +224,89 @@ public sealed class QuarantineReleaseTests(GovAiApiFactory factory)
         Assert.Contains("QuarantineReleased", govde, StringComparison.Ordinal);
     }
 
+    // ── Belge incelemesi ──────────────────────────────────────────────────
+
+    [Fact(DisplayName = "KR8. Karantinadaki belgenin metni ve sürümleri okunabilir")]
+    public async Task Belge_incelemesi_acilir()
+    {
+        var (documentId, _) = await KarantinaKayitKurAsync(
+            "https://www.kosgeb.gov.tr/ihale/belge-testi");
+
+        var belge = await _reviewer.GetFromJsonAsync<JsonElement>($"/api/quarantine/{documentId}");
+
+        // Karantinadan çıkarma kararı ancak belgenin NE DEDİĞİ görülerek verilebilir.
+        Assert.Contains("Yazılım geliştirme", belge.GetProperty("textPreview").GetString()!);
+        Assert.True(belge.GetProperty("textLength").GetInt32() > 0);
+        Assert.False(belge.GetProperty("textTruncated").GetBoolean());
+
+        var surumler = belge.GetProperty("versions").EnumerateArray().ToList();
+
+        Assert.NotEmpty(surumler);
+        Assert.Equal(200, surumler[0].GetProperty("httpStatusCode").GetInt32());
+        Assert.Equal(64, surumler[0].GetProperty("rawContentHash").GetString()!.Length);
+
+        // Neden karantinada olduğu ekranda yazmalı.
+        Assert.NotEqual("None", belge.GetProperty("reason").GetString());
+    }
+
+    [Fact(DisplayName = "KR9. Fırsatı olmayan belge de incelenebilir")]
+    public async Task Firsatsiz_belge_incelenebilir()
+    {
+        // Üretimdeki karantina kayıtlarının tamamı böyle: karantina belge sisteme
+        // GİRERKEN uygulanıyor, fırsat kaydı henüz oluşmamış oluyor. İlk sürümde
+        // ekran fırsat detayına bağlanıyordu ve bağlantı hiç görünmüyordu.
+        var kaynak = await _catalog.PostAsJsonAsync("/api/sources", new
+        {
+            name = "Resmî Gazete " + Guid.CreateVersion7().ToString("N")[..8],
+            type = "OfficialGazette",
+            baseUrl = "https://www.resmigazete.gov.tr",
+            cronExpression = "0 6 * * *"
+        });
+
+        var sourceId = (await kaynak.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        var belgeYanit = await _ingest.PostAsJsonAsync("/api/sources/documents", new
+        {
+            sourceId,
+            url = "https://www.resmigazete.gov.tr/eskiler/tasinmaz-" + Guid.CreateVersion7().ToString("N")[..6],
+            title = "TAŞINMAZLAR SATILACAKTIR",
+            rawContent = "Mülkiyeti idareye ait taşınmazlar satılacaktır. İhale 15.10.2026 tarihinde yapılacaktır.",
+            mediaType = "text/html",
+            httpStatusCode = 200
+        });
+
+        belgeYanit.EnsureSuccessStatusCode();
+        var documentId = (await belgeYanit.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("documentId").GetGuid();
+
+        var belge = await _reviewer.GetFromJsonAsync<JsonElement>($"/api/quarantine/{documentId}");
+
+        Assert.Equal("TAŞINMAZLAR SATILACAKTIR", belge.GetProperty("title").GetString());
+        Assert.Contains("taşınmazlar satılacaktır", belge.GetProperty("textPreview").GetString()!);
+
+        // Türeyen kayıt yok; ekran bunu söyler ama belge yine de incelenir.
+        Assert.True(
+            !belge.TryGetProperty("opportunityId", out var firsat)
+            || firsat.ValueKind is JsonValueKind.Null);
+    }
+
+    [Fact(DisplayName = "KR10. Belge incelemesi kiracıya ve worker'a kapalıdır")]
+    public async Task Belge_incelemesi_yetkisizlere_kapali()
+    {
+        var (documentId, _) = await KarantinaKayitKurAsync(
+            "https://www.kosgeb.gov.tr/ihale/yetki-testi");
+
+        var kiraci = await _factory.CreateAuthenticatedClientAsync(_factory.TenantA);
+
+        Assert.Equal(
+            System.Net.HttpStatusCode.Forbidden,
+            (await kiraci.GetAsync($"/api/quarantine/{documentId}")).StatusCode);
+
+        Assert.Equal(
+            System.Net.HttpStatusCode.Forbidden,
+            (await _ingest.GetAsync($"/api/quarantine/{documentId}")).StatusCode);
+    }
+
     [Fact(DisplayName = "KR6. Karantinadaki fırsatın detayı KİRACIYA kapalı kalır")]
     public async Task Karantinadaki_firsat_kiraciya_kapali()
     {

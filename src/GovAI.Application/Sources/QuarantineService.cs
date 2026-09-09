@@ -59,6 +59,82 @@ public sealed record QuarantinedDocumentDto(
     Guid? OpportunityId = null);
 
 /// <summary>
+/// Belgenin tek bir yakalanışı; inceleme ekranında sürüm listesi olarak görünür.
+/// </summary>
+public sealed record DocumentVersionDto(
+    Guid VersionId,
+    int VersionNumber,
+    DateTimeOffset RetrievedAt,
+    int HttpStatusCode,
+    string MediaType,
+    string? Charset,
+    string CanonicalUrl,
+
+    /// <summary>Ham gövdenin SHA-256'sı; kanıt zinciri buna dayanır.</summary>
+    string RawContentHash,
+
+    DocumentParseStatus ParseStatus,
+    bool RequiresOcr,
+    string? ParseError,
+    int? PageCount,
+    int ChunkCount,
+    string? Title);
+
+/// <summary>
+/// Karantinadaki bir belgenin tam incelemesi (Faz 3).
+///
+/// <para>
+/// <b>Neden gerekli:</b> inceleyici "bu kaydı karantinadan çıkarayım mı?" sorusuna
+/// başlık ve adrese bakarak cevap veremez. Belgenin ne dediğini, kaç sürümü olduğunu,
+/// ayrıştırmanın başarılı olup olmadığını görmesi gerekir. Bu bilgiler veritabanında
+/// zaten duruyordu ama hiçbir uçtan dışarı verilmiyordu.
+/// </para>
+///
+/// <para>
+/// Metin <b>sınırlı</b> gönderilir: bazı belgeler yüz binlerce karakter ve inceleme
+/// için ilk sayfalar yeter. Kesildiyse tam uzunluk ayrıca bildirilir, böylece ekran
+/// "kırpıldı" diyebilir — sessizce eksik metin göstermek, kaydın içeriği hakkında
+/// yanlış karar verdirir.
+/// </para>
+/// </summary>
+public sealed record QuarantinedDocumentDetailDto(
+    Guid DocumentId,
+    string Title,
+    string Url,
+    string? CanonicalUrl,
+    Guid SourceId,
+    string SourceName,
+    string? OfficialDomain,
+    QuarantineReason Reason,
+    string? Note,
+    DocumentProcessingStatus Status,
+    string? ProcessingError,
+    DocumentOrigin Origin,
+    DateTimeOffset CollectedAt,
+    string MediaType,
+
+    /// <summary>Ayrıştırılmış düz metin, <see cref="TextPreviewLimit"/> ile sınırlı.</summary>
+    string? TextPreview,
+
+    /// <summary>Metnin tam uzunluğu; kırpılıp kırpılmadığı buradan anlaşılır.</summary>
+    int TextLength,
+
+    IReadOnlyList<DocumentVersionDto> Versions,
+
+    /// <summary>Bu belgeden türemiş fırsat kaydı; yoksa <c>null</c>.</summary>
+    Guid? OpportunityId,
+
+    /// <summary>Bu belgeden türemiş mevzuat kaydı; yoksa <c>null</c>.</summary>
+    Guid? RegulatoryChangeId)
+{
+    /// <summary>Ekrana gönderilecek azami metin uzunluğu.</summary>
+    public const int TextPreviewLimit = 20_000;
+
+    /// <summary>Metin kırpıldı mı? Ekran bunu kullanıcıya söylemek zorundadır.</summary>
+    public bool TextTruncated => TextLength > (TextPreview?.Length ?? 0);
+}
+
+/// <summary>
 /// Karantina yönetimi (Faz 2).
 ///
 /// Karantina <b>silme değildir</b>. Kayıt durur, incelenebilir ve yeniden ayrıştırılabilir;
@@ -212,6 +288,15 @@ public sealed class QuarantineService(
     public Task<IReadOnlyList<QuarantinedDocumentDto>> ListQuarantinedAsync(
         CancellationToken cancellationToken = default) =>
         query.ListQuarantinedAsync(cancellationToken);
+
+    /// <summary>
+    /// Bir belgenin tam incelemesi. <b>Salt okurdur</b>; hiçbir şey değiştirmez.
+    /// </summary>
+    public async Task<QuarantinedDocumentDetailDto> GetDocumentAsync(
+        Guid documentId,
+        CancellationToken cancellationToken = default) =>
+        await query.GetDocumentDetailAsync(documentId, cancellationToken)
+        ?? throw new NotFoundException("Doküman", documentId);
 
     /// <summary>Kaydı karantinadan çıkarır; yeniden ayrıştırma için sıraya döner.</summary>
     public async Task ReleaseAsync(Guid documentId, CancellationToken cancellationToken = default)
