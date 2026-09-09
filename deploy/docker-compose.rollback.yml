@@ -15,11 +15,11 @@
 # Yeniden derleme `latest`i üzerine yazar ve eski imaj isimsiz kalır — geri dönüş
 # imkânsızlaşır.
 #
-# ── 09.09.2026 · Platform İnceleme paneli yayını öncesi çalışan sürüm ─────────
+# ── 09.09.2026 · Arayüz dili yayını öncesi çalışan sürüm ─────────────────────
 #
-#   govai-api:cffc2b5      efdf71f3ad84
-#   govai-web:cffc2b5      ddba10b97178
-#   govai-worker:cffc2b5   22e28b233ef2
+#   govai-api:5cb1a7f
+#   govai-web:5cb1a7f
+#   govai-worker:5cb1a7f
 #
 # DÖRT WORKER AYNI İMAJI PAYLAŞIR. Bu dosya eskiden her worker'ı ayrı bir imaj
 # adına (`govai-collector:…`, `govai-parser:…`) sabitliyordu; o adlar artık
@@ -27,7 +27,7 @@
 # bölümüne düşerek SUNUCUDA DERLEME başlatırdı. Geri dönüşün kendisi arıza
 # üretmemelidir.
 #
-# ÖNCEKİ SÜRÜMLER (artık hedef değil): b13f0c2 ve 3e9b9ab. O etiketli imajlar
+# ÖNCEKİ SÜRÜMLER (artık hedef değil): cffc2b5, 9c35582, c202352, b13f0c2, 3e9b9ab. O etiketli imajlar
 # silinmedi; gerekirse bu dosyanın bir kopyasıyla hedeflenebilirler.
 #
 # VERİTABANI: Bu dosya veritabanına DOKUNMAZ. Geri dönüş otomatik restore İÇERMEZ —
@@ -37,25 +37,25 @@
 
 services:
   api:
-    image: govai-api:cffc2b5
+    image: govai-api:5cb1a7f
     pull_policy: never
 
   web:
-    image: govai-web:cffc2b5
+    image: govai-web:5cb1a7f
     pull_policy: never
 
   collector:
-    image: govai-worker:cffc2b5
+    image: govai-worker:5cb1a7f
     pull_policy: never
 
   parser:
-    image: govai-worker:cffc2b5
+    image: govai-worker:5cb1a7f
     pull_policy: never
 
   scoring:
-    image: govai-worker:cffc2b5
+    image: govai-worker:5cb1a7f
     pull_policy: never
 
   scheduler:
-    image: govai-worker:cffc2b5
+    image: govai-worker:5cb1a7f
     pull_policy: never
