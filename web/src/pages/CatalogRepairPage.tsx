@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/api/client'
 import type { CatalogRepairPlanReport, CatalogRepairReport } from '@/api/types'
 import { EmptyState, ErrorBox, InfoBox, Loading, SuccessBox } from '@/components/Common'
+import { HelpTip } from '@/components/HelpTip'
 
 const hedefEtiketleri: Record<string, string> = {
   Opportunity: 'Çağrı',
@@ -109,7 +110,9 @@ export default function CatalogRepairPage() {
   return (
     <section className="page" data-sayfa="katalog-onarimi">
       <header className="page-header">
-        <h1>Katalog Düzeltme</h1>
+        <h1>
+          Katalog Düzeltme <HelpTip field="katalogDuzeltme" />
+        </h1>
         <p className="muted">
           Kataloğa yanlışlıkla girmiş kayıtları düzeltir: çağrı olmayan sayfalar katalogdan
           çıkarılır, yanlış başlıklar resmî belgedeki asıl başlıkla değiştirilir.{' '}
@@ -214,7 +217,9 @@ export default function CatalogRepairPage() {
 
       {degisecekler.length > 0 && (
         <div className="card" data-alan="onay">
-          <h2>Onay</h2>
+          <h2>
+            Onay <HelpTip field="planOnayi" />
+          </h2>
 
           <InfoBox>
             Bu işlem <strong>{degisecekler.length}</strong> kaydı değiştirecek. Siz

@@ -5,6 +5,7 @@ import type {
   RuleDimension,
 } from '@/api/types'
 import { EmptyState, InfoBox } from '@/components/Common'
+import { HelpTip } from '@/components/HelpTip'
 import {
   NOT_PROVIDED_LABEL,
   categoryLabels,
@@ -174,7 +175,9 @@ function KanitBolumu({ kanit }: { kanit: OpportunityProvenance | null }) {
 
   return (
     <div className="card" style={{ marginBottom: 16 }}>
-      <h2>{bolumBasliklari.resmiDayanak}</h2>
+      <h2>
+        {bolumBasliklari.resmiDayanak} <HelpTip field="resmiDayanak" />
+      </h2>
 
       <p className="muted">
         Bu sayfadaki bilgiler aşağıdaki resmî belgeden alınmıştır. Her koşulun belgede

@@ -21,6 +21,25 @@ const ARGE_CALISAN =
 const CIRO = 'Bir mali yılda elde edilen toplam satış hasılatı (KDV hariç).'
 
 export const fieldHelp = {
+  // ── Katalog Denetimi: bölüm açıklamaları ──
+  //
+  // Bu ekranlar yeni ve terimleri kendine özgü. İnceleyici "kanıt neydi", "karantina
+  // silme mi", "düzeltme neyi değiştirir" sorularını ekranın kendisinde bulmalı;
+  // aksi hâlde ya sormak zorunda kalır ya da yanlış varsayımla karar verir.
+  incelemeBekleyenler:
+    'Sisteme girmiş ama çağrı olmadığı anlaşılan, bu yüzden katalogda gösterilmeyen kayıtlar.',
+  katalogDuzeltme:
+    'Kataloğa yanlışlıkla girmiş kayıtların düzeltilmesi: çağrı olmayan sayfalar çıkarılır, yanlış başlıklar değiştirilir.',
+  dayanakEslestirme:
+    'Bir başvuru koşulunun, resmî belgede o koşulun yazdığı bölümle eşleştirilmesi.',
+  belgeGecmisi:
+    'Aynı adresin sistem tarafından her alınışı; içerik değişse de önceki hâli saklanır.',
+  belgeMetni: 'Belgenin sistem tarafından okunmuş hâli.',
+  resmiDayanak: 'Bilgilerin alındığı resmî belge ve belgenin ilgili bölümleri.',
+  planOnayi: 'Listedeki işlemlerin uygulanması için verdiğiniz açık onay.',
+  manuelIceAktarma:
+    'Resmî ilan adresini vererek içeriğin sistem tarafından indirilmesi.',
+
   // ── Senaryo simülasyonu ──
   scenarioName: 'Denemeye verdiğiniz ad; senaryoları birbirinden ayırmak içindir.',
   scenarioEmployeeCount: CALISAN,

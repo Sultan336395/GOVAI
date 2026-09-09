@@ -20,7 +20,7 @@ const statusLabels: Record<SourceDto['lastRunStatus'], string> = {
 }
 
 /**
- * Veri Kaynakları (PlatformCatalogManager).
+ * Resmî Kaynaklar (PlatformCatalogManager).
  *
  * Doğrulanmamış kaynak taranmaz ve burada "aktif" gösterilmez: tarama düğmesi yalnızca
  * gerçekten taranabilir kaynaklarda etkindir.
@@ -65,7 +65,7 @@ export default function SourcesPage() {
     <>
       <div className="page-header">
         <div>
-          <h1>Veri Kaynakları</h1>
+          <h1>Resmî Kaynaklar</h1>
           <p>
             Resmî kurum siteleri ve tarama planları. {data.length} kaynak tanımlı,{' '}
             {dogrulanan} tanesi canlı doğrulanmış.

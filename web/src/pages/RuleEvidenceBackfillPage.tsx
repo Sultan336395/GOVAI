@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/api/client'
 import type { RuleEvidenceBackfillOutcome, RuleEvidenceBackfillReport } from '@/api/types'
 import { EmptyState, ErrorBox, InfoBox, Loading, SuccessBox } from '@/components/Common'
+import { HelpTip } from '@/components/HelpTip'
 
 /**
  * Sonuç etiketleri.
@@ -109,7 +110,9 @@ export default function RuleEvidenceBackfillPage() {
   return (
     <section className="page" data-sayfa="kanit-baglama">
       <header className="page-header">
-        <h1>Dayanak Eşleştirme</h1>
+        <h1>
+          Dayanak Eşleştirme <HelpTip field="dayanakEslestirme" />
+        </h1>
         <p className="muted">
           Çağrıların başvuru koşullarını, resmî belgede geçtikleri bölümle eşleştirir. Böylece
           her koşulun belgede nerede yazdığı gösterilebilir. Sistem{' '}
@@ -228,7 +231,9 @@ export default function RuleEvidenceBackfillPage() {
 
       {(gecerliPlan?.boundCount ?? 0) + (gecerliPlan?.needsReparseCount ?? 0) > 0 && (
         <div className="card" data-alan="onay">
-          <h2>Onay</h2>
+          <h2>
+            Onay <HelpTip field="planOnayi" />
+          </h2>
 
           <InfoBox>
             Bu işlem <strong>{gecerliPlan!.boundCount}</strong> çağrının koşullarını resmî

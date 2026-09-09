@@ -229,7 +229,6 @@ select {
   font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 0.07em;
-  text-transform: uppercase;
   color: var(--text-muted);
 }
 
@@ -290,7 +289,6 @@ select {
   font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 0.07em;
-  text-transform: uppercase;
   color: var(--text-muted);
 }
 
@@ -422,7 +420,6 @@ select {
 .kpi-label {
   color: var(--text-muted);
   font-size: 12px;
-  text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
@@ -451,9 +448,13 @@ td {
   vertical-align: top;
 }
 
+/* Başlıklar YAZILDIĞI GİBİ gösterilir.
+   Eskiden `text-transform: uppercase` vardı ve iki sorun üretiyordu: yazdığımız
+   "Yapılacak İşlemler" ekranda "YAPILACAK İŞLEMLER" görünüyordu, üstelik tarayıcı
+   Türkçe kuralını bilmediği için `işlem` kelimesini `IŞLEM` yapıyordu (noktasız I).
+   Büyük harf düzeni artık metnin kendisinde. */
 th {
   font-size: 12px;
-  text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--text-muted);
   white-space: nowrap;

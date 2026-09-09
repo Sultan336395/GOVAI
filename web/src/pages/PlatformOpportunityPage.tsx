@@ -24,7 +24,7 @@ import { formatDate } from '@/lib/format'
  * </p>
  *
  * <p>
- * Salt okunurdur. Değişiklik yalnızca Katalog Onarımı ve Kanıt Bağlama ekranlarından,
+ * Salt okunurdur. Değişiklik yalnızca Katalog Düzeltme ve Dayanak Eşleştirme ekranlarından,
  * plan görülüp onaylanarak yapılır.
  * </p>
  */
@@ -47,7 +47,7 @@ export default function PlatformOpportunityPage() {
     <section className="page" data-sayfa="platform-firsat">
       <header className="page-header">
         <Link to="/quarantine" className="muted small" data-alan="geri">
-          ← Platform İnceleme
+          ← Katalog Denetimi
         </Link>
 
         <h1>{data.title}</h1>
@@ -69,7 +69,7 @@ export default function PlatformOpportunityPage() {
 
       <InfoBox>
         Bu ekran <strong>salt okunurdur</strong> ve firma verisi içermez. Değişiklik
-        yalnızca Katalog Onarımı ve Kanıt Bağlama ekranlarından, plan görülüp
+        yalnızca Katalog Düzeltme ve Dayanak Eşleştirme ekranlarından, liste görülüp
         onaylanarak yapılır.
       </InfoBox>
 

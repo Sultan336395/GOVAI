@@ -2,6 +2,7 @@ import { Link, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/api/client'
 import { ErrorBox, InfoBox, Loading } from '@/components/Common'
+import { HelpTip } from '@/components/HelpTip'
 import { formatDate } from '@/lib/format'
 import { belgeOkunabilirlik, incelemeNedeni, kayitKaynagi } from '@/lib/sozluk'
 
@@ -101,7 +102,9 @@ export default function PlatformDocumentPage() {
       </div>
 
       <div className="card" data-alan="surumler">
-        <h2>Belge Geçmişi</h2>
+        <h2>
+          Belge Geçmişi <HelpTip field="belgeGecmisi" />
+        </h2>
 
         <p className="muted">
           Aynı adres birden çok kez alınmış olabilir; içerik her değiştiğinde önceki hâli
@@ -141,7 +144,9 @@ export default function PlatformDocumentPage() {
       </div>
 
       <div className="card" data-alan="metin">
-        <h2>Belge Metni</h2>
+        <h2>
+          Belge Metni <HelpTip field="belgeMetni" />
+        </h2>
 
         {data.textPreview ? (
           <>

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { HelpTip } from '@/components/HelpTip'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/api/client'
 import type { TriageReport } from '@/api/types'
@@ -75,7 +76,9 @@ export default function QuarantinePage() {
     <>
       <div className="page-header">
         <div>
-          <h1>Karantina İnceleme</h1>
+          <h1>
+            İnceleme Bekleyenler <HelpTip field="incelemeBekleyenler" />
+          </h1>
           <p>
             Katalog dışında tutulan kayıtlar. Hiçbiri silinmez; buradan geri alınabilir.
             Karantinadaki kayıt şirketlere gösterilmez, skorlanmaz ve bildirim üretmez.
@@ -95,7 +98,9 @@ export default function QuarantinePage() {
       {triage.error ? <ErrorBox error={triage.error} /> : null}
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <h2 style={{ marginTop: 0 }}>Resmî adresten elle içe aktarma</h2>
+        <h2 style={{ marginTop: 0 }}>
+          Resmi Kaynaktan Manuel İçe Aktarma <HelpTip field="manuelIceAktarma" />
+        </h2>
         <p className="muted" style={{ marginTop: 0 }}>
           Otomatik taramaya uygun olmayan kaynaklar içindir. Adres kaynağın{' '}
           <strong>resmî alan adına</strong> ait olmalıdır; içerik yapıştırılmaz, sistem
