@@ -3,6 +3,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { api } from '@/api/client'
 import { EmptyState, ErrorBox, Loading } from '@/components/Common'
 import { NOT_PROVIDED_LABEL, categoryLabels, formatCurrency, formatDate, formatDeadline } from '@/lib/format'
+import { ayirtEdiciIz } from '@/lib/sozluk'
 
 export default function OpportunitiesPage() {
   const [search, setSearch] = useState('')
@@ -14,6 +15,13 @@ export default function OpportunitiesPage() {
     queryFn: () => api.searchOpportunities({ search, onlyOpen, page, pageSize: 25 }),
     placeholderData: keepPreviousData,
   })
+
+  // Bir başlık listede birden çok kez geçiyorsa o satırlara ayırt edici iz eklenir.
+  const tekrarEdenBasliklar = new Set(
+    (data?.items ?? [])
+      .map((o) => o.title)
+      .filter((baslik, sira, hepsi) => hepsi.indexOf(baslik) !== sira),
+  )
 
   return (
     <>
@@ -75,6 +83,17 @@ export default function OpportunitiesPage() {
                       {opportunity.title}
                       <div className="muted" style={{ fontSize: 12 }}>
                         {opportunity.publisher}
+                        {/* Aynı başlığı taşıyan kayıtlar mükerrer DEĞİLDİR: Resmî
+                            Gazete ilanları standart adla yayımlanır ve aynı gün iki
+                            ayrı ihale aynı adı taşır. Ayırt edici iz olmadan
+                            kullanıcı hangisinin hangisi olduğunu anlayamaz. */}
+                        {tekrarEdenBasliklar.has(opportunity.title) &&
+                        ayirtEdiciIz(opportunity.sourceUrl) ? (
+                          <span data-alan="ayirt-edici">
+                            {' · '}
+                            {ayirtEdiciIz(opportunity.sourceUrl)}
+                          </span>
+                        ) : null}
                       </div>
                     </td>
                     <td>{categoryLabels[opportunity.supportCategory]}</td>

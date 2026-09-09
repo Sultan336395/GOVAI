@@ -332,7 +332,8 @@ public sealed class OpportunityService(
         opportunity.Budget?.Currency,
         opportunity.IsReviewedByConsultant,
         opportunity.Rules.Count,
-        opportunity.DocumentChecklist.Count);
+        opportunity.DocumentChecklist.Count,
+        opportunity.SourceUrl);
 
     /// <summary>
     /// Kanıt bağlantısını ekran sözleşmesine çevirir. Bağlam verilmediyse metin ve özet

@@ -171,3 +171,73 @@ def alakasiz_baslik_mi(baslik: str) -> bool:
         return False
 
     return any(_gecer_mi(katlanmis, isaret) for isaret in METIN_ISARETLERI)
+
+
+#: Bir sayfanın **kendisinin liste** olduğunu gösteren adlar.
+#:
+#: Bunlar tek başına bir çağrı değildir: "Destekler Listesi" sayfası onlarca desteği
+#: birden gösterir ve bağlantı hangi destekten bahsedildiğini söylemez. Sahada
+#: görüldü — KOSGEB'in iki ayrı liste sayfası kataloğa çağrı olarak girdi ve ikisi de
+#: aynı adı taşıyordu, çünkü kurum her sayfaya aynı ``<title>``'ı koyuyor.
+LISTE_SAYFASI_ADLARI: tuple[str, ...] = (
+    "destekler listesi", "destek listesi", "destekler",
+    "duyurular", "duyuru listesi", "ilanlar", "ilan listesi",
+    "haberler", "haber listesi", "mevzuat listesi",
+    "yururlukten kaldirilan destekler", "programlar", "program listesi",
+    "cagrilar", "cagri listesi", "tum duyurular", "tum ilanlar",
+)
+
+#: Liste adının yanında geçtiğinde sayfanın **gerçek bir kayıt** olduğunu gösteren
+#: ifadeler. "Bedeli Ödenecek İlaçlar Listesinde Yapılan Düzenlemeler Hakkında
+#: Duyuru" bir liste sayfası değildir: listeden söz eden bir duyurudur.
+KAYIT_ISARETLERI: tuple[str, ...] = (
+    "yapilan", "hakkinda", "degisiklik", "guncelleme", "duzenleme",
+    "yayimlanan", "iliskin", "dair", "tarihli", "sayili",
+)
+
+
+def liste_sayfasi_basligi_mi(baslik: str, kurum: str = "") -> bool:
+    """Başlık, tek bir kaydın adı değil, bir **liste sayfasının** adı mı?
+
+    Kurum siteleri her sayfaya aynı ``<title>``'ı koyabiliyor: iki farklı KOSGEB
+    sayfası kataloğa aynı adla girdi ve mükerrer kayıt gibi göründü. Oysa ikisi de
+    liste sayfasıydı ve hiçbiri kayıt olmamalıydı.
+
+    Karar iki adımda verilir:
+
+    1. Kurumun adı başlığın sonundaki ekten sökülür ("Destekler Listesi - KOSGEB
+       T.C. Küçük ve Orta Ölçekli…" → "Destekler Listesi"). Kalan kısım sayfanın
+       kendi adıdır.
+    2. Kalan ad bir liste adıysa **ve** kayıt işareti taşımıyorsa liste sayfasıdır.
+
+    İkinci şart olmadan gerçek duyurular elenirdi: "…İlaçlar Listesinde Yapılan
+    Düzenlemeler Hakkında Duyuru" listeden söz eden bir kayıttır, listenin kendisi
+    değil.
+    """
+    if not baslik:
+        return False
+
+    # Kurum adı ekini sök: "<sayfa adı> - <kurum tam adı>" kalıbı yaygındır.
+    sayfa_adi = baslik
+    katlanmis_kurum = katla(kurum)
+
+    if katlanmis_kurum:
+        for ayrac in (" - ", " | ", " – ", " — "):
+            if ayrac in baslik:
+                bas, _, son = baslik.partition(ayrac)
+                if katlanmis_kurum.split()[0] in katla(son):
+                    sayfa_adi = bas
+                    break
+
+    katlanmis = katla(sayfa_adi)
+
+    if not katlanmis:
+        return False
+
+    # Kayıt işareti varsa bu bir duyurudur, liste değil.
+    if any(_gecer_mi(katlanmis, isaret) for isaret in KAYIT_ISARETLERI):
+        return False
+
+    # Tam eşleşme aranır: "destekler" liste adıdır ama "destekler kapsaminda
+    # yapilacak odemeler" bir kayıttır.
+    return katlanmis in LISTE_SAYFASI_ADLARI

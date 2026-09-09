@@ -208,6 +208,8 @@ export interface OpportunitySummary {
   isReviewedByConsultant: boolean
   ruleCount: number
   documentCount: number
+  /** Resmî adres; aynı başlıklı kayıtları ayırt etmek için kullanılır. */
+  sourceUrl: string | null
 }
 
 /** Bir alanın neden boş olduğu (Faz 2). C# karşılığı: FieldAvailabilityDto. */

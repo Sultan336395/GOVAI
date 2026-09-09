@@ -168,3 +168,37 @@ export function taramaTakvimi(cron: string | null | undefined): string {
 
   return cron
 }
+
+/**
+ * Aynı başlığı taşıyan kayıtları ayırt edecek ek bilgi.
+ *
+ * Resmî Gazete ilanları standart başlıklarla yayımlanır: aynı gün iki ayrı orman
+ * ihalesi de "ORMAN EMVALİ SATILACAKTIR" adını taşır. Bunlar mükerrer kayıt
+ * DEĞİLDİR — iki ayrı ihaledir — ama listede yan yana durunca kullanıcı hangisinin
+ * hangisi olduğunu anlayamaz ve sistemi kayıt tekrarlıyor sanır.
+ *
+ * Çözüm ayırt edici bir iz göstermektir: ilanın kendi belge adı. Resmî Gazete
+ * adresleri `20260908-3-6.pdf` biçimindedir; son parça o günün kaçıncı ilanı
+ * olduğunu söyler ve iki kaydı kesin ayırır.
+ *
+ * Ayırt edici bir iz çıkarılamıyorsa <b>uydurulmaz</b>: `null` döner ve ekran ek
+ * satır göstermez.
+ */
+export function ayirtEdiciIz(sourceUrl: string | null | undefined): string | null {
+  if (!sourceUrl) return null
+
+  try {
+    const yol = new URL(sourceUrl).pathname
+    const sonParca = yol.split('/').filter(Boolean).pop()
+
+    if (!sonParca) return null
+
+    // Uzantı atılır; kalan ad kaydın kendi işaretidir.
+    const ad = sonParca.replace(/\.[a-z0-9]{2,5}$/i, '')
+
+    // Anlamsız kısa parçalar ("3", "tr") ayırt etmez.
+    return ad.length >= 4 ? ad : null
+  } catch {
+    return null
+  }
+}

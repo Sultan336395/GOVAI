@@ -13,7 +13,11 @@ from typing import Any
 
 from govai_workers.api_client import GovAiClient
 from govai_workers.collector import eurlex
-from govai_workers.collector.alaka import alakasiz_baslik_mi, katla
+from govai_workers.collector.alaka import (
+    alakasiz_baslik_mi,
+    katla,
+    liste_sayfasi_basligi_mi,
+)
 from govai_workers.collector.fetcher import PoliteFetcher
 from govai_workers.logging_setup import configure_logging, get_logger
 from govai_workers.messaging import RoutingKeys, consume
@@ -358,6 +362,21 @@ def process_document(client: GovAiClient, document: dict[str, Any]) -> None:
             document_id,
             status="Skipped",
             error="Başlık kurumsal sayfa başlığı; çağrı kaydı açılmadı.",
+        )
+        return
+
+    # Liste sayfası tek bir çağrı DEĞİLDİR ve kayıt açılmamalıdır.
+    #
+    # Sahada iki KOSGEB liste sayfası kataloğa girdi ve ikisi de aynı adı taşıdı —
+    # kurum her sayfaya aynı <title>'ı koyuyor, dolayısıyla iki farklı sayfa mükerrer
+    # kayıt gibi göründü. Kanıt parçaları zaten kaydedildi; elenen tek şey uydurma
+    # çağrı kaydıdır.
+    if liste_sayfasi_basligi_mi(title, document.get("sourceName") or ""):
+        log.info("parse_skipped_list_page", document_id=document_id, title=title[:120])
+        client.record_parse_result(
+            document_id,
+            status="Skipped",
+            error="Liste sayfası; tek bir çağrı değildir, kayıt açılmadı.",
         )
         return
 

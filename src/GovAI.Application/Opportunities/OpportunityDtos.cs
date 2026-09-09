@@ -16,7 +16,16 @@ public sealed record OpportunitySummaryDto(
     string? Currency,
     bool IsReviewedByConsultant,
     int RuleCount,
-    int DocumentCount);
+    int DocumentCount,
+
+    /// <summary>
+    /// Çağrının resmî adresi.
+    ///
+    /// Listede gerekli: Resmî Gazete ilanları standart başlıklarla yayımlanır ve aynı
+    /// gün iki ayrı ihale aynı adı taşır. Bunlar mükerrer kayıt değildir, ama başlıktan
+    /// ayırt edilemezler; ekran ayırt edici izi adresten çıkarır.
+    /// </summary>
+    string? SourceUrl = null);
 
 public sealed record OpportunityDetailDto(
     Guid Id,

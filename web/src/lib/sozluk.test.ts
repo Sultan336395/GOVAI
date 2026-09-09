@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { adet, belgeOkunabilirlik, incelemeNedeni, taramaTakvimi } from './sozluk'
+import { adet, ayirtEdiciIz, belgeOkunabilirlik, incelemeNedeni, taramaTakvimi } from './sozluk'
 
 /**
  * Terim sözlüğü.
@@ -61,5 +61,33 @@ describe('adet', () => {
     // Türkçede sayıdan sonra çoğul eki kullanılmaz: "3 çağrılar" yanlıştır.
     expect(adet(3, 'Çağrı')).toBe('3 çağrı')
     expect(adet(1250, 'Kayıt')).toBe('1.250 kayıt')
+  })
+})
+
+describe('ayirtEdiciIz', () => {
+  it('S9. Aynı başlıklı iki ilanı adresinden ayırır', () => {
+    // Resmî Gazete ilanları standart adla yayımlanır: aynı gün iki ayrı orman
+    // ihalesi de "ORMAN EMVALİ SATILACAKTIR" adını taşır. Mükerrer kayıt değildir.
+    const ilk = 'https://www.resmigazete.gov.tr/ilanlar/eskiilanlar/2026/09/20260908-3-6.pdf'
+    const ikinci = 'https://www.resmigazete.gov.tr/ilanlar/eskiilanlar/2026/09/20260908-3-7.pdf'
+
+    expect(ayirtEdiciIz(ilk)).toBe('20260908-3-6')
+    expect(ayirtEdiciIz(ikinci)).toBe('20260908-3-7')
+    expect(ayirtEdiciIz(ilk)).not.toBe(ayirtEdiciIz(ikinci))
+  })
+
+  it('S10. Ayırt edici iz çıkaramazsa UYDURMAZ', () => {
+    // Yanlış bir iz, iki kaydı aynı sanmaya ya da olmayan bir farkı görmeye yol açar.
+    expect(ayirtEdiciIz(null)).toBeNull()
+    expect(ayirtEdiciIz('')).toBeNull()
+    expect(ayirtEdiciIz('https://www.kosgeb.gov.tr/')).toBeNull()
+    expect(ayirtEdiciIz('bozuk adres')).toBeNull()
+
+    // Anlamsız kısa parça ayırt etmez.
+    expect(ayirtEdiciIz('https://www.kosgeb.gov.tr/site/tr')).toBeNull()
+  })
+
+  it('S11. Uzantı gösterilmez', () => {
+    expect(ayirtEdiciIz('https://x.gov.tr/ilan/20260908-kosgeb.pdf')).toBe('20260908-kosgeb')
   })
 })
