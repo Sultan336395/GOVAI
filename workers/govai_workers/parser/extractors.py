@@ -14,6 +14,7 @@ from dataclasses import dataclass
 
 from bs4 import BeautifulSoup
 
+from govai_workers.collector.fetcher import metni_coz
 from govai_workers.logging_setup import get_logger
 
 log = get_logger(__name__)
@@ -63,17 +64,25 @@ def extract_text(content: bytes, media_type: str) -> str:
     return extract_document(content, media_type).text
 
 
-def extract_document(content: bytes, media_type: str) -> ExtractedDocument:
+def extract_document(
+    content: bytes,
+    media_type: str,
+    charset: str | None = None,
+) -> ExtractedDocument:
     """Metni künyesiyle birlikte çıkarır.
 
     PDF sayfaları form-feed ile ayrılır; böylece kanıt parçalarında sayfa numarası
     korunabilir. Metin katmanı olmayan taranmış PDF için **uydurma metin üretilmez**,
     ``needs_ocr`` işaretlenir.
+
+    ``charset`` indiricinin belirlediği karakter kümesidir. Verilmezse gövdeden
+    çıkarılır — ama <b>karar yine tek bir yerde</b> verilir (``metni_coz``), burada
+    ikinci bir tahmin yapılmaz.
     """
     if "pdf" in media_type.lower():
         return _extract_pdf_document(content)
 
-    text = _extract_html(content)
+    text = _extract_html(content, charset)
     return ExtractedDocument(text=text, error=None if text.strip() else "HTML metni boş.")
 
 
@@ -133,9 +142,15 @@ def _extract_pdf_document(content: bytes) -> ExtractedDocument:
         return ExtractedDocument(text="", error=f"PDF ayrıştırılamadı: {exc}"[:500])
 
 
-def _extract_html(content: bytes) -> str:
+def _extract_html(content: bytes, charset: str | None = None) -> str:
     try:
-        soup = BeautifulSoup(content, "lxml")
+        # BeautifulSoup'a BAYT DEĞİL METİN verilir.
+        #
+        # Bayt verildiğinde kümeyi kendi başına tahmin ediyor ve indiricinin özenle
+        # verdiği kararı yok sayıyordu: aynı belge iki yerde iki farklı şekilde
+        # çözülüyor, ayrıştırıcı bozuk metin üretiyordu. Çözme kararının tek sahibi
+        # ``metni_coz``tur.
+        soup = BeautifulSoup(metni_coz(content, charset), "lxml")
 
         for selector in _NOISE_SELECTORS:
             for node in soup.select(selector):

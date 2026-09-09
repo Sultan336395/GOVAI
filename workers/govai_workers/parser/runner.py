@@ -234,7 +234,8 @@ def process_document(client: GovAiClient, document: dict[str, Any]) -> None:
     media_type = document.get("mediaType", "text/html")
 
     if raw is not None:
-        extracted = extract_document(raw.encode("utf-8"), media_type)
+        # İçeriği BİZ kodladık; kümesi tahmin edilecek bir şey değil.
+        extracted = extract_document(raw.encode("utf-8"), media_type, charset="utf-8")
     else:
         # Ham içerik mesajda taşınmıyorsa kaynaktan yeniden indirilir.
         #
@@ -257,7 +258,13 @@ def process_document(client: GovAiClient, document: dict[str, Any]) -> None:
                     )
                     return
 
-                extracted = extract_document(fetched.content, fetched.media_type)
+                # İndiricinin belirlediği küme GEÇİRİLİR. Eskiden ham baytlar
+                # doğrudan çıkarıcıya gidiyor, o da kümeyi kendi başına yeniden
+                # tahmin ediyordu; aynı belge toplayıcıda doğru, ayrıştırıcıda
+                # bozuk çözülüyordu.
+                extracted = extract_document(
+                    fetched.content, fetched.media_type, charset=fetched.charset
+                )
                 media_type = fetched.media_type
 
     # Metin katmanı yok ya da EKSİK: uydurma metin ÜRETİLMEZ, belge insana bırakılır.
@@ -451,7 +458,9 @@ def main() -> int:
                 log.error("url_unreachable", url=args.url)
                 return 1
 
-            extracted = extract_document(fetched.content, fetched.media_type)
+            extracted = extract_document(
+                fetched.content, fetched.media_type, charset=fetched.charset
+            )
             text = extracted.text
             extraction = extract_rules(args.url, text)
             chunks = build_chunks(text)

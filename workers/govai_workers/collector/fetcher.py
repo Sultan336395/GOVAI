@@ -85,31 +85,43 @@ class FetchedDocument:
         Sonraki adaylar makullük denetiminden geçer: sonuçta replacement karakteri
         (``U+FFFD``) ya da beklenmeyen kontrol karakteri varsa o küme yanlıştır.
         """
-        if _cok_baytli_utf8(self.content):
-            return self.content.decode("utf-8")
+        return metni_coz(self.content, self.charset)
 
-        adaylar = (
-            self.charset,
-            _sniff_meta_charset(self.content),
-            "utf-8",
-            # Türk kamu sitelerinde hâlâ yaygın olan eski kümeler.
-            "windows-1254",
-            "iso-8859-9",
-        )
 
-        for encoding in adaylar:
-            if not encoding:
-                continue
-            try:
-                cozulen = self.content.decode(encoding)
-            except (LookupError, UnicodeDecodeError):
-                continue
+def metni_coz(content: bytes, bildirilen: str | None = None) -> str:
+    """Gövdeyi doğru karakter kümesiyle çözer.
 
-            if _makul_metin(cozulen):
-                return cozulen
+    <b>Bu kararın tek sahibi burasıdır.</b> Ayrıştırıcı da aynı işlevi çağırır;
+    eskiden ham baytları doğrudan BeautifulSoup'a veriyordu ve o kümeyi kendi
+    başına yeniden tahmin ediyordu. Aynı belge iki ayrı yerde iki farklı şekilde
+    çözülüyordu: toplayıcı doğru saklıyor, ayrıştırıcı bozuk metin üretiyordu.
+    Sahada iki KOSGEB belgesinin metni bu yüzden ``KÃ¼Ã§Ã¼k`` diye kaydedildi.
+    """
+    if _cok_baytli_utf8(content):
+        return content.decode("utf-8")
 
-        # Hiçbiri makul değil: içeriğin tamamını kaybetmektense birkaç karakteri kaybet.
-        return self.content.decode("utf-8", errors="replace")
+    adaylar = (
+        bildirilen,
+        _sniff_meta_charset(content),
+        "utf-8",
+        # Türk kamu sitelerinde hâlâ yaygın olan eski kümeler.
+        "windows-1254",
+        "iso-8859-9",
+    )
+
+    for encoding in adaylar:
+        if not encoding:
+            continue
+        try:
+            cozulen = content.decode(encoding)
+        except (LookupError, UnicodeDecodeError):
+            continue
+
+        if _makul_metin(cozulen):
+            return cozulen
+
+    # Hiçbiri makul değil: içeriğin tamamını kaybetmektense birkaç karakteri kaybet.
+    return content.decode("utf-8", errors="replace")
 
 
 def _cok_baytli_utf8(content: bytes) -> bool:
