@@ -128,7 +128,7 @@ function Baslik({
           <strong>{durum}</strong>
           <div className="muted" style={{ fontSize: 12 }} data-alan="guven-ozeti">
             {/* Başlık sunucudan gelir: model çalışmadıysa "Kural tabanlı güven" yazar.
-                "Hibrit güven" yazmak, model hiç çalışmamışken onun da doğruladığı
+                "Yapay zekâ destekli güven" yazmak, model hiç çalışmamışken onun da doğruladığı
                 izlenimini verir — kullanıcının alabileceği en yanıltıcı mesaj. */}
             {confidence.title}: {confidence.levelLabel} ({formatPercent(confidence.value)})
           </div>
@@ -344,6 +344,14 @@ function YapayZekaKatkisi({ contribution }: { contribution: AnalysisContribution
   )
 }
 
+/**
+ * Analizin künyesi.
+ *
+ * Eskiden burada kural seti, firma profili ve mali veri sürüm numaraları ile modelin
+ * teknik adı yazıyordu. Bunlar sistemin iç muhasebesidir; danışman için tek anlamlı
+ * bilgi analizin NE ZAMAN ve NEYE GÖRE yapıldığıdır. Sürüm bilgisi kaydedilmeye devam
+ * eder — yalnızca ekranda gösterilmez.
+ */
 function SurumKunyesi({
   version,
   evaluatedAt,
@@ -353,9 +361,11 @@ function SurumKunyesi({
 }) {
   return (
     <div className="muted" style={{ fontSize: 12, marginTop: 12 }} data-alan="surum-kunyesi">
-      Analiz tarihi {formatDate(evaluatedAt)} · Kural seti v{version.ruleSetVersion} · Firma
-      profili v{version.companyProfileVersion} · Mali veri v{version.financialDataVersion}
-      {version.modelName ? ` · Model ${version.modelProvider}/${version.modelName}` : ' · Model kullanılmadı'}
+      {formatDate(evaluatedAt)} tarihinde, firmanın o günkü bilgileri ve çağrının resmî
+      belgesi kullanılarak hazırlandı.
+      {version.modelName
+        ? ' Yapay zekâ açıklaması eklendi.'
+        : ' Yalnızca kural tabanlı değerlendirme yapıldı.'}
     </div>
   )
 }

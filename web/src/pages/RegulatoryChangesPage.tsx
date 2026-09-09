@@ -39,7 +39,7 @@ export default function RegulatoryChangesPage() {
           <h1>Mevzuat Değişiklikleri</h1>
           <p>
             Resmî kaynaklardan toplanan ve kaynağına karşı doğrulanmış mevzuat kayıtları.
-            Her kayıt, alındığı belgenin belirli bir sürümüne ve o sürümdeki paragrafa kadar
+            Her kayıt, alındığı resmî belgeye ve o belgedeki ilgili bölüme kadar
             geri gösterilebilir.
           </p>
         </div>

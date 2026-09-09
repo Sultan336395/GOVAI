@@ -9,6 +9,7 @@ import {
   sourceHealthLabels,
 } from '@/lib/regulatoryLabels'
 import { formatDate } from '@/lib/format'
+import { taramaTakvimi } from '@/lib/sozluk'
 
 const statusLabels: Record<SourceDto['lastRunStatus'], string> = {
   Pending: 'Beklemede',
@@ -105,7 +106,7 @@ export default function SourcesPage() {
                       {source.officialDomain ? ` · ${source.officialDomain}` : ''}
                     </div>
                     <div className="muted" style={{ fontSize: 12 }}>
-                      {source.cronExpression} · en fazla {source.maxPages} sayfa
+                      {taramaTakvimi(source.cronExpression)} · en fazla {source.maxPages} sayfa
                     </div>
                   </td>
                   <td>{sourceCategoryLabels[source.category] ?? '—'}</td>

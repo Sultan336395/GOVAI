@@ -38,24 +38,24 @@ describe('platform rolleri', () => {
   it('katalog yöneticisi kaynakları ve karantinayı görür, şirket ekranlarını görmez', () => {
     const ctx = baglam({ userRole: 'PlatformCatalogManager' })
 
-    expect(gruplar(ctx)).toEqual(['Fırsat ve Analiz', 'Mevzuat ve Uyum', 'Platform Yönetimi'])
-    expect(etiketler(ctx)).toContain('Veri Kaynakları')
-    expect(etiketler(ctx)).toContain('Karantina İnceleme')
+    expect(gruplar(ctx)).toEqual(['Fırsat ve Analiz', 'Mevzuat ve Uyum', 'Katalog Denetimi'])
+    expect(etiketler(ctx)).toContain('Resmî Kaynaklar')
+    expect(etiketler(ctx)).toContain('İnceleme Bekleyenler')
     expect(etiketler(ctx)).not.toContain('Şirketlerim')
     expect(etiketler(ctx)).not.toContain('Fırsat Eşleşmelerim')
   })
 
-  it('inceleyici YALNIZCA Platform İnceleme alanını görür', () => {
+  it('inceleyici YALNIZCA Katalog Denetimi alanını görür', () => {
     const ctx = baglam({ userRole: 'PlatformReviewer' })
 
     // Rolün tek işi kataloğu denetlemek. Tek grup görmesi en az yetki ilkesinin
     // görünen yüzü; hesabı devralan kişi ne yapacağını aramak zorunda kalmaz.
-    expect(gruplar(ctx)).toEqual(['Platform İnceleme'])
+    expect(gruplar(ctx)).toEqual(['Katalog Denetimi'])
 
     expect(etiketler(ctx)).toEqual([
-      'Karantina İnceleme',
-      'Katalog Onarımı',
-      'Kanıt Bağlama',
+      'İnceleme Bekleyenler',
+      'Katalog Düzeltme',
+      'Dayanak Eşleştirme',
     ])
   })
 
@@ -63,7 +63,7 @@ describe('platform rolleri', () => {
     const ctx = baglam({ userRole: 'PlatformReviewer' })
 
     for (const gorunmemeli of [
-      'Veri Kaynakları',
+      'Resmî Kaynaklar',
       'Şirketlerim',
       'Fırsat Eşleşmelerim',
       'Fon, Hibe ve İhale Kataloğu',
@@ -76,8 +76,8 @@ describe('platform rolleri', () => {
   it('katalog yöneticisi bakım ekranlarını da görür', () => {
     const ctx = baglam({ userRole: 'PlatformCatalogManager' })
 
-    expect(etiketler(ctx)).toContain('Katalog Onarımı')
-    expect(etiketler(ctx)).toContain('Kanıt Bağlama')
+    expect(etiketler(ctx)).toContain('Katalog Düzeltme')
+    expect(etiketler(ctx)).toContain('Dayanak Eşleştirme')
   })
 
   it('kiracı kullanıcısı bakım ekranlarını hiç görmez', () => {
@@ -86,8 +86,8 @@ describe('platform rolleri', () => {
     for (const rol of ['SuperAdmin', 'CompanyManager', 'OperationUser', 'ReadOnly'] as UserRole[]) {
       const ctx = baglam({ userRole: rol })
 
-      expect(etiketler(ctx)).not.toContain('Katalog Onarımı')
-      expect(etiketler(ctx)).not.toContain('Kanıt Bağlama')
+      expect(etiketler(ctx)).not.toContain('Katalog Düzeltme')
+      expect(etiketler(ctx)).not.toContain('Dayanak Eşleştirme')
     }
   })
 

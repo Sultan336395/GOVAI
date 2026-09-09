@@ -70,11 +70,11 @@ export function buildNavigation({
   if (userRole === 'PlatformReviewer') {
     return [
       {
-        title: 'Platform İnceleme',
+        title: 'Katalog Denetimi',
         items: [
-          { to: '/quarantine', label: 'Karantina İnceleme', icon: 'quarantine' },
-          { to: '/platform/catalog-repair', label: 'Katalog Onarımı', icon: 'quarantine' },
-          { to: '/platform/rule-evidence', label: 'Kanıt Bağlama', icon: 'regulation' },
+          { to: '/quarantine', label: 'İnceleme Bekleyenler', icon: 'quarantine' },
+          { to: '/platform/catalog-repair', label: 'Katalog Düzeltme', icon: 'quarantine' },
+          { to: '/platform/rule-evidence', label: 'Dayanak Eşleştirme', icon: 'regulation' },
         ],
       },
     ]
@@ -98,13 +98,13 @@ export function buildNavigation({
 
     // Kaynak yönetimi katalog yöneticisinin işidir; karantina incelemesi ikisinin de.
     const system: NavItem[] = [
-      { to: '/sources', label: 'Veri Kaynakları', icon: 'sources' },
-      { to: '/quarantine', label: 'Karantina İnceleme', icon: 'quarantine' },
-      { to: '/platform/catalog-repair', label: 'Katalog Onarımı', icon: 'quarantine' },
-      { to: '/platform/rule-evidence', label: 'Kanıt Bağlama', icon: 'regulation' },
+      { to: '/sources', label: 'Resmî Kaynaklar', icon: 'sources' },
+      { to: '/quarantine', label: 'İnceleme Bekleyenler', icon: 'quarantine' },
+      { to: '/platform/catalog-repair', label: 'Katalog Düzeltme', icon: 'quarantine' },
+      { to: '/platform/rule-evidence', label: 'Dayanak Eşleştirme', icon: 'regulation' },
     ]
 
-    platform.push({ title: 'Platform Yönetimi', items: system })
+    platform.push({ title: 'Katalog Denetimi', items: system })
 
     return platform
   }

@@ -368,15 +368,18 @@ describe('Fırsat analiz paneli', () => {
     )
   })
 
-  it('AP11. Analiz sürümü ve tarihi künyede görünür', () => {
+  it('AP11. Künye analizin tarihini söyler, sürüm numarası göstermez', () => {
     render(<OpportunityAnalysisPanel data={ANALIZ} />)
 
     const kunye = document.querySelector('[data-alan="surum-kunyesi"]')!
 
     expect(kunye.textContent).toContain('08.09.2026')
-    expect(kunye.textContent).toContain('2026.09.1')
-    expect(kunye.textContent).toContain('v7')
-    expect(kunye.textContent).toContain('Model kullanılmadı')
+    expect(kunye.textContent).toContain('kural tabanlı değerlendirme')
+
+    // Kural seti ve profil sürümleri sistemin iç muhasebesidir; kaydedilir ama
+    // ekranda gösterilmez.
+    expect(kunye.textContent).not.toContain('2026.09.1')
+    expect(kunye.textContent).not.toContain('v7')
   })
 
   it('AP12. Elenen yapay zekâ ifadelerinin sayısı bildirilir, içerikleri gösterilmez', () => {
@@ -403,7 +406,7 @@ describe('Fırsat analiz paneli', () => {
         rejectedClaimCount: 1,
         conflicts: [],
         warning: null,
-        modeLabel: 'Hibrit analiz',
+        modeLabel: 'Yapay zekâ destekli analiz',
         aiConfidenceLabel: '%100',
       },
     }
@@ -511,7 +514,7 @@ describe('Güven göstergesi', () => {
     // Sayı aynı sayı; ADI farklı. "Hibrit güven: Orta" yazmak, model hiç çalışmamışken
     // onun da doğruladığı izlenimini verir.
     expect(govde).toContain('Kural tabanlı güven')
-    expect(govde).not.toContain('Hibrit güven')
+    expect(govde).not.toContain('Yapay zekâ destekli güven')
   })
 
   it('AP26. Yapay zekâ kapalıyken analiz türü ve YZ güveni açıkça yazar', () => {
@@ -528,7 +531,7 @@ describe('Güven göstergesi', () => {
   it('AP27. Yapay zekâ katkısı varken hibrit etiketleri görünür', () => {
     const hibrit: OpportunityAnalysis = {
       ...ANALIZ,
-      confidence: { ...ANALIZ.confidence, title: 'Hibrit güven' },
+      confidence: { ...ANALIZ.confidence, title: 'Yapay zekâ destekli güven' },
       contribution: {
         hasAiContribution: true,
         aiStatus: 'Succeeded',
@@ -537,7 +540,7 @@ describe('Güven göstergesi', () => {
         rejectedClaimCount: 0,
         conflicts: [],
         warning: null,
-        modeLabel: 'Hibrit analiz',
+        modeLabel: 'Yapay zekâ destekli analiz',
         aiConfidenceLabel: '%80',
       },
     }
@@ -546,8 +549,8 @@ describe('Güven göstergesi', () => {
 
     const govde = document.body.textContent ?? ''
 
-    expect(govde).toContain('Hibrit güven')
-    expect(govde).toContain('Hibrit analiz')
+    expect(govde).toContain('Yapay zekâ destekli güven')
+    expect(govde).toContain('Yapay zekâ destekli analiz')
     expect(govde).toContain('Yapay zekâ güveni: %80')
   })
 

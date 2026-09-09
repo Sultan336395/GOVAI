@@ -115,8 +115,11 @@ describe('Katalog onarımı ekranı', () => {
     expect(await screen.findByText('KOSGEB Destekler')).toBeTruthy()
 
     const tablo = document.querySelector('[data-tablo="degisecekler"]')!
-    expect(tablo.textContent).toContain('Karantinaya al')
-    expect(tablo.textContent).toContain('KOSGEB-LISTE')
+    expect(tablo.textContent).toContain('Katalogdan çıkar')
+
+    // Adım kodu bir yazılım tanımlayıcısıdır; yerine Türkçe gerekçe yazılır.
+    expect(tablo.textContent).not.toContain('KOSGEB-LISTE')
+    expect(tablo.textContent).toContain('Destek listesi sayfası')
 
     // Etkilenecek değerlendirme sayısı görünür: kullanıcı bedelini bilerek onaylar.
     expect(tablo.textContent).toContain('7')

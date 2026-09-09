@@ -404,7 +404,7 @@ public class HybridAnalysisServiceTests
 
         var sonuc = await service.AnalyzeOpportunityAsync(company.Id, opportunity.Id);
 
-        // Sayı aynı sayı; ADI farklı. "Hibrit güven: Yüksek" yazmak, model hiç
+        // Sayı aynı sayı; ADI farklı. "Yapay zekâ destekli güven: Yüksek" yazmak, model hiç
         // çalışmamışken onun da doğruladığı izlenimini verir.
         Assert.Equal("Kural tabanlı güven", sonuc.Confidence.Title);
         Assert.Equal("Kural tabanlı analiz", sonuc.Contribution.ModeLabel);
@@ -440,8 +440,8 @@ public class HybridAnalysisServiceTests
 
         var sonuc = await service.AnalyzeRegulationAsync(company.Id, change.Id);
 
-        Assert.Equal("Hibrit güven", sonuc.Confidence.Title);
-        Assert.Equal("Hibrit analiz", sonuc.Contribution.ModeLabel);
+        Assert.Equal("Yapay zekâ destekli güven", sonuc.Confidence.Title);
+        Assert.Equal("Yapay zekâ destekli analiz", sonuc.Contribution.ModeLabel);
         Assert.NotEqual("Kullanılamıyor", sonuc.Contribution.AiConfidenceLabel);
     }
 

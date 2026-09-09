@@ -52,8 +52,7 @@ export default function EligibilityDetailPage() {
           </Link>
           <h1 style={{ marginTop: 6 }}>{data.opportunityTitle}</h1>
           <p>
-            {data.publisher} · Son başvuru {formatDate(data.deadline)} · Profil sürümü v
-            {data.companyProfileVersion}
+            {data.publisher} · Son başvuru {formatDate(data.deadline)}
           </p>
         </div>
         <div style={{ textAlign: 'right' }}>

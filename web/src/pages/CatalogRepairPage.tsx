@@ -6,13 +6,29 @@ import type { CatalogRepairPlanReport, CatalogRepairReport } from '@/api/types'
 import { EmptyState, ErrorBox, InfoBox, Loading, SuccessBox } from '@/components/Common'
 
 const hedefEtiketleri: Record<string, string> = {
-  Opportunity: 'Fırsat',
-  RegulatoryChange: 'Mevzuat kaydı',
+  Opportunity: 'Çağrı',
+  RegulatoryChange: 'Mevzuat',
 }
 
 const eylemEtiketleri: Record<string, string> = {
-  Quarantine: 'Karantinaya al',
-  RetitleFromDocument: 'Başlığı belgeden düzelt',
+  Quarantine: 'Katalogdan çıkar',
+  RetitleFromDocument: 'Başlığı düzelt',
+}
+
+/**
+ * Adım kodları kullanıcıya gösterilmez.
+ *
+ * `KOSGEB-LISTE` bir yazılım tanımlayıcısıdır; danışman için hiçbir anlamı yok ve
+ * ekranda "gerekçe" sütununda duruyordu. Yerine ne yapılacağının Türkçe karşılığı
+ * yazılır.
+ */
+const gerekceler: Record<string, string> = {
+  'KOSGEB-YURURLUKTEN-KALDIRILAN': 'Yürürlükten kaldırılmış destekler sayfası; başvurulabilir bir çağrı değil.',
+  'KOSGEB-LISTE': 'Destek listesi sayfası; tek bir çağrıyı değil, onlarca desteği birden gösteriyor.',
+  'SGK-SUT': 'Sağlık Uygulama Tebliği içeriği; işvereni bağlayan bir düzenleme değil.',
+  'SGK-ILAC': 'İlaç listesi duyurusu; işveren mevzuatı değil.',
+  'SGK-GAYRIMENKUL': 'Kurumun kendi gayrimenkul satışı; firmayı ilgilendiren bir düzenleme değil.',
+  'SGK-MENU-BASLIGI': 'Başlık, sayfanın menüsünden alınmış; kaydın gerçek konusunu anlatmıyor.',
 }
 
 /**
@@ -50,8 +66,8 @@ export default function CatalogRepairPage() {
       setSonuc(rapor)
       setOnaylandi(false)
       setNotice(
-        `${rapor.changed} kayıt onarıldı. Hiçbir kayıt silinmedi; ` +
-          'karantinaya alınanların belgesi, ham içeriği ve kanıtları yerinde duruyor.',
+        `${rapor.changed} kayıt düzeltildi. Hiçbir kayıt silinmedi; ` +
+          'katalogdan çıkarılanların belgesi ve dayanakları yerinde duruyor.',
       )
       const yeni = await queryClient.fetchQuery({
         queryKey: ['catalog-repair-plan'],
@@ -93,11 +109,11 @@ export default function CatalogRepairPage() {
   return (
     <section className="page" data-sayfa="katalog-onarimi">
       <header className="page-header">
-        <h1>Katalog Onarımı</h1>
+        <h1>Katalog Düzeltme</h1>
         <p className="muted">
-          Kataloğa yanlışlıkla girmiş kayıtları düzeltir. <strong>Hiçbir kayıt silinmez</strong>;
-          çöp kayıtlar karantinaya alınır, yanlış başlıklar belge sürümündeki gerçek başlıkla
-          düzeltilir. İşlem geri alınabilir.
+          Kataloğa yanlışlıkla girmiş kayıtları düzeltir: çağrı olmayan sayfalar katalogdan
+          çıkarılır, yanlış başlıklar resmî belgedeki asıl başlıkla değiştirilir.{' '}
+          <strong>Hiçbir kayıt silinmez</strong> ve yapılan her işlem geri alınabilir.
         </p>
       </header>
 
@@ -106,7 +122,7 @@ export default function CatalogRepairPage() {
       {geriAl.error && <ErrorBox error={geriAl.error} />}
 
       <div className="card" data-alan="plan-ozeti">
-        <h2>Plan</h2>
+        <h2>Yapılacak işlemler</h2>
 
         {gecerliPlan === null || gecerliPlan.matches.length === 0 ? (
           <EmptyState>Onarılacak kayıt bulunamadı. Katalog temiz.</EmptyState>
@@ -114,7 +130,7 @@ export default function CatalogRepairPage() {
           <>
             <p>
               <strong>{degisecekler.length}</strong> kayıt değişecek,{' '}
-              <strong>{atlananlar.length}</strong> kayıt atlanacak.
+              <strong>{atlananlar.length}</strong> kayıt olduğu gibi kalacak.
             </p>
 
             {degisecekler.length > 0 && (
@@ -123,9 +139,9 @@ export default function CatalogRepairPage() {
                   <thead>
                     <tr>
                       <th>Kayıt</th>
-                      <th>Tür</th>
-                      <th>Yapılacak</th>
-                      <th>Gerekçe</th>
+                      <th>Türü</th>
+                      <th>Yapılacak işlem</th>
+                      <th>Neden</th>
                       <th>Etkilenen değerlendirme</th>
                     </tr>
                   </thead>
@@ -154,13 +170,13 @@ export default function CatalogRepairPage() {
                           )}
                           {m.proposedTitle && (
                             <div className="small">
-                              Yeni başlık: <strong>{m.proposedTitle}</strong>
+                              Yeni başlığı: <strong>{m.proposedTitle}</strong>
                             </div>
                           )}
                         </td>
                         <td>{hedefEtiketleri[m.target] ?? m.target}</td>
                         <td>{eylemEtiketleri[m.action] ?? m.action}</td>
-                        <td className="small">{m.stepCode}</td>
+                        <td className="small">{gerekceler[m.stepCode] ?? m.stepCode}</td>
                         <td>{m.affectedAssessmentCount}</td>
                       </tr>
                     ))}
@@ -171,7 +187,7 @@ export default function CatalogRepairPage() {
 
             {atlananlar.length > 0 && (
               <details data-alan="atlananlar">
-                <summary>Atlanacak {atlananlar.length} kayıt ve sebepleri</summary>
+                <summary>Değişmeyecek {atlananlar.length} kayıt ve nedenleri</summary>
                 <ul>
                   {atlananlar.map((m) => (
                     <li key={m.recordId}>
@@ -191,7 +207,7 @@ export default function CatalogRepairPage() {
             onClick={() => planiTazele.mutate()}
             disabled={planiTazele.isPending}
           >
-            Planı yenile
+            Listeyi yenile
           </button>
         </div>
       </div>
@@ -201,8 +217,8 @@ export default function CatalogRepairPage() {
           <h2>Onay</h2>
 
           <InfoBox>
-            Bu işlem <strong>{degisecekler.length}</strong> kaydı değiştirecek. Onaylamadan
-            hiçbir şey uygulanmaz. Uygulandıktan sonra da geri alabilirsiniz.
+            Bu işlem <strong>{degisecekler.length}</strong> kaydı değiştirecek. Siz
+            onaylamadan hiçbir şey uygulanmaz; uyguladıktan sonra da geri alabilirsiniz.
           </InfoBox>
 
           <label className="checkbox">
@@ -212,7 +228,7 @@ export default function CatalogRepairPage() {
               checked={onaylandi}
               onChange={(e) => setOnaylandi(e.target.checked)}
             />
-            Yukarıdaki listeyi inceledim ve uygulanmasını onaylıyorum.
+            Listeyi inceledim, uygulanmasını onaylıyorum.
           </label>
 
           <button
@@ -221,7 +237,7 @@ export default function CatalogRepairPage() {
             onClick={() => uygula.mutate()}
             disabled={!onaylandi || uygula.isPending}
           >
-            {uygula.isPending ? 'Uygulanıyor…' : 'Onarımı uygula'}
+            {uygula.isPending ? 'Uygulanıyor…' : 'Düzeltmeleri uygula'}
           </button>
         </div>
       )}
@@ -231,15 +247,15 @@ export default function CatalogRepairPage() {
           <h2>Sonuç</h2>
 
           <p>
-            {sonuc.changed} kayıt onarıldı, {sonuc.alreadyDone} kayıt zaten uygulanmıştı.
+            {sonuc.changed} kayıt düzeltildi, {sonuc.alreadyDone} kayıt zaten düzeltilmişti.
           </p>
 
           <ul>
             {sonuc.outcomes.map((o) => (
               <li key={`${o.stepCode}-${o.recordId}`}>
-                <strong>{o.stepCode}</strong> — {o.result}
+                {gerekceler[o.stepCode] ?? o.stepCode} — {o.result}
                 {o.previousTitle && (
-                  <span className="muted small"> (eski başlık: {o.previousTitle})</span>
+                  <span className="muted small"> (önceki başlığı: {o.previousTitle})</span>
                 )}
               </li>
             ))}
@@ -253,7 +269,7 @@ export default function CatalogRepairPage() {
               onClick={() => geriAl.mutate(sonuc.runId!)}
               disabled={geriAl.isPending}
             >
-              {geriAl.isPending ? 'Geri alınıyor…' : 'Bu onarımı geri al'}
+              {geriAl.isPending ? 'Geri alınıyor…' : 'Bu işlemi geri al'}
             </button>
           )}
         </div>

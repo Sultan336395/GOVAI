@@ -13,16 +13,16 @@ import { EmptyState, ErrorBox, InfoBox, Loading, SuccessBox } from '@/components
  * karantinadaki kayıt ise hiç ele alınmaz.
  */
 const sonucEtiketleri: Record<RuleEvidenceBackfillOutcome, string> = {
-  Bound: 'Kanıt bağlanacak',
-  AlreadyBound: 'Zaten bağlı',
-  NoEvidenceFound: 'Kanıt bulunamadı — dokunulmayacak',
-  NeedsReparse: 'Saklanan içerikten yeniden ayrıştırılacak',
-  NeedsRedownload: 'Ham içerik yok — yeniden indirme gerekli',
-  SkippedQuarantined: 'Karantinada — atlanacak',
-  SkippedUnverifiedSource: 'Kaynak doğrulanmamış — atlanacak',
-  NoSourceDocument: 'Elle açılmış kayıt — belgesi yok',
-  NoRules: 'Kuralı yok',
-  Failed: 'Hata',
+  Bound: 'Dayanağı bulundu',
+  AlreadyBound: 'Dayanağı zaten var',
+  NoEvidenceFound: 'Dayanağı bulunamadı — dokunulmayacak',
+  NeedsReparse: 'Belge yeniden okunacak',
+  NeedsRedownload: 'Belge metni yok — yeniden alınması gerekiyor',
+  SkippedQuarantined: 'İncelemede — atlanacak',
+  SkippedUnverifiedSource: 'Kaynağı doğrulanmamış — atlanacak',
+  NoSourceDocument: 'Elle eklenmiş; resmî belgesi yok',
+  NoRules: 'Başvuru koşulu yok',
+  Failed: 'İşlenemedi',
 }
 
 /** Ekranda öne çıkarılacak sonuçlar; gerisi ayrıntı bölümünde kalır. */
@@ -66,8 +66,8 @@ export default function RuleEvidenceBackfillPage() {
       setSonuc(rapor)
       setOnaylandi(false)
       setNotice(
-        `${rapor.evidenceLinksCreated} kanıt bağlantısı kuruldu. ` +
-          'Kanıtı bulunamayan kurallara dokunulmadı; hiçbir kural silinmedi.',
+        `${rapor.boundCount} çağrının koşulları resmî belgedeki bölümlerle eşleştirildi. ` +
+          'Dayanağı bulunamayan koşullara dokunulmadı; hiçbir koşul silinmedi.',
       )
       const yeni = await queryClient.fetchQuery({
         queryKey: ['rule-evidence-plan'],
@@ -79,9 +79,9 @@ export default function RuleEvidenceBackfillPage() {
 
   const geriAl = useMutation({
     mutationFn: (runId: string) => api.undoRuleEvidenceBackfill(runId),
-    onSuccess: async (rapor) => {
+    onSuccess: async () => {
       setSonuc(null)
-      setNotice(`${rapor.removedLinkCount} bağlantı geri alındı.`)
+      setNotice('Eşleştirme geri alındı; koşullar önceki hâline döndü.')
       const yeni = await queryClient.fetchQuery({
         queryKey: ['rule-evidence-plan'],
         queryFn: () => api.ruleEvidenceBackfillPlan(100),
@@ -109,11 +109,12 @@ export default function RuleEvidenceBackfillPage() {
   return (
     <section className="page" data-sayfa="kanit-baglama">
       <header className="page-header">
-        <h1>Kanıt Bağlama</h1>
+        <h1>Dayanak Eşleştirme</h1>
         <p className="muted">
-          Mevcut fırsat kurallarını, veritabanında zaten duran resmî belge sürümlerine bağlar.
-          <strong> İnternete çıkmaz.</strong> Kanıtı güvenilir biçimde bulunamayan kural tahmin
-          edilerek bağlanmaz ve silinmez.
+          Çağrıların başvuru koşullarını, resmî belgede geçtikleri bölümle eşleştirir. Böylece
+          her koşulun belgede nerede yazdığı gösterilebilir. Sistem{' '}
+          <strong>yeni belge indirmez</strong>; yalnızca elindeki belgeleri kullanır. Belgede
+          güvenilir biçimde bulunamayan koşul tahmin edilmez, olduğu gibi bırakılır.
         </p>
       </header>
 
@@ -122,33 +123,32 @@ export default function RuleEvidenceBackfillPage() {
       {geriAl.error && <ErrorBox error={geriAl.error} />}
 
       <div className="card" data-alan="plan-ozeti">
-        <h2>Plan</h2>
+        <h2>Yapılacak işlemler</h2>
 
         {gecerliPlan === null || gecerliPlan.totalExamined === 0 ? (
-          <EmptyState>İncelenecek fırsat kaydı bulunamadı.</EmptyState>
+          <EmptyState>İncelenecek çağrı kaydı yok.</EmptyState>
         ) : (
           <>
             <ul data-alan="sayilar">
               <li>
-                İncelenen kayıt: <strong>{gecerliPlan.totalExamined}</strong>
+                İncelenen çağrı: <strong>{gecerliPlan.totalExamined}</strong>
               </li>
               <li>
-                Bağlanacak kayıt: <strong>{gecerliPlan.boundCount}</strong> (
-                {gecerliPlan.evidenceLinksCreated} bağlantı)
+                Dayanağı bulunan: <strong>{gecerliPlan.boundCount}</strong>
               </li>
-              <li>Zaten bağlı: {gecerliPlan.alreadyBoundCount}</li>
-              <li>Kanıt bulunamayan: {gecerliPlan.noEvidenceCount}</li>
-              <li>Yeniden ayrıştırılacak: {gecerliPlan.needsReparseCount}</li>
-              <li>Yeniden indirme gereken: {gecerliPlan.needsRedownloadCount}</li>
-              <li>Karantinada olduğu için atlanan: {gecerliPlan.skippedQuarantinedCount}</li>
+              <li>Dayanağı zaten olan: {gecerliPlan.alreadyBoundCount}</li>
+              <li>Dayanağı bulunamayan: {gecerliPlan.noEvidenceCount}</li>
+              <li>Belgesi yeniden okunacak: {gecerliPlan.needsReparseCount}</li>
+              <li>Belge metni eksik: {gecerliPlan.needsRedownloadCount}</li>
+              <li>İncelemede olduğu için atlanan: {gecerliPlan.skippedQuarantinedCount}</li>
               <li>Kaynağı doğrulanmamış: {gecerliPlan.skippedUnverifiedSourceCount}</li>
-              <li>Hata alan: {gecerliPlan.failedCount}</li>
+              <li>İşlenemeyen: {gecerliPlan.failedCount}</li>
             </ul>
 
             {gecerliPlan.hasMore && (
               <InfoBox>
-                Bu tur ilk {gecerliPlan.totalExamined} kaydı kapsıyor. Uygulandıktan sonra aynı
-                ekrandan devam edebilirsiniz; işlem kaldığı yerden sürer.
+                Bu liste ilk {gecerliPlan.totalExamined} kaydı kapsıyor. Uyguladıktan sonra
+                aynı ekrandan devam edebilirsiniz; işlem kaldığı yerden sürer.
               </InfoBox>
             )}
 
@@ -157,10 +157,9 @@ export default function RuleEvidenceBackfillPage() {
                 <table data-tablo="kayitlar">
                   <thead>
                     <tr>
-                      <th>Fırsat</th>
+                      <th>Çağrı</th>
                       <th>Sonuç</th>
-                      <th>Kural</th>
-                      <th>Belge sürümü</th>
+                      <th>Koşul</th>
                       <th>Açıklama</th>
                     </tr>
                   </thead>
@@ -189,9 +188,6 @@ export default function RuleEvidenceBackfillPage() {
                         <td>
                           {i.rulesBound}/{i.ruleCount}
                         </td>
-                        <td>
-                          {i.documentVersionNumber === null ? '—' : `v${i.documentVersionNumber}`}
-                        </td>
                         <td className="small">{i.explanation}</td>
                       </tr>
                     ))}
@@ -202,7 +198,7 @@ export default function RuleEvidenceBackfillPage() {
 
             {digerleri.length > 0 && (
               <details data-alan="digerleri">
-                <summary>Değişmeyecek {digerleri.length} kayıt</summary>
+                <summary>Değişmeyecek {digerleri.length} çağrı</summary>
                 <ul>
                   {digerleri.map((i) => (
                     <li key={i.opportunityId}>
@@ -225,7 +221,7 @@ export default function RuleEvidenceBackfillPage() {
             onClick={() => planiTazele.mutate()}
             disabled={planiTazele.isPending}
           >
-            Planı yenile
+            Listeyi yenile
           </button>
         </div>
       </div>
@@ -235,9 +231,9 @@ export default function RuleEvidenceBackfillPage() {
           <h2>Onay</h2>
 
           <InfoBox>
-            Bu işlem <strong>{gecerliPlan!.evidenceLinksCreated}</strong> kanıt bağlantısı
-            kuracak. Kural, belge, sürüm ve kanıt parçaları değişmez; yalnızca aralarındaki
-            ilişki eklenir. Onaylamadan hiçbir şey uygulanmaz.
+            Bu işlem <strong>{gecerliPlan!.boundCount}</strong> çağrının koşullarını resmî
+            belgedeki bölümlerle eşleştirecek. Çağrılar ve belgeler değişmez; yalnızca
+            aralarındaki bağ kurulur. Siz onaylamadan hiçbir şey uygulanmaz.
           </InfoBox>
 
           <label className="checkbox">
@@ -247,7 +243,7 @@ export default function RuleEvidenceBackfillPage() {
               checked={onaylandi}
               onChange={(e) => setOnaylandi(e.target.checked)}
             />
-            Yukarıdaki listeyi inceledim ve uygulanmasını onaylıyorum.
+            Listeyi inceledim, uygulanmasını onaylıyorum.
           </label>
 
           <button
@@ -256,7 +252,7 @@ export default function RuleEvidenceBackfillPage() {
             onClick={() => uygula.mutate()}
             disabled={!onaylandi || uygula.isPending}
           >
-            {uygula.isPending ? 'Uygulanıyor…' : 'Kanıt bağlamayı uygula'}
+            {uygula.isPending ? 'Uygulanıyor…' : 'Eşleştirmeyi uygula'}
           </button>
         </div>
       )}
@@ -266,8 +262,8 @@ export default function RuleEvidenceBackfillPage() {
           <h2>Sonuç</h2>
 
           <p>
-            {sonuc.boundCount} kayıtta {sonuc.evidenceLinksCreated} bağlantı kuruldu.{' '}
-            {sonuc.noEvidenceCount} kayıtta kanıt bulunamadı ve dokunulmadı.
+            {sonuc.boundCount} çağrının koşulları belgedeki bölümlerle eşleştirildi.{' '}
+            {sonuc.noEvidenceCount} çağrıda dayanak bulunamadı ve o kayıtlara dokunulmadı.
           </p>
 
           {sonuc.runId && (
@@ -278,7 +274,7 @@ export default function RuleEvidenceBackfillPage() {
               onClick={() => geriAl.mutate(sonuc.runId!)}
               disabled={geriAl.isPending}
             >
-              {geriAl.isPending ? 'Geri alınıyor…' : 'Bu bağlamayı geri al'}
+              {geriAl.isPending ? 'Geri alınıyor…' : 'Bu işlemi geri al'}
             </button>
           )}
         </div>

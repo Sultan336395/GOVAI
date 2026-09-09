@@ -125,8 +125,8 @@ describe('Kanıt bağlama ekranı', () => {
 
     const tablo = document.querySelector('[data-tablo="kayitlar"]')!
 
-    expect(tablo.textContent).toContain('Kanıt bağlanacak')
-    expect(tablo.textContent).toContain('Kanıt bulunamadı — dokunulmayacak')
+    expect(tablo.textContent).toContain('Dayanağı bulundu')
+    expect(tablo.textContent).toContain('Dayanağı bulunamadı — dokunulmayacak')
   })
 
   it('KB-E2. Değişmeyecek kayıtlar ayrı bölümde durur', async () => {
@@ -136,21 +136,21 @@ describe('Kanıt bağlama ekranı', () => {
 
     const digerleri = document.querySelector('[data-alan="digerleri"]')!
     expect(digerleri.textContent).toContain('Yurt Dışı Pazar Desteği')
-    expect(digerleri.textContent).toContain('Zaten bağlı')
+    expect(digerleri.textContent).toContain('Dayanağı zaten var')
   })
 
-  it('KB-E3. Belge sürümü ve resmî kaynak ekranda görünür', async () => {
+  it('KB-E3. Resmî kaynak bağlantısı görünür, sürüm numarası görünmez', async () => {
     ekranaBas()
 
     await screen.findByText('KOBİ Dijital Dönüşüm Destek Programı')
 
     const tablo = document.querySelector('[data-tablo="kayitlar"]')!
 
-    // Kanıt zincirinin görünen halkası: hangi sürüme bağlanıyor.
-    expect(tablo.textContent).toContain('v2')
-
     const baglanti = tablo.querySelector('a[href*="kosgeb.gov.tr"]')
     expect(baglanti).toBeTruthy()
+
+    // Belge sürüm numarası sistemin iç muhasebesidir; kullanıcı için anlamı yok.
+    expect(tablo.textContent).not.toContain('v2')
   })
 
   it('KB-E4. Onay verilmeden Uygula düğmesi kapalıdır', async () => {

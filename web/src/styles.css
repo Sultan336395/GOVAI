@@ -914,3 +914,32 @@ tbody tr:hover {
     margin-bottom: 0.5rem;
   }
 }
+
+/* Resmî dayanak listesi.
+   Belgeden alınan bölümler tablo değil alıntı olarak gösterilir: tablo, sayfa ve
+   bölüm numaralarını veri gibi öne çıkarıyordu; okunması gereken şey metnin kendisi. */
+.dayanak-listesi {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.dayanak-listesi > li {
+  border-left: 3px solid var(--border);
+  padding-left: 0.75rem;
+}
+
+.dayanak-yer {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted, #64748b);
+  margin-bottom: 0.25rem;
+}
+
+.dayanak-listesi blockquote {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+}

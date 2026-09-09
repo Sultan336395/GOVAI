@@ -2,15 +2,8 @@ import { Link, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/api/client'
 import { ErrorBox, InfoBox, Loading } from '@/components/Common'
-import { documentOriginLabels, quarantineReasonLabels } from '@/lib/regulatoryLabels'
 import { formatDate } from '@/lib/format'
-
-const ayristirmaEtiketleri: Record<string, string> = {
-  Pending: 'Ayrıştırılmadı',
-  Parsed: 'Ayrıştırıldı',
-  Failed: 'Ayrıştırma başarısız',
-  NeedsOcr: 'Taranmış belge — metin katmanı yok',
-}
+import { belgeOkunabilirlik, incelemeNedeni, kayitKaynagi } from '@/lib/sozluk'
 
 /**
  * Belge incelemesi (Platform İnceleme).
@@ -48,63 +41,48 @@ export default function PlatformDocumentPage() {
     <section className="page" data-sayfa="platform-belge">
       <header className="page-header">
         <Link to="/quarantine" className="muted small" data-alan="geri">
-          ← Karantina İnceleme
+          ← İnceleme Bekleyenler
         </Link>
 
         <h1>{data.title}</h1>
 
         <p className="muted">
-          {data.sourceName} · {formatDate(data.collectedAt)} · {data.mediaType}
+          {data.sourceName} · {formatDate(data.collectedAt)}
         </p>
       </header>
 
       {karantinada && (
         <InfoBox>
-          <strong>Karantinada: {quarantineReasonLabels[data.reason]}</strong>
+          <strong>İncelemeye alındı: {incelemeNedeni[data.reason]}</strong>
           <div>
-            Katalogda görünmüyor ve skorlanmıyor. Kayıt <b>silinmedi</b>; belge, ham
-            içeriği ve sürümleri yerinde duruyor.
+            Bu kayıt katalogda görünmüyor ve firmalara önerilmiyor. <b>Silinmedi</b>;
+            belge ve geçmişi olduğu gibi duruyor, dilediğinizde geri alabilirsiniz.
           </div>
           {data.note ? <div className="small">Not: {data.note}</div> : null}
         </InfoBox>
       )}
 
       <div className="card" data-alan="kunye">
-        <h2>Künye</h2>
+        <h2>Belge bilgileri</h2>
 
         <dl className="kv">
-          <dt>Kaynak</dt>
-          <dd>
-            {data.sourceName}
-            {data.officialDomain ? <span className="muted"> ({data.officialDomain})</span> : null}
-          </dd>
+          <dt>Yayımlayan kurum</dt>
+          <dd>{data.sourceName}</dd>
 
-          <dt>Adres</dt>
+          <dt>Belgenin adresi</dt>
           <dd style={{ overflowWrap: 'anywhere' }}>
             <a href={data.url} target="_blank" rel="noreferrer">
               {data.url}
             </a>
           </dd>
 
-          {data.canonicalUrl && data.canonicalUrl !== data.url ? (
-            <>
-              <dt>Yönlendirilen adres</dt>
-              <dd style={{ overflowWrap: 'anywhere' }}>{data.canonicalUrl}</dd>
-            </>
-          ) : null}
+          <dt>Sisteme girişi</dt>
+          <dd>{kayitKaynagi[data.origin]}</dd>
 
-          <dt>Kayda giriş</dt>
-          <dd>{documentOriginLabels[data.origin]}</dd>
+          <dt>Alındığı tarih</dt>
+          <dd>{formatDate(data.collectedAt)}</dd>
 
-          <dt>İşlem durumu</dt>
-          <dd>
-            {data.status}
-            {data.processingError ? (
-              <div className="small">Hata: {data.processingError}</div>
-            ) : null}
-          </dd>
-
-          <dt>Türeyen kayıt</dt>
+          <dt>İlgili kayıt</dt>
           <dd>
             {data.opportunityId ? (
               <Link to={`/platform/opportunities/${data.opportunityId}`} data-alan="firsat">
@@ -114,7 +92,8 @@ export default function PlatformDocumentPage() {
               <Link to={`/regulatory-changes/${data.regulatoryChangeId}`}>Mevzuat kaydını aç</Link>
             ) : (
               <span className="muted">
-                Yok — belge karantinaya girerken kayıt henüz oluşmamıştı.
+                Bu belgeden bir çağrı kaydı oluşturulmamış. Belge, kataloğa girmeden önce
+                incelemeye alındığı için beklenen durum budur.
               </span>
             )}
           </dd>
@@ -122,36 +101,36 @@ export default function PlatformDocumentPage() {
       </div>
 
       <div className="card" data-alan="surumler">
-        <h2>Sürümler ({data.versions.length})</h2>
+        <h2>Belge geçmişi</h2>
+
+        <p className="muted">
+          Aynı adres birden çok kez alınmış olabilir; içerik her değiştiğinde önceki hâli
+          korunur. En üstteki, sistemin şu an kullandığı hâldir.
+        </p>
 
         {data.versions.length === 0 ? (
-          <p className="muted">Bu belgenin kayıtlı sürümü yok.</p>
+          <p className="muted">Bu belgenin kayıtlı bir alınışı yok.</p>
         ) : (
           <div className="table-scroll">
             <table>
               <thead>
                 <tr>
-                  <th>Sürüm</th>
-                  <th>Alındığı zaman</th>
-                  <th>HTTP</th>
-                  <th>Ayrıştırma</th>
-                  <th>Kanıt parçası</th>
-                  <th>Hash</th>
+                  <th>Alındığı tarih</th>
+                  <th>Durum</th>
+                  <th>Okunabilirlik</th>
                 </tr>
               </thead>
               <tbody>
-                {data.versions.map((v) => (
+                {data.versions.map((v, sira) => (
                   <tr key={v.versionId}>
-                    <td>v{v.versionNumber}</td>
-                    <td>{formatDate(v.retrievedAt)}</td>
-                    <td>{v.httpStatusCode}</td>
                     <td>
-                      {ayristirmaEtiketleri[v.parseStatus] ?? v.parseStatus}
-                      {v.parseError ? <div className="small">{v.parseError}</div> : null}
+                      {formatDate(v.retrievedAt)}
+                      {sira === 0 ? <span className="badge eligible"> güncel</span> : null}
                     </td>
-                    <td>{v.chunkCount}</td>
-                    <td className="small" style={{ overflowWrap: 'anywhere' }}>
-                      {v.rawContentHash.slice(0, 16)}…
+                    <td>{v.httpStatusCode === 200 ? 'Erişildi' : 'Erişilemedi'}</td>
+                    <td>
+                      {belgeOkunabilirlik[v.parseStatus]}
+                      {v.parseError ? <div className="small">{v.parseError}</div> : null}
                     </td>
                   </tr>
                 ))}
@@ -168,9 +147,8 @@ export default function PlatformDocumentPage() {
           <>
             {data.textTruncated && (
               <InfoBox>
-                Metin uzun olduğu için kırpıldı: {data.textPreview.length.toLocaleString('tr-TR')} /{' '}
-                {data.textLength.toLocaleString('tr-TR')} karakter gösteriliyor. Tamamı için resmî
-                kaynağa gidin.
+                Belge uzun olduğu için ilk bölümü gösteriliyor. Tamamını okumak için
+                yukarıdaki resmî adrese gidin.
               </InfoBox>
             )}
 
@@ -180,8 +158,8 @@ export default function PlatformDocumentPage() {
           </>
         ) : (
           <p className="muted">
-            Bu belgenin çıkarılmış metni yok. Taranmış bir PDF olabilir ya da ayrıştırma
-            başarısız olmuştur; sürüm tablosundaki ayrıştırma durumuna bakın.
+            Bu belgenin metni okunamadı. Taranmış bir görüntü olabilir ya da kaynağa
+            erişilememiş olabilir; yukarıdaki belge geçmişinde sebebi yazıyor.
           </p>
         )}
       </div>

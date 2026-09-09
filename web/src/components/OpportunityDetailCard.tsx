@@ -15,6 +15,7 @@ import {
   formatPercent,
   sourceTypeLabels,
 } from '@/lib/format'
+import { bolumBasliklari } from '@/lib/sozluk'
 
 /**
  * Fırsat detayı (Faz 2).
@@ -41,7 +42,7 @@ export function OpportunityDetailCard({ data }: { data: OpportunityDetail }) {
       ) : null}
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <h2>Fırsat künyesi</h2>
+        <h2>{bolumBasliklari.kunye}</h2>
 
         <div className="grid two">
           <Alan ad="Fırsat türü" deger={categoryLabels[data.supportCategory]} />
@@ -99,7 +100,7 @@ export function OpportunityDetailCard({ data }: { data: OpportunityDetail }) {
       <ButceKalemleri data={data} />
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <h2>Başvuru koşulları ve uygunluk kriterleri</h2>
+        <h2>{bolumBasliklari.basvuruKosullari}</h2>
         {data.rules.length === 0 ? (
           <EmptyState>
             Resmî kaynaktan çıkarılmış bir koşul yok. Koşullar uydurulmaz; danışman elle
@@ -135,7 +136,7 @@ export function OpportunityDetailCard({ data }: { data: OpportunityDetail }) {
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <h2>Gerekli belgeler</h2>
+        <h2>{bolumBasliklari.istenenBelgeler}</h2>
         {data.documentChecklist.length === 0 ? (
           <EmptyState>Resmî kaynakta belge listesi belirtilmemiş.</EmptyState>
         ) : (
@@ -163,9 +164,9 @@ function KanitBolumu({ kanit }: { kanit: OpportunityProvenance | null }) {
   if (!kanit) {
     return (
       <div className="card" style={{ marginBottom: 16 }}>
-        <h2>Kaynak ve kanıt</h2>
+        <h2>{bolumBasliklari.resmiDayanak}</h2>
         <EmptyState>
-          Bu kayıt bir resmî belgeye bağlı değil; kanıt zinciri gösterilemiyor.
+          Bu kayıt bir resmî belgeye bağlı değil; dayanağı gösterilemiyor.
         </EmptyState>
       </div>
     )
@@ -173,80 +174,56 @@ function KanitBolumu({ kanit }: { kanit: OpportunityProvenance | null }) {
 
   return (
     <div className="card" style={{ marginBottom: 16 }}>
-      <h2>Kaynak ve kanıt</h2>
+      <h2>{bolumBasliklari.resmiDayanak}</h2>
+
+      <p className="muted">
+        Bu sayfadaki bilgiler aşağıdaki resmî belgeden alınmıştır. Her koşulun belgede
+        nerede geçtiği ayrıca gösterilir.
+      </p>
 
       <div className="grid two">
-        <Alan ad="Resmî kaynak" deger={kanit.sourceName} />
+        <Alan ad="Yayımlayan kurum" deger={kanit.sourceName} />
         <Alan
-          ad="Kaynak doğrulama durumu"
+          ad="Kaynak doğrulaması"
           deger={
             kanit.sourceVerified
-              ? `Doğrulandı (${formatDate(kanit.sourceVerifiedAt)}) · ${kanit.sourceHealth}`
-              : `Doğrulanmadı · ${kanit.sourceHealth}`
+              ? `Doğrulandı · ${formatDate(kanit.sourceVerifiedAt)}`
+              : 'Henüz doğrulanmadı'
           }
         />
-        <Alan ad="Resmî alan adı" deger={kanit.officialDomain} />
-        <Alan ad="Belge sürümü" deger={kanit.documentVersion != null ? `v${kanit.documentVersion}` : null} />
-        <Alan ad="Belge alınma zamanı" deger={kanit.retrievedAt ? formatDate(kanit.retrievedAt) : null} />
-        <Alan ad="Karakter kümesi" deger={kanit.charset} />
-        <Alan ad="Sayfa sayısı" deger={kanit.pageCount} />
-        <Alan ad="Ayrıştırma durumu" deger={kanit.parseStatus} />
+        <Alan
+          ad="Belgenin alındığı tarih"
+          deger={kanit.retrievedAt ? formatDate(kanit.retrievedAt) : null}
+        />
+        <Alan ad="Belge uzunluğu" deger={kanit.pageCount ? `${kanit.pageCount} sayfa` : null} />
       </div>
-
-      {kanit.contentHash ? (
-        <div className="muted" style={{ fontSize: 12, marginTop: 10, overflowWrap: 'anywhere' }}>
-          İçerik hash'i (SHA-256): <code>{kanit.contentHash}</code>
-        </div>
-      ) : null}
 
       {kanit.requiresOcr ? (
         <InfoBox>
-          Bu belgenin metin katmanı yetersiz; içeriği OCR olmadan güvenle okunamıyor.
-          {kanit.parseError ? ` ${kanit.parseError}` : ''} Aşağıdaki kanıt parçaları belgenin
-          tamamını temsil etmeyebilir.
+          Bu belge taranmış görüntü olduğu için metni tam olarak çıkarılamadı. Aşağıdaki
+          bölümler belgenin tamamını temsil etmeyebilir; kararınızı vermeden önce resmî
+          kaynaktaki asıl belgeyi okuyun.
         </InfoBox>
       ) : null}
 
-      <h3 style={{ marginTop: 20, marginBottom: 6 }}>Kanıt bölümleri</h3>
+      <h3 style={{ marginTop: 20, marginBottom: 6 }}>Belgeden alınan bölümler</h3>
       {kanit.evidence.length === 0 ? (
         <EmptyState>
-          Bu kayıt için kanıt parçası üretilmemiş. Kanıtsız bilgi resmî sayılmaz.
+          Bu kayıt için belgeden alınmış bir bölüm yok. Dayanağı gösterilemeyen bilgi
+          resmî sayılmaz.
         </EmptyState>
       ) : (
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Sayfa</th>
-                <th>Bölüm</th>
-                <th>Metin aralığı</th>
-                <th>Metin</th>
-              </tr>
-            </thead>
-            <tbody>
-              {kanit.evidence.map((parca) => (
-                <tr key={parca.sequenceNumber}>
-                  <td>{parca.sequenceNumber}</td>
-                  <td>{parca.pageNumber ?? '—'}</td>
-                  <td>{parca.sectionTitle ?? '—'}</td>
-                  <td className="muted" style={{ whiteSpace: 'nowrap' }}>
-                    {parca.startOffset}–{parca.endOffset}
-                  </td>
-                  <td>
-                    {parca.text}
-                    <div
-                      className="muted"
-                      style={{ fontSize: 11, marginTop: 4, overflowWrap: 'anywhere' }}
-                    >
-                      hash: <code>{parca.textHash}</code>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <ul className="dayanak-listesi" data-alan="belge-bolumleri">
+          {kanit.evidence.map((parca) => (
+            <li key={parca.sequenceNumber}>
+              <div className="dayanak-yer">
+                {parca.sectionTitle ?? 'Belge metni'}
+                {parca.pageNumber ? ` · ${parca.pageNumber}. sayfa` : ''}
+              </div>
+              <blockquote>{parca.text}</blockquote>
+            </li>
+          ))}
+        </ul>
       )}
 
       <ResmiKaynakDugmesi kanit={kanit} />
@@ -305,8 +282,8 @@ function KuralKanitlari({ kural }: { kural: OpportunityRule }) {
   if (kural.evidence.length === 0) {
     return (
       <div style={{ marginTop: 4 }} data-kanit-yok={kural.id}>
-        Resmî belgede kanıt parçası bağlanamadı; bu koşul için yapay zekâ açıklaması
-        üretilmez.
+        Bu koşulun resmî belgede nerede geçtiği belirlenemedi. Koşul değerlendirmede
+        kullanılmaya devam eder; yalnızca belgeye dayanan bir açıklama üretilmez.
       </div>
     )
   }
@@ -315,16 +292,13 @@ function KuralKanitlari({ kural }: { kural: OpportunityRule }) {
     <ul style={{ margin: '4px 0 0', paddingLeft: 16 }} data-kanit-listesi={kural.id}>
       {kural.evidence.map((kanit) => (
         <li key={kanit.evidenceChunkId}>
-          {kanit.roleLabel}
-          {kanit.sectionTitle ? ` · ${kanit.sectionTitle}` : ''}
-          {kanit.pageNumber != null ? ` · s.${kanit.pageNumber}` : ''}
-          {` · karakter ${kanit.startOffset}–${kanit.endOffset}`}
-          {kanit.documentVersionNumber != null ? ` · belge v${kanit.documentVersionNumber}` : ''}
+          {kanit.sectionTitle ?? 'Belge metni'}
+          {kanit.pageNumber != null ? ` · ${kanit.pageNumber}. sayfa` : ''}
           {kanit.officialUrl ? (
             <>
               {' · '}
               <a href={kanit.officialUrl} target="_blank" rel="noreferrer noopener">
-                resmî kaynak
+                belgeyi aç
               </a>
             </>
           ) : null}
@@ -353,7 +327,7 @@ function ButceKalemleri({ data }: { data: OpportunityDetail }) {
 
   return (
     <div className="card" style={{ marginBottom: 16 }}>
-      <h2>Belgeden çıkarılan bütçe kalemleri</h2>
+      <h2>{bolumBasliklari.destekTutari}</h2>
 
       <div className="grid two">
         {data.budgetItems.map((kalem) => (
@@ -362,8 +336,6 @@ function ButceKalemleri({ data }: { data: OpportunityDetail }) {
             ad={kalem.label}
             deger={formatAmount(kalem.amount, kalem.currency)}
             alinti={kalem.excerpt}
-            baslangic={kalem.startOffset}
-            bitis={kalem.endOffset}
             incelenmeli={kalem.needsReview}
           />
         ))}
@@ -373,8 +345,6 @@ function ButceKalemleri({ data }: { data: OpportunityDetail }) {
             ad={oran.label}
             deger={formatPercent(oran.rate)}
             alinti={oran.excerpt}
-            baslangic={oran.startOffset}
-            bitis={oran.endOffset}
             incelenmeli={false}
           />
         ))}
@@ -388,15 +358,11 @@ function ButceSatiri({
   ad,
   deger,
   alinti,
-  baslangic,
-  bitis,
   incelenmeli,
 }: {
   ad: string
   deger: string
   alinti: string | null
-  baslangic: number
-  bitis: number
   incelenmeli: boolean
 }) {
   return (
@@ -415,7 +381,7 @@ function ButceSatiri({
 
       {alinti ? (
         <blockquote className="muted" style={{ fontSize: 12, margin: '4px 0 0', padding: 0 }}>
-          “{alinti}” <span>(belge karakter aralığı {baslangic}–{bitis})</span>
+          “{alinti}”
         </blockquote>
       ) : (
         <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>

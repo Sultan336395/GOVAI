@@ -986,7 +986,7 @@ export interface AnalysisConfidence {
   ruleSetVersion: string
   /**
    * Göstergenin başlığı: yapay zekâ çalışmadıysa "Kural tabanlı güven".
-   * "Hibrit güven" yazmak, model hiç çalışmamışken onun da doğruladığı izlenimi verir.
+   * "Yapay zekâ destekli güven" yazmak, model hiç çalışmamışken onun da doğruladığı izlenimi verir.
    */
   title: string
 }
@@ -1006,7 +1006,7 @@ export interface AnalysisContribution {
   rejectedClaimCount: number
   conflicts: RuleAiConflict[]
   warning: string | null
-  /** "Kural tabanlı analiz" veya "Hibrit analiz". */
+  /** "Kural tabanlı analiz" veya "Yapay zekâ destekli analiz". */
   modeLabel: string
   /** Model çalışmadıysa "Kullanılamıyor"; sıfır gösterilmez. */
   aiConfidenceLabel: string

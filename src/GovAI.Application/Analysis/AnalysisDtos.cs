@@ -63,7 +63,7 @@ public sealed record ConfidenceFactorDto(
 ///
 /// <para>
 /// <c>Title</c> bilinçli olarak ayrı bir alan: yapay zekâ kapalıyken bu sayı
-/// <b>kural tabanlı güvendir</b>, hibrit güven değildir. "Hibrit güven: Yüksek"
+/// <b>kural tabanlı güvendir</b>, yapay zekâ destekli güven değildir. "Yapay zekâ destekli güven: Yüksek"
 /// yazmak, model hiç çalışmamışken kullanıcıya modelin de doğruladığı izlenimi verir —
 /// ürünün verebileceği en yanıltıcı mesaj budur.
 /// </para>
@@ -98,7 +98,7 @@ public sealed record AnalysisContributionDto(
     IReadOnlyList<RuleAiConflictDto> Conflicts,
     // Model yoksa veya güven düşükse ekranda gösterilecek uyarı.
     string? Warning,
-    // Analizin türü: "Kural tabanlı analiz" veya "Hibrit analiz".
+    // Analizin türü: "Kural tabanlı analiz" veya "Yapay zekâ destekli analiz".
     string ModeLabel,
     // Yapay zekâ güveni. Model çalışmadıysa "Kullanılamıyor" yazar; sayı gösterilmez.
     string AiConfidenceLabel);
@@ -215,13 +215,13 @@ public static class AnalysisLabels
     public const string RulesOnlyModeLabel = "Kural tabanlı analiz";
 
     /// <summary>Model çalıştığında analiz türünün adı.</summary>
-    public const string HybridModeLabel = "Hibrit analiz";
+    public const string HybridModeLabel = "Yapay zekâ destekli analiz";
 
     /// <summary>Model çalışmadığında güven göstergesinin başlığı.</summary>
     public const string RulesOnlyConfidenceTitle = "Kural tabanlı güven";
 
     /// <summary>Model çalıştığında güven göstergesinin başlığı.</summary>
-    public const string HybridConfidenceTitle = "Hibrit güven";
+    public const string HybridConfidenceTitle = "Yapay zekâ destekli güven";
 
     /// <summary>
     /// Model çalışmadığında yapay zekâ güveninin karşılığı.

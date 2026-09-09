@@ -284,16 +284,21 @@ describe('Fırsat detay ekranı', () => {
     expect(screen.getByText(/son başvuru tarihi geçti/i)).toBeTruthy()
   })
 
-  it('W8. Kanıt parçası sayfa, bölüm, aralık ve hash ile birlikte gösterilir', () => {
+  it('W8. Belgeden alınan bölüm, yeri ve metniyle gösterilir', () => {
     render(<OpportunityDetailCard data={FIRSAT} />)
 
-    expect(screen.getByText('İhale konusu')).toBeTruthy()
-    expect(screen.getByText('0–78')).toBeTruthy()
-    expect(screen.getByText(/Belge sürümü/)).toBeTruthy()
+    const bolumler = document.querySelector('[data-alan="belge-bolumleri"]')!
 
-    // Hash metni <code> içinde ayrı bir düğümde durur.
-    const hashler = screen.getAllByText('c'.repeat(64))
-    expect(hashler.length).toBeGreaterThan(0)
+    // Okunması gereken şey metnin kendisi ve belgede nerede geçtiği.
+    expect(bolumler.textContent).toContain('İhale konusu')
+
+    // Karakter aralığı ve sürüm numarası sistemin iç muhasebesidir.
+    expect(bolumler.textContent).not.toContain('0–78')
+    expect(document.body.textContent).not.toContain('Belge sürümü')
+
+    // Hash hiçbir yerde gösterilmez; kaydedilmeye devam eder ama kullanıcı için
+    // anlamı yoktur ve ekranı okunmaz hâle getiriyordu.
+    expect(document.body.textContent).not.toContain('c'.repeat(64))
   })
 
   it('W9. Kanıtı olmayan kayıt bunu açıkça söyler', () => {
@@ -304,10 +309,10 @@ describe('Fırsat detay ekranı', () => {
 
     render(<OpportunityDetailCard data={kanitsiz} />)
 
-    expect(screen.getByText(/Kanıtsız bilgi resmî sayılmaz/)).toBeTruthy()
+    expect(screen.getByText(/Dayanağı gösterilemeyen bilgi resmî sayılmaz/)).toBeTruthy()
   })
 
-  it('W10. OCR gereken belge tam içerikli gibi gösterilmez', () => {
+  it('W10. Taranmış belge tam içerikli gibi gösterilmez', () => {
     const ocr: OpportunityDetail = {
       ...FIRSAT,
       provenance: {
@@ -321,19 +326,24 @@ describe('Fırsat detay ekranı', () => {
 
     render(<OpportunityDetailCard data={ocr} />)
 
-    expect(screen.getByText(/metin katmanı yetersiz/)).toBeTruthy()
-    expect(document.body.textContent).toContain('168 karakter')
+    expect(screen.getByText(/taranmış görüntü olduğu için/)).toBeTruthy()
+
+    // "168 karakter" gibi teknik ölçüler yerine ne yapması gerektiği söylenir.
+    expect(document.body.textContent).toContain('resmî kaynaktaki asıl belgeyi okuyun')
   })
 
-  it('W11. Kaynak doğrulama durumu ve belge sürümü ekranda yer alır', () => {
+  it('W11. Kaynak ve doğrulama durumu görünür; teknik künye görünmez', () => {
     render(<OpportunityDetailCard data={FIRSAT} />)
 
     const govde = document.body.textContent ?? ''
 
     expect(govde).toContain('Resmî Gazete İhale İlanları')
     expect(govde).toContain('Doğrulandı')
-    expect(govde).toContain('v1')
-    expect(govde).toContain('a'.repeat(64))
+
+    // Sürüm numarası, hash ve karakter kümesi kullanıcıya bir şey anlatmaz.
+    expect(govde).not.toContain('v1')
+    expect(govde).not.toContain('a'.repeat(64))
+    expect(govde).not.toContain('Karakter kümesi')
   })
 
   it('W12. Kaynak belgesi olmayan kayıt kanıt bölümünü uydurmaz', () => {
@@ -341,7 +351,7 @@ describe('Fırsat detay ekranı', () => {
 
     render(<OpportunityDetailCard data={elle} />)
 
-    expect(screen.getByText(/kanıt zinciri gösterilemiyor/)).toBeTruthy()
+    expect(screen.getByText(/dayanağı gösterilemiyor/)).toBeTruthy()
     expect(screen.queryByRole('link', { name: /Resmî kaynağa git/ })).toBeNull()
   })
 
@@ -441,8 +451,9 @@ describe('Fırsat detay ekranı', () => {
     expect(kredi).not.toContain('geri ödemesiz')
 
     // Kanıt belgedeki yerine bağlıdır; danışman tutarı belgede bulabilir.
-    expect(hibe).toContain('120–168')
-    expect(kredi).toContain('169–214')
+    // Karakter aralığı gösterilmez; ayrımı sağlayan şey alıntının kendisidir.
+    expect(hibe).not.toContain('120–168')
+    expect(kredi).not.toContain('169–214')
   })
 
   it('W18b. Alıntısı olmayan kalem kanıt uydurmaz', () => {
@@ -488,14 +499,16 @@ describe('Fırsat detay ekranı', () => {
 
     const liste = document.querySelector('[data-kanit-listesi]')!
 
-    // Zincirin görünen halkaları: rol, bölüm, sayfa, aralık, belge sürümü, resmî adres.
-    expect(liste.textContent).toContain('Değerin geçtiği bölüm')
+    // Kullanıcı için anlamlı halkalar: belgenin hangi bölümü, kaçıncı sayfası ve
+    // belgenin kendisine giden bağlantı.
     expect(liste.textContent).toContain('Başvuru Şartları')
-    expect(liste.textContent).toContain('s.2')
-    expect(liste.textContent).toContain('60–152')
-    expect(liste.textContent).toContain('belge v3')
+    expect(liste.textContent).toContain('2. sayfa')
 
-    const baglanti = within(liste as HTMLElement).getByRole('link', { name: 'resmî kaynak' })
+    // Karakter aralığı ve belge sürüm numarası sistemin iç muhasebesidir.
+    expect(liste.textContent).not.toContain('60–152')
+    expect(liste.textContent).not.toContain('belge v3')
+
+    const baglanti = within(liste as HTMLElement).getByRole('link', { name: 'belgeyi aç' })
     expect(baglanti.getAttribute('href')).toBe('https://www.resmigazete.gov.tr/ilan/1')
   })
 
@@ -545,8 +558,8 @@ describe('Fırsat detay ekranı', () => {
     const maddeler = document.querySelectorAll('[data-kanit-listesi] li')
 
     expect(maddeler.length).toBe(2)
-    expect(maddeler[0].textContent).toContain('Değerin geçtiği bölüm')
-    expect(maddeler[1].textContent).toContain('Koşulun geçtiği bölüm')
+    expect(maddeler[0].textContent).toContain('Koşullar')
+    expect(maddeler[1].textContent).toContain('Ek Açıklama')
   })
 
   it('W22. Kanıtsız kural gizlenmez; yapay zekânın konuşamayacağı söylenir', () => {
@@ -556,7 +569,10 @@ describe('Fırsat detay ekranı', () => {
     expect(screen.getAllByText('İhale yeri Mersin ilidir.').length).toBeGreaterThan(0)
 
     const uyari = document.querySelector('[data-kanit-yok]')!
-    expect(uyari.textContent).toContain('yapay zekâ açıklaması üretilmez')
+
+    // Koşul kaybolmaz: değerlendirmede kullanılmaya devam eder.
+    expect(uyari.textContent).toContain('değerlendirmede')
+    expect(uyari.textContent).toContain('belgeye dayanan bir açıklama üretilmez')
   })
 
   it('W19. Eski tek bütçe alanlı kayıtlar ekranı bozmaz', () => {

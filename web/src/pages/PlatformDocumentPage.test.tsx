@@ -99,7 +99,7 @@ describe('Belge incelemesi', () => {
 
     await screen.findByText('TAŞINMAZLAR SATILACAKTIR')
 
-    expect(document.body.textContent).toContain('henüz oluşmamıştı')
+    expect(document.body.textContent).toContain('çağrı kaydı oluşturulmamış')
     expect(document.querySelector('[data-alan="firsat"]')).toBeNull()
   })
 
@@ -110,23 +110,27 @@ describe('Belge incelemesi', () => {
 
     const govde = document.body.textContent ?? ''
 
-    expect(govde).toContain('Karantinada')
+    expect(govde).toContain('İncelemeye alındı')
     expect(govde).toContain('İlan sayfası; çağrı değildir.')
-    // Karantina silme değildir; ekran bunu söylemeli.
-    expect(govde).toContain('silinmedi')
+    // İncelemeye almak silmek değildir; ekran bunu söylemeli.
+    expect(govde).toContain('Silinmedi')
   })
 
-  it('BD4. Sürüm tablosu ayrıştırma durumunu ve hash başlangıcını gösterir', async () => {
+  it('BD4. Belge geçmişi okunabilirliği iş dilinde gösterir', async () => {
     ekranaBas()
 
     await screen.findByText('TAŞINMAZLAR SATILACAKTIR')
 
     const surumler = document.querySelector('[data-alan="surumler"]')!
 
-    expect(surumler.textContent).toContain('v1')
-    expect(surumler.textContent).toContain('Ayrıştırıldı')
-    expect(surumler.textContent).toContain('200')
-    expect(surumler.textContent).toContain('aaaaaaaaaaaaaaaa')
+    expect(surumler.textContent).toContain('Metni okundu')
+    expect(surumler.textContent).toContain('Erişildi')
+    expect(surumler.textContent).toContain('güncel')
+
+    // Sürüm numarası, HTTP kodu ve hash sistemin iç muhasebesidir; ekranda işi yok.
+    expect(surumler.textContent).not.toContain('v1')
+    expect(surumler.textContent).not.toContain('200')
+    expect(surumler.textContent).not.toContain('aaaaaaaa')
   })
 
   it('BD5. Metin kırpıldıysa bu açıkça söylenir', async () => {
@@ -140,8 +144,10 @@ describe('Belge incelemesi', () => {
     await screen.findByText('TAŞINMAZLAR SATILACAKTIR')
 
     // Sessizce eksik metin göstermek, içerik hakkında yanlış karar verdirir.
-    expect(document.body.textContent).toContain('kırpıldı')
-    expect(document.body.textContent).toContain('145.320')
+    expect(document.body.textContent).toContain('ilk bölümü gösteriliyor')
+
+    // Karakter sayısı kullanıcıya bir şey anlatmaz; kırpıldığını bilmesi yeter.
+    expect(document.body.textContent).not.toContain('145.320')
   })
 
   it('BD6. Metin yoksa sebebi anlatılır', async () => {
@@ -149,7 +155,7 @@ describe('Belge incelemesi', () => {
 
     await screen.findByText('TAŞINMAZLAR SATILACAKTIR')
 
-    expect(document.body.textContent).toContain('Taranmış bir PDF olabilir')
+    expect(document.body.textContent).toContain('Taranmış bir görüntü olabilir')
     expect(document.querySelector('[data-alan="metin-govdesi"]')).toBeNull()
   })
 

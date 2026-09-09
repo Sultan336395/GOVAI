@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/api/client'
 import type { TriageReport } from '@/api/types'
 import { EmptyState, ErrorBox, InfoBox, Loading, SuccessBox } from '@/components/Common'
-import { documentOriginLabels, quarantineReasonLabels } from '@/lib/regulatoryLabels'
+import { incelemeNedeni, kayitKaynagi } from '@/lib/sozluk'
 import { formatDate } from '@/lib/format'
 
 /**
@@ -63,7 +63,7 @@ export default function QuarantinePage() {
   const approve = useMutation({
     mutationFn: (documentId: string) => api.approveQuarantined(documentId),
     onSuccess: async () => {
-      setNotice('Kayıt karantinadan çıkarıldı ve yeniden ayrıştırmaya alındı.')
+      setNotice('Kayıt kataloğa geri alındı ve yeniden okunmak üzere sıraya girdi.')
       await queryClient.invalidateQueries({ queryKey: ['quarantine'] })
     },
   })
@@ -168,7 +168,7 @@ export default function QuarantinePage() {
                   <tr key={row.documentId}>
                     <td>{row.title}</td>
                     <td>{row.sourceName}</td>
-                    <td>{quarantineReasonLabels[row.proposedReason]}</td>
+                    <td>{incelemeNedeni[row.proposedReason]}</td>
                     <td className="muted">{row.evidence}</td>
                     <td>{row.missingField ?? '—'}</td>
                     <td>{row.isScored ? `Evet (${row.linkedAssessmentCount})` : 'Hayır'}</td>
@@ -182,24 +182,23 @@ export default function QuarantinePage() {
       ) : null}
 
       <InfoBox>
-        Karantinadan çıkarılan kayıt yeniden ayrıştırılır. Kaynağın URL kalıbı
-        daraltılmadıkça aynı sayfa tekrar toplanabilir.
+        Kataloğa geri alınan kayıt yeniden okunur ve firmalara önerilmeye başlar. Kaynağın
+        tarama ayarları daraltılmazsa aynı sayfa ileride yeniden toplanabilir.
       </InfoBox>
 
       {data.length === 0 ? (
-        <EmptyState>Karantinada kayıt yok.</EmptyState>
+        <EmptyState>İnceleme bekleyen kayıt yok.</EmptyState>
       ) : (
         <div className="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>Başlık</th>
-                <th>Kaynak</th>
+                <th>Kayıt</th>
+                <th>Yayımlayan kurum</th>
                 <th>Neden</th>
-                <th>Not</th>
-                <th>Sürüm</th>
-                <th>Köken</th>
-                <th>Toplanma</th>
+                <th>Açıklama</th>
+                <th>Sisteme girişi</th>
+                <th>Alındığı tarih</th>
                 <th />
               </tr>
             </thead>
@@ -208,18 +207,17 @@ export default function QuarantinePage() {
                 <tr key={item.documentId}>
                   <td>
                     {/* Başlık HER ZAMAN belge incelemesine götürür.
-                        İlk sürümde fırsat detayına bağlanıyordu ve hiç görünmüyordu:
-                        karantina belge sisteme GİRERKEN uygulanıyor, yani fırsat kaydı
-                        henüz oluşmamış oluyor. Üretimdeki karantina kayıtlarının
-                        hiçbirinde fırsat yoktu. İnceleyicinin ihtiyacı zaten belgenin
-                        kendisi — metni, sürümleri ve ayrıştırma durumu. */}
+                        İlk sürümde çağrı kaydına bağlanıyordu ve hiç görünmüyordu: kayıt
+                        sisteme GİRERKEN incelemeye alınıyor, yani çağrı kaydı henüz
+                        oluşmamış oluyor. Üretimdeki kayıtların hiçbirinde çağrı yoktu.
+                        İnceleyicinin ihtiyacı zaten belgenin kendisi. */}
                     <Link to={`/platform/documents/${item.documentId}`} data-alan="detay">
                       <strong>{item.title}</strong>
                     </Link>
                     {item.titleRepaired ? (
                       <div className="muted" style={{ fontSize: 12 }}>
-                        Başlık bozuk karakter kümesiyle kaydedilmişti; burada onarılmış
-                        hâli gösteriliyor. Ham belge değiştirilmedi.
+                        Başlık kaynakta bozuk kaydedilmişti; burada okunabilir hâli
+                        gösteriliyor. Belgenin kendisi değiştirilmedi.
                       </div>
                     ) : null}
                     <div className="muted" style={{ fontSize: 12, overflowWrap: 'anywhere' }}>
@@ -227,12 +225,11 @@ export default function QuarantinePage() {
                     </div>
                   </td>
                   <td>{item.sourceName}</td>
-                  <td>{quarantineReasonLabels[item.reason]}</td>
+                  <td>{incelemeNedeni[item.reason]}</td>
                   <td className="muted">{item.note ?? '—'}</td>
-                  <td>{item.versionCount}</td>
                   <td>
                     <span className={item.origin === 'ManualImport' ? 'badge indeterminate' : 'muted'}>
-                      {documentOriginLabels[item.origin]}
+                      {kayitKaynagi[item.origin]}
                     </span>
                   </td>
                   <td>{formatDate(item.collectedAt)}</td>

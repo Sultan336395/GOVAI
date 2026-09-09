@@ -4,11 +4,8 @@ import { api } from '@/api/client'
 import { RegulationImpactPanel } from '@/components/AnalysisPanel'
 import { ErrorBox, InfoBox, Loading } from '@/components/Common'
 import { useCompanies } from '@/app/contexts'
-import {
-  changeTypeLabels,
-  parseStatusLabels,
-  regulationDomainLabels,
-} from '@/lib/regulatoryLabels'
+import { changeTypeLabels, regulationDomainLabels } from '@/lib/regulatoryLabels'
+import { belgeOkunabilirlik } from '@/lib/sozluk'
 import { formatDate, NOT_PROVIDED_LABEL } from '@/lib/format'
 
 /**
@@ -101,14 +98,13 @@ export default function RegulatoryChangeDetailPage() {
       <div className="card" style={{ marginBottom: 16 }}>
         <h2 style={{ marginTop: 0 }}>Belge bilgileri</h2>
         <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
-          {alan('Belge sürümü', `v${data.documentVersion}`)}
+
           {alan('Alınma zamanı', formatDate(data.retrievedAt))}
           {alan('HTTP durumu', String(data.httpStatusCode))}
           {alan('Medya türü', data.mediaType)}
           {alan('Karakter kümesi', data.charset)}
           {alan('Sayfa sayısı', data.pageCount ? String(data.pageCount) : null)}
-          {alan('Ayrıştırma', parseStatusLabels[data.parseStatus])}
-          {alan('OCR gerekli mi', data.requiresOcr ? 'Evet' : 'Hayır')}
+          {alan('Belge okunabilirliği', belgeOkunabilirlik[data.parseStatus])}
         </div>
 
         <div style={{ marginTop: 12 }}>
@@ -121,7 +117,7 @@ export default function RegulatoryChangeDetailPage() {
         {data.previousVersionId ? (
           <div style={{ marginTop: 12 }}>
             <Link to={`/regulatory-changes/${data.previousVersionId}`}>
-              Önceki sürümü görüntüle
+              Belgenin önceki hâlini görüntüle
             </Link>
           </div>
         ) : null}
@@ -130,12 +126,11 @@ export default function RegulatoryChangeDetailPage() {
       <div className="card">
         <h2 style={{ marginTop: 0 }}>Kanıt bölümleri</h2>
         <p className="muted" style={{ marginTop: 0 }}>
-          Belgeden kesilmiş, konumu korunmuş parçalar. Her parça belge sürümüne ve
-          oradaki karakter aralığına geri bağlanır.
+          Bu kaydın dayandığı bölümler, resmî belgede geçtiği hâliyle.
         </p>
 
         {data.evidence.length === 0 ? (
-          <div className="state">Bu sürüm için kanıt parçası üretilmemiş.</div>
+          <div className="state">Bu belge için gösterilebilir bir bölüm yok.</div>
         ) : (
           <div className="rule-list">
             {data.evidence.map((chunk) => (
