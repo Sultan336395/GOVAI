@@ -114,7 +114,7 @@ export function OpportunityDetailCard({ data }: { data: OpportunityDetail }) {
                   <th>Koşul</th>
                   <th>Boyut</th>
                   <th>Ağırlık</th>
-                  <th>Kaynak metin</th>
+                  <th>Kaynak Metin</th>
                 </tr>
               </thead>
               <tbody>

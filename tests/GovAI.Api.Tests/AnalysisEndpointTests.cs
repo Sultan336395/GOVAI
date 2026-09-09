@@ -70,7 +70,7 @@ public sealed class AnalysisEndpointTests(GovAiApiFactory factory)
 
         var ham = await response.Content.ReadAsStringAsync();
 
-        Assert.Contains("Uygunluk puanı", ham);
+        Assert.Contains("Uygunluk Puanı", ham);
         Assert.DoesNotContain("kazanma ihtimali", ham, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("kazanma olasılığı", ham, StringComparison.OrdinalIgnoreCase);
     }

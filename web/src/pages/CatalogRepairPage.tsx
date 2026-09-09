@@ -122,7 +122,7 @@ export default function CatalogRepairPage() {
       {geriAl.error && <ErrorBox error={geriAl.error} />}
 
       <div className="card" data-alan="plan-ozeti">
-        <h2>Yapılacak işlemler</h2>
+        <h2>Yapılacak İşlemler</h2>
 
         {gecerliPlan === null || gecerliPlan.matches.length === 0 ? (
           <EmptyState>Onarılacak kayıt bulunamadı. Katalog temiz.</EmptyState>
@@ -140,9 +140,9 @@ export default function CatalogRepairPage() {
                     <tr>
                       <th>Kayıt</th>
                       <th>Türü</th>
-                      <th>Yapılacak işlem</th>
+                      <th>Yapılacak İşlem</th>
                       <th>Neden</th>
-                      <th>Etkilenen değerlendirme</th>
+                      <th>Etkilenen Değerlendirme</th>
                     </tr>
                   </thead>
                   <tbody>

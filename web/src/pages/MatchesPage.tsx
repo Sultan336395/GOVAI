@@ -42,7 +42,7 @@ export default function MatchesPage() {
     <>
       <div className="page-header">
         <div>
-          <h1>Fırsat eşleşmeleri</h1>
+          <h1>Fırsat Eşleşmeleri</h1>
           <p>
             Firma profiliniz ile eşleşen çağrılar <strong>önce sektör uyumuna</strong>, sonra
             uygunluk skoruna göre sıralanır. Sektörü doğrulanamayan veya tutmayan çağrılar
@@ -106,13 +106,13 @@ export default function MatchesPage() {
               <thead>
                 <tr>
                   <th>Fırsat</th>
-                  <th>Destek türü</th>
-                  <th>Sektör uyumu</th>
+                  <th>Destek Türü</th>
+                  <th>Sektör Uyumu</th>
                   <th>Skor</th>
                   <th>Güven</th>
                   <th>Karar</th>
-                  <th>Son başvuru</th>
-                  <th>Azami tutar</th>
+                  <th>Son Başvuru</th>
+                  <th>Azami Tutar</th>
                   <th>Eksikler</th>
                 </tr>
               </thead>

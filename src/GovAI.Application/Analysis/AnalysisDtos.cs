@@ -209,19 +209,19 @@ public static class AnalysisLabels
     /// Puanın ekrandaki adı. Sabit tutulur ki hiçbir ekran bunu "kazanma ihtimali"
     /// diye yazamasın; sistemde o tahmini yapacak geçmiş başvuru sonucu verisi yoktur.
     /// </summary>
-    public const string ScoreLabel = "Uygunluk puanı";
+    public const string ScoreLabel = "Uygunluk Puanı";
 
     /// <summary>Model çalışmadığında analiz türünün adı.</summary>
-    public const string RulesOnlyModeLabel = "Kural tabanlı analiz";
+    public const string RulesOnlyModeLabel = "Kural Tabanlı Analiz";
 
     /// <summary>Model çalıştığında analiz türünün adı.</summary>
-    public const string HybridModeLabel = "Yapay zekâ destekli analiz";
+    public const string HybridModeLabel = "Yapay Zekâ Destekli Analiz";
 
     /// <summary>Model çalışmadığında güven göstergesinin başlığı.</summary>
-    public const string RulesOnlyConfidenceTitle = "Kural tabanlı güven";
+    public const string RulesOnlyConfidenceTitle = "Kural Tabanlı Güven";
 
     /// <summary>Model çalıştığında güven göstergesinin başlığı.</summary>
-    public const string HybridConfidenceTitle = "Yapay zekâ destekli güven";
+    public const string HybridConfidenceTitle = "Yapay Zekâ Destekli Güven";
 
     /// <summary>
     /// Model çalışmadığında yapay zekâ güveninin karşılığı.

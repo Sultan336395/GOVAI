@@ -91,10 +91,10 @@ export default function RegulatoryChangesPage() {
             <thead>
               <tr>
                 <th>Başlık</th>
-                <th>Düzenleme alanı</th>
+                <th>Düzenleme Alanı</th>
                 <th>Kurum</th>
-                <th>Yargı alanı</th>
-                <th>Değişiklik türü</th>
+                <th>Yargı Alanı</th>
+                <th>Değişiklik Türü</th>
                 <th>Yayın</th>
                 <th>Yürürlük</th>
                 <th>Doğrulama</th>

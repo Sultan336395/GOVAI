@@ -225,8 +225,8 @@ export default function CompanyMembersPage() {
                 <th>Kullanıcı</th>
                 <th>Rol</th>
                 <th>Durum</th>
-                <th>Varsayılan şirketi</th>
-                <th>Eklendiği tarih</th>
+                <th>Varsayılan Şirketi</th>
+                <th>Eklendiği Tarih</th>
                 {canManage ? <th /> : null}
               </tr>
             </thead>

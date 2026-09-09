@@ -72,7 +72,7 @@ export default function EligibilityDetailPage() {
       {firsat.data ? <OpportunityDetailCard data={firsat.data} /> : null}
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <h2>Yönetici özeti</h2>
+        <h2>Yönetici Özeti</h2>
         {data.executiveSummary ? (
           <p style={{ margin: 0 }}>{data.executiveSummary}</p>
         ) : (
@@ -93,7 +93,7 @@ export default function EligibilityDetailPage() {
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <h2>Skor nasıl hesaplandı?</h2>
+        <h2>Skor Nasıl Hesaplandı?</h2>
         <div className="table-wrap">
           <table>
             <thead>
@@ -156,7 +156,7 @@ export default function EligibilityDetailPage() {
       </div>
 
       <div className="card">
-        <h2>Belge kontrol listesi</h2>
+        <h2>Belge Kontrol Listesi</h2>
         <DocumentTable documents={data.documentChecklist} />
       </div>
     </>

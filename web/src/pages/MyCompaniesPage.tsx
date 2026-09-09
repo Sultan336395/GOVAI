@@ -85,7 +85,7 @@ export default function MyCompaniesPage() {
                 <th>Ölçek</th>
                 <th>Çalışan</th>
                 <th>Ciro</th>
-                <th>Grup / bağ</th>
+                <th>Grup / Bağ</th>
                 <th>Profil</th>
                 <th />
               </tr>

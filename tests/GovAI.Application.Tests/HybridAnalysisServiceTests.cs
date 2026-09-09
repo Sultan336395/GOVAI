@@ -48,7 +48,7 @@ public class HybridAnalysisServiceTests
 
         var sonuc = await service.AnalyzeOpportunityAsync(company.Id, opportunity.Id);
 
-        Assert.Equal("Uygunluk puanı", sonuc.Score.Label);
+        Assert.Equal("Uygunluk Puanı", sonuc.Score.Label);
 
         var tumMetinler = sonuc.Criteria.Select(c => c.Rationale)
             .Concat(sonuc.Score.Components.Select(c => c.Rationale))
@@ -406,8 +406,8 @@ public class HybridAnalysisServiceTests
 
         // Sayı aynı sayı; ADI farklı. "Yapay zekâ destekli güven: Yüksek" yazmak, model hiç
         // çalışmamışken onun da doğruladığı izlenimini verir.
-        Assert.Equal("Kural tabanlı güven", sonuc.Confidence.Title);
-        Assert.Equal("Kural tabanlı analiz", sonuc.Contribution.ModeLabel);
+        Assert.Equal("Kural Tabanlı Güven", sonuc.Confidence.Title);
+        Assert.Equal("Kural Tabanlı Analiz", sonuc.Contribution.ModeLabel);
         Assert.Equal("Kullanılamıyor", sonuc.Contribution.AiConfidenceLabel);
     }
 
@@ -440,8 +440,8 @@ public class HybridAnalysisServiceTests
 
         var sonuc = await service.AnalyzeRegulationAsync(company.Id, change.Id);
 
-        Assert.Equal("Yapay zekâ destekli güven", sonuc.Confidence.Title);
-        Assert.Equal("Yapay zekâ destekli analiz", sonuc.Contribution.ModeLabel);
+        Assert.Equal("Yapay Zekâ Destekli Güven", sonuc.Confidence.Title);
+        Assert.Equal("Yapay Zekâ Destekli Analiz", sonuc.Contribution.ModeLabel);
         Assert.NotEqual("Kullanılamıyor", sonuc.Contribution.AiConfidenceLabel);
     }
 

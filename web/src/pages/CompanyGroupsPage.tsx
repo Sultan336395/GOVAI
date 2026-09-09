@@ -62,7 +62,7 @@ export default function CompanyGroupsPage() {
     <>
       <div className="page-header">
         <div>
-          <h1>Şirket grubu ve bağlı şirketler</h1>
+          <h1>Şirket Grubu ve Bağlı Şirketler</h1>
           <p>
             Aynı gruba bağlı şirketler birlikte raporlanır. Ana–bağlı şirket bağı, çağrıların
             grup düzeyinde değerlendirilmesi gereken durumlar için tutulur.
@@ -116,7 +116,7 @@ export default function CompanyGroupsPage() {
                 <tr>
                   <th>Grup</th>
                   <th>Açıklama</th>
-                  <th>Şirket sayısı</th>
+                  <th>Şirket Sayısı</th>
                 </tr>
               </thead>
               <tbody>
@@ -133,7 +133,7 @@ export default function CompanyGroupsPage() {
         </div>
       ) : null}
 
-      <h2>Şirketlerin bağı</h2>
+      <h2>Şirketlerin Bağı</h2>
 
       {!canManageAny ? (
         <EmptyState>

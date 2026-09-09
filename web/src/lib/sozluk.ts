@@ -38,34 +38,34 @@ export const terimler = {
   cagriCogul: 'Çağrılar',
 
   /** Çağrı metninden çıkarılmış, firmanın sağlaması gereken koşul. */
-  kosul: 'Başvuru koşulu',
-  kosulCogul: 'Başvuru koşulları',
+  kosul: 'Başvuru Koşulu',
+  kosulCogul: 'Başvuru Koşulları',
 
   /** Koşulun dayandığı resmî belge bölümü. */
-  dayanak: 'Resmî dayanak',
-  dayanakCogul: 'Resmî dayanaklar',
+  dayanak: 'Resmî Dayanak',
+  dayanakCogul: 'Resmî Dayanaklar',
 
   /** Çağrının alındığı resmî belge. */
-  belge: 'Resmî belge',
+  belge: 'Resmî Belge',
 
   /** Kurumun yayın kanalı. */
-  kaynak: 'Resmî kaynak',
+  kaynak: 'Resmî Kaynak',
 
   /** Katalog dışına alınmış kayıt. */
-  incelemeBekleyen: 'İncelemeye alınan kayıt',
+  incelemeBekleyen: 'İncelemeye Alınan Kayıt',
 } as const
 
 // ── Bölüm başlıkları ────────────────────────────────────────────────────────
 
 export const bolumBasliklari = {
   ozet: 'Özet',
-  kunye: 'Çağrı bilgileri',
-  destekTutari: 'Destek tutarı',
-  basvuruKosullari: 'Başvuru koşulları',
-  istenenBelgeler: 'İstenen belgeler',
-  resmiDayanak: 'Resmî dayanak',
-  belgeIcerigi: 'Belge içeriği',
-  kaynakBilgisi: 'Kaynak bilgisi',
+  kunye: 'Çağrı Bilgileri',
+  destekTutari: 'Destek Tutarı',
+  basvuruKosullari: 'Başvuru Koşulları',
+  istenenBelgeler: 'İstenen Belgeler',
+  resmiDayanak: 'Resmî Dayanak',
+  belgeIcerigi: 'Belge İçeriği',
+  kaynakBilgisi: 'Kaynak Bilgisi',
   degerlendirme: 'Değerlendirme',
   gerekce: 'Gerekçe',
 } as const

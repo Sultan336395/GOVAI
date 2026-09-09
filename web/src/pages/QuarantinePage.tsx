@@ -156,11 +156,11 @@ export default function QuarantinePage() {
                 <tr>
                   <th>Başlık</th>
                   <th>Kaynak</th>
-                  <th>Önerilen neden</th>
+                  <th>Önerilen Neden</th>
                   <th>Kanıt</th>
-                  <th>Eksik alan</th>
+                  <th>Eksik Alan</th>
                   <th>Skorlanmış</th>
-                  <th>Önerilen işlem</th>
+                  <th>Önerilen İşlem</th>
                 </tr>
               </thead>
               <tbody>
@@ -194,11 +194,11 @@ export default function QuarantinePage() {
             <thead>
               <tr>
                 <th>Kayıt</th>
-                <th>Yayımlayan kurum</th>
+                <th>Yayımlayan Kurum</th>
                 <th>Neden</th>
                 <th>Açıklama</th>
-                <th>Sisteme girişi</th>
-                <th>Alındığı tarih</th>
+                <th>Sisteme Girişi</th>
+                <th>Alındığı Tarih</th>
                 <th />
               </tr>
             </thead>

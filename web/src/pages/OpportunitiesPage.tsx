@@ -19,7 +19,7 @@ export default function OpportunitiesPage() {
     <>
       <div className="page-header">
         <div>
-          <h1>Çağrı kataloğu</h1>
+          <h1>Çağrı Kataloğu</h1>
           <p>Toplanan tüm resmî teşvik, hibe ve ihale çağrıları.</p>
         </div>
       </div>
@@ -60,11 +60,11 @@ export default function OpportunitiesPage() {
               <thead>
                 <tr>
                   <th>Çağrı</th>
-                  <th>Destek türü</th>
+                  <th>Destek Türü</th>
                   <th>Yayın</th>
-                  <th>Son başvuru</th>
-                  <th>Azami tutar</th>
-                  <th>Kural / belge</th>
+                  <th>Son Başvuru</th>
+                  <th>Azami Tutar</th>
+                  <th>Kural / Belge</th>
                   <th>Onay</th>
                 </tr>
               </thead>

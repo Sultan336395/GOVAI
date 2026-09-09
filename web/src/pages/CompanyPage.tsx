@@ -84,7 +84,7 @@ export default function CompanyPage() {
 
       <div className="grid two" style={{ marginBottom: 16 }}>
         <div className="card">
-          <h2>Faaliyet kodları (NACE)</h2>
+          <h2>Faaliyet Kodları (NACE)</h2>
           {data.naceCodes.length === 0 ? (
             <p className="muted" style={{ margin: 0 }}>
               NACE kodu girilmemiş — sektörel eşleşme değerlendirilemiyor.
@@ -125,7 +125,7 @@ export default function CompanyPage() {
 
       <div className="grid two">
         <div className="card">
-          <h2>Belgeler ve sertifikalar</h2>
+          <h2>Belgeler ve Sertifikalar</h2>
           {data.certificates.length === 0 ? (
             <p className="muted" style={{ margin: 0 }}>
               Kayıtlı belge yok.
@@ -155,7 +155,7 @@ export default function CompanyPage() {
         </div>
 
         <div className="card">
-          <h2>Aktif yatırımlar</h2>
+          <h2>Aktif Yatırımlar</h2>
           {data.activeInvestments.length === 0 ? (
             <p className="muted" style={{ margin: 0 }}>
               Kayıtlı yatırım planı yok.
@@ -166,7 +166,7 @@ export default function CompanyPage() {
                 <thead>
                   <tr>
                     <th>Yatırım</th>
-                    <th>İlgili destek</th>
+                    <th>İlgili Destek</th>
                     <th>Bütçe</th>
                   </tr>
                 </thead>

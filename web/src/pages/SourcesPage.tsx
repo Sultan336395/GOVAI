@@ -89,8 +89,8 @@ export default function SourcesPage() {
                 <th>Kategori</th>
                 <th>Sağlık</th>
                 <th>Doğrulama</th>
-                <th>Son tarama</th>
-                <th>Son hata</th>
+                <th>Son Tarama</th>
+                <th>Son Hata</th>
                 <th>Karantina</th>
                 <th />
               </tr>

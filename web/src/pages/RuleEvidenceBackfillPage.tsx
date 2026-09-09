@@ -123,7 +123,7 @@ export default function RuleEvidenceBackfillPage() {
       {geriAl.error && <ErrorBox error={geriAl.error} />}
 
       <div className="card" data-alan="plan-ozeti">
-        <h2>Yapılacak işlemler</h2>
+        <h2>Yapılacak İşlemler</h2>
 
         {gecerliPlan === null || gecerliPlan.totalExamined === 0 ? (
           <EmptyState>İncelenecek çağrı kaydı yok.</EmptyState>

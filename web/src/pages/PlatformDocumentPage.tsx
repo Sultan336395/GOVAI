@@ -63,7 +63,7 @@ export default function PlatformDocumentPage() {
       )}
 
       <div className="card" data-alan="kunye">
-        <h2>Belge bilgileri</h2>
+        <h2>Belge Bilgileri</h2>
 
         <dl className="kv">
           <dt>Yayımlayan kurum</dt>
@@ -101,7 +101,7 @@ export default function PlatformDocumentPage() {
       </div>
 
       <div className="card" data-alan="surumler">
-        <h2>Belge geçmişi</h2>
+        <h2>Belge Geçmişi</h2>
 
         <p className="muted">
           Aynı adres birden çok kez alınmış olabilir; içerik her değiştiğinde önceki hâli
@@ -115,7 +115,7 @@ export default function PlatformDocumentPage() {
             <table>
               <thead>
                 <tr>
-                  <th>Alındığı tarih</th>
+                  <th>Alındığı Tarih</th>
                   <th>Durum</th>
                   <th>Okunabilirlik</th>
                 </tr>
@@ -141,7 +141,7 @@ export default function PlatformDocumentPage() {
       </div>
 
       <div className="card" data-alan="metin">
-        <h2>Belge metni</h2>
+        <h2>Belge Metni</h2>
 
         {data.textPreview ? (
           <>

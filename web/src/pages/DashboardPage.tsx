@@ -112,7 +112,7 @@ export default function DashboardPage() {
 
       <div className="grid two" style={{ marginBottom: 16 }}>
         <div className="card">
-          <h2>Karar dağılımı</h2>
+          <h2>Karar Dağılımı</h2>
           {verdictData.length === 0 ? (
             <EmptyState>Henüz değerlendirme yok.</EmptyState>
           ) : (
@@ -131,7 +131,7 @@ export default function DashboardPage() {
         </div>
 
         <div className="card">
-          <h2>Skor boyutları (ortalama %)</h2>
+          <h2>Skor Boyutları (Ortalama %)</h2>
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={dimensionData} margin={{ left: -18, bottom: 40 }}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
@@ -145,12 +145,12 @@ export default function DashboardPage() {
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <h2>Öncelikli fırsatlar</h2>
+        <h2>Öncelikli Fırsatlar</h2>
         <MatchTable matches={data.topOpportunities} />
       </div>
 
       <div className="card">
-        <h2>Son başvurusu yaklaşanlar</h2>
+        <h2>Son Başvurusu Yaklaşanlar</h2>
         {data.closingSoon.length === 0 ? (
           <EmptyState>15 gün içinde kapanan uygun fırsat yok.</EmptyState>
         ) : (
@@ -172,11 +172,11 @@ function MatchTable({ matches }: { matches: import('@/api/types').OpportunityMat
         <thead>
           <tr>
             <th>Fırsat</th>
-            <th>Sektör uyumu</th>
+            <th>Sektör Uyumu</th>
             <th>Skor</th>
             <th>Karar</th>
-            <th>Son başvuru</th>
-            <th>Azami tutar</th>
+            <th>Son Başvuru</th>
+            <th>Azami Tutar</th>
             <th>Eksikler</th>
           </tr>
         </thead>

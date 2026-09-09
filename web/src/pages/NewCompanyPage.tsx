@@ -47,7 +47,7 @@ export default function NewCompanyPage() {
       <>
         <div className="page-header">
           <div>
-            <h1>Yeni şirket ekle</h1>
+            <h1>Yeni Şirket Ekle</h1>
           </div>
         </div>
         <NotAuthorized message="Yeni şirket eklemek için çalışma alanı yöneticisi olmanız ya da en az bir şirkette şirket sahibi olmanız gerekir." />
@@ -60,7 +60,7 @@ export default function NewCompanyPage() {
       <>
         <div className="page-header">
           <div>
-            <h1>Şirket eklendi</h1>
+            <h1>Şirket Eklendi</h1>
           </div>
         </div>
 
@@ -92,7 +92,7 @@ export default function NewCompanyPage() {
     <>
       <div className="page-header">
         <div>
-          <h1>Yeni şirket ekle</h1>
+          <h1>Yeni Şirket Ekle</h1>
           <p>
             Yıldızlı alanlar zorunludur. Kalan bilgileri sonradan tamamlayabilirsiniz; eksik alan
             firmayı elemez, yalnızca ilgili koşulları belirsiz bırakır.

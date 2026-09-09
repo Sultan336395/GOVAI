@@ -54,7 +54,7 @@ export default function SimulationPage() {
     <>
       <div className="page-header">
         <div>
-          <h1>Senaryo simülasyonu</h1>
+          <h1>Senaryo Simülasyonu</h1>
           <p>
             Boş bıraktığınız alanlar firmanın mevcut değerini korur. Simülasyon firma kaydını
             değiştirmez.
@@ -64,7 +64,7 @@ export default function SimulationPage() {
 
       <div className="grid two">
         <form className="card" onSubmit={handleSubmit}>
-          <h2>Senaryo tanımı</h2>
+          <h2>Senaryo Tanımı</h2>
 
           <div className="field">
             <FieldLabel htmlFor="scenario-name" field="scenarioName">Senaryo adı</FieldLabel>
@@ -175,17 +175,17 @@ export default function SimulationPage() {
 
       {result && result.impacts.length > 0 ? (
         <div className="card" style={{ marginTop: 16 }}>
-          <h2>Etkilenen fırsatlar</h2>
+          <h2>Etkilenen Fırsatlar</h2>
           <div className="table-wrap">
             <table>
               <thead>
                 <tr>
                   <th>Fırsat</th>
-                  <th>Destek türü</th>
-                  <th>Mevcut skor</th>
-                  <th>Senaryo skoru</th>
+                  <th>Destek Türü</th>
+                  <th>Mevcut Skor</th>
+                  <th>Senaryo Skoru</th>
                   <th>Fark</th>
-                  <th>Karar değişimi</th>
+                  <th>Karar Değişimi</th>
                 </tr>
               </thead>
               <tbody>
