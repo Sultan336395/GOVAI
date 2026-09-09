@@ -1,4 +1,5 @@
 using GovAI.Application.Abstractions.Persistence;
+using GovAI.Application.Abstractions.Services;
 using GovAI.Application.Common;
 using GovAI.Application.Sources;
 using GovAI.Domain.Common;
@@ -27,16 +28,18 @@ public class CatalogRepairServiceTests
 
     private static (
         (CatalogRepairService Service, FakeCatalogRepairRepository Repo) Kisa,
-        FakeMaintenanceRunRepository Runs) BuildFull(params CatalogRepairCandidate[] kayitlar)
+        FakeMaintenanceRunRepository Runs,
+        FakeEventPublisher Events) BuildFull(params CatalogRepairCandidate[] kayitlar)
     {
         var repo = new FakeCatalogRepairRepository(kayitlar);
         var runs = new FakeMaintenanceRunRepository();
+        var events = new FakeEventPublisher();
 
         var service = new CatalogRepairService(
             repo, runs, new FakeUnitOfWork(), new FixedClock(Now),
-            new FakeCurrentUser(), NullLogger<CatalogRepairService>.Instance);
+            new FakeCurrentUser(), events, NullLogger<CatalogRepairService>.Instance);
 
-        return ((service, repo), runs);
+        return ((service, repo), runs, events);
     }
 
     /// <summary>
@@ -317,7 +320,7 @@ public class CatalogRepairServiceTests
     [Fact(DisplayName = "KO18. Uygulanan onarım geri alınabilir")]
     public async Task Onarim_geri_alinabilir()
     {
-        var ((service, repo), runs) = BuildFull(KosgebListe(), KosgebYururlukten());
+        var ((service, repo), runs, _) = BuildFull(KosgebListe(), KosgebYururlukten());
 
         var rapor = await UygulaAsync(service);
 
@@ -333,6 +336,36 @@ public class CatalogRepairServiceTests
         // Kayıt SİLİNMEDİ; çalıştırma kaydı da duruyor.
         Assert.Empty(repo.Deleted);
         Assert.Single(runs.Runs);
+    }
+
+    [Fact(DisplayName = "KO22. Geri alınan fırsat için yeniden puanlama tetiklenir")]
+    public async Task Geri_alinan_firsat_puanlanir()
+    {
+        var ((service, _), _, events) = BuildFull(KosgebListe());
+
+        var rapor = await UygulaAsync(service);
+        await service.UndoAsync(rapor.RunId!.Value);
+
+        // Kayıt katalogda görünür ama puanlanmazsa firmaların eşleşme listesine
+        // gece turuna kadar düşmez; danışman kaydı gün boyu göremez.
+        var (kuyruk, mesaj) = Assert.Single(events.Published);
+
+        Assert.Equal(QueueNames.ScoringRequested, kuyruk);
+
+        var neden = mesaj.GetType().GetProperty("Reason")?.GetValue(mesaj) as string;
+        Assert.Equal("CatalogRepairUndone", neden);
+    }
+
+    [Fact(DisplayName = "KO23. Mevzuat kaydının geri alınması puanlama tetiklemez")]
+    public async Task Mevzuat_geri_alinirken_puanlama_yok()
+    {
+        // Mevzuata başvurulmaz ve skorlanmaz; boşuna toplu tur başlatmak maliyet üretir.
+        var ((service, _), _, events) = BuildFull(SgkSut());
+
+        var rapor = await UygulaAsync(service);
+        await service.UndoAsync(rapor.RunId!.Value);
+
+        Assert.Empty(events.Published);
     }
 
     [Fact(DisplayName = "KO19. Aynı çalıştırma iki kez geri alınamaz")]
@@ -365,7 +398,7 @@ public class CatalogRepairServiceTests
     [Fact(DisplayName = "KO21. Hiçbir şey değişmediyse çalıştırma kaydı açılmaz")]
     public async Task Degisiklik_yoksa_kayit_acilmaz()
     {
-        var ((service, _), runs) = BuildFull(KosgebListe(karantinada: true));
+        var ((service, _), runs, _) = BuildFull(KosgebListe(karantinada: true));
 
         var rapor = await UygulaAsync(service);
 

@@ -223,6 +223,14 @@ public sealed class QuarantineQueryRepository(GovAiDbContext context) : IQuarant
             {
                 d.Id, d.Title, d.Url, SourceName = s.Name, d.QuarantineReason,
                 d.QuarantineNote, d.CollectedAt, VersionCount = d.Versions.Count, d.Origin,
+
+                // Karantinadaki fırsat sorgu filtresine takılmaz (fırsatlarda kiracı
+                // filtresi yoktur) ama yumuşak silinmiş kayıt gelmemeli.
+                OpportunityId = context.Opportunities
+                    .IgnoreQueryFilters()
+                    .Where(o => o.SourceDocumentId == d.Id && !o.IsDeleted)
+                    .Select(o => (Guid?)o.Id)
+                    .FirstOrDefault(),
             })
             .OrderByDescending(x => x.CollectedAt)
             .ToListAsync(cancellationToken);
@@ -239,7 +247,8 @@ public sealed class QuarantineQueryRepository(GovAiDbContext context) : IQuarant
                 return new QuarantinedDocumentDto(
                     x.Id, onarilan, x.Url, x.SourceName, x.QuarantineReason,
                     x.QuarantineNote, x.CollectedAt, x.VersionCount, x.Origin,
-                    TitleRepaired: !string.Equals(onarilan, x.Title, StringComparison.Ordinal));
+                    TitleRepaired: !string.Equals(onarilan, x.Title, StringComparison.Ordinal),
+                    OpportunityId: x.OpportunityId);
             })
             .ToList();
     }
@@ -296,7 +305,7 @@ public sealed class QuarantineQueryRepository(GovAiDbContext context) : IQuarant
         return opportunities.Count;
     }
 
-    public async Task<int> ReleaseOpportunitiesForDocumentAsync(
+    public async Task<IReadOnlyList<Guid>> ReleaseOpportunitiesForDocumentAsync(
         Guid documentId,
         CancellationToken cancellationToken = default)
     {
@@ -311,7 +320,7 @@ public sealed class QuarantineQueryRepository(GovAiDbContext context) : IQuarant
             opportunity.ReleaseFromQuarantine();
         }
 
-        return opportunities.Count;
+        return [.. opportunities.Select(o => o.Id)];
     }
 
     public async Task<int> QuarantineRegulatoryChangesForDocumentAsync(

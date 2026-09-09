@@ -97,6 +97,7 @@ public sealed class CatalogRepairService(
     IUnitOfWork unitOfWork,
     IDateTimeProvider clock,
     ICurrentUser currentUser,
+    IEventPublisher events,
     ILogger<CatalogRepairService> logger)
 {
     /// <summary>Kuru çalıştırma: ne değişeceğini gösterir, hiçbir şeyi değiştirmez.</summary>
@@ -273,6 +274,24 @@ public sealed class CatalogRepairService(
         run.MarkUndone(currentUser.Email, now);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // Karantinadan çıkan fırsat HEMEN puanlanır; gece turu beklenmez. Aksi hâlde
+        // kayıt katalogda görünür ama firmaların eşleşme listesine gün boyu düşmezdi.
+        foreach (var geri in sonuclar.Where(x =>
+                     x.Result == "Geri alındı."
+                     && x.Action == CatalogRepairAction.Quarantine
+                     && x.Target == CatalogRepairTarget.Opportunity))
+        {
+            await events.PublishAsync(
+                QueueNames.ScoringRequested,
+                new
+                {
+                    OpportunityId = geri.RecordId,
+                    RequestedAt = now,
+                    Reason = "CatalogRepairUndone"
+                },
+                cancellationToken);
+        }
 
         logger.LogInformation(
             "Katalog onarımı geri alındı. CalistirmaId={RunId} KayitSayisi={Count}",

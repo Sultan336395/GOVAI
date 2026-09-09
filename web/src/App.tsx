@@ -10,6 +10,7 @@ import CompanyPage from '@/pages/CompanyPage'
 import QuarantinePage from '@/pages/QuarantinePage'
 import CatalogRepairPage from '@/pages/CatalogRepairPage'
 import RuleEvidenceBackfillPage from '@/pages/RuleEvidenceBackfillPage'
+import PlatformOpportunityPage from '@/pages/PlatformOpportunityPage'
 import RegulatoryChangeDetailPage from '@/pages/RegulatoryChangeDetailPage'
 import RegulatoryChangesPage from '@/pages/RegulatoryChangesPage'
 import DashboardPage from '@/pages/DashboardPage'
@@ -97,6 +98,10 @@ export default function App() {
         {/* Faz 3 — Platform İnceleme bakım işlemleri */}
         <Route path="/platform/catalog-repair" element={<CatalogRepairPage />} />
         <Route path="/platform/rule-evidence" element={<RuleEvidenceBackfillPage />} />
+        <Route
+          path="/platform/opportunities/:opportunityId"
+          element={<PlatformOpportunityPage />}
+        />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

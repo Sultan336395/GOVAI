@@ -104,6 +104,8 @@ const FIRSAT: OpportunityDetail = {
   },
   isOpen: true,
   provenance: KANIT,
+  quarantineReason: 'None',
+  quarantineNote: null,
 }
 
 /**

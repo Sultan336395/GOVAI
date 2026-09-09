@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RuleEvidenceBackfillItem, RuleEvidenceBackfillReport } from '@/api/types'
 
@@ -95,7 +96,9 @@ function ekranaBas() {
 
   return render(
     <QueryClientProvider client={client}>
-      <RuleEvidenceBackfillPage />
+      <MemoryRouter>
+        <RuleEvidenceBackfillPage />
+      </MemoryRouter>
     </QueryClientProvider>,
   )
 }
@@ -201,6 +204,18 @@ describe('Kanıt bağlama ekranı', () => {
     })
 
     await waitFor(() => expect(undoRuleEvidenceBackfill).toHaveBeenCalledWith(SONUC.runId))
+  })
+
+  it('KB-E9. Fırsat başlığı detay ekranına götürür', async () => {
+    ekranaBas()
+
+    await screen.findByText('KOBİ Dijital Dönüşüm Destek Programı')
+
+    const detay = document.querySelector('[data-alan="detay"]')!
+
+    expect(detay.getAttribute('href')).toBe(
+      '/platform/opportunities/01a05d9e-0000-7000-a000-000000000001',
+    )
   })
 
   it('KB-E7. Bağlanacak kayıt yoksa onay bölümü hiç görünmez', async () => {

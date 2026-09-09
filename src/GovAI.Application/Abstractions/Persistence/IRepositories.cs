@@ -138,7 +138,14 @@ public interface IQuarantineQueryRepository
         CancellationToken cancellationToken = default);
 
     /// <summary>Belge karantinadan çıkınca türev fırsatlar da katalogdaki yerine döner.</summary>
-    Task<int> ReleaseOpportunitiesForDocumentAsync(
+    /// <summary>
+    /// Belgeden türeyen fırsatları karantinadan çıkarır ve <b>kimliklerini</b> döner.
+    ///
+    /// Sayı yetmez: karantinadan çıkan her fırsat için yeniden puanlama tetiklenmeli,
+    /// bu da kaydın kimliğini gerektirir. Yalnızca sayı dönerken kayıt katalogda
+    /// görünüyor ama firmaların eşleşme listesine ancak gece turunda düşüyordu.
+    /// </summary>
+    Task<IReadOnlyList<Guid>> ReleaseOpportunitiesForDocumentAsync(
         Guid documentId,
         CancellationToken cancellationToken = default);
 

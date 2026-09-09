@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/api/client'
 import type { TriageReport } from '@/api/types'
@@ -206,7 +207,20 @@ export default function QuarantinePage() {
               {data.map((item) => (
                 <tr key={item.documentId}>
                   <td>
-                    <strong>{item.title}</strong>
+                    {/* Belgeden bir fırsat türemişse başlık detaya götürür: inceleyici
+                        "bu kayıt gerçekte ne?" sorusunu resmî siteye gitmeden cevaplar.
+                        Türememişse (mevzuat belgesi, ayrıştırılamamış kayıt) düz metin
+                        kalır — çalışmayan bağlantı göstermeyiz. */}
+                    {item.opportunityId ? (
+                      <Link
+                        to={`/platform/opportunities/${item.opportunityId}`}
+                        data-alan="detay"
+                      >
+                        <strong>{item.title}</strong>
+                      </Link>
+                    ) : (
+                      <strong>{item.title}</strong>
+                    )}
                     {item.titleRepaired ? (
                       <div className="muted" style={{ fontSize: 12 }}>
                         Başlık bozuk karakter kümesiyle kaydedilmişti; burada onarılmış

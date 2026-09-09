@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CatalogRepairPlanReport, CatalogRepairReport } from '@/api/types'
 
@@ -86,7 +87,9 @@ function ekranaBas() {
 
   return render(
     <QueryClientProvider client={client}>
-      <CatalogRepairPage />
+      <MemoryRouter>
+        <CatalogRepairPage />
+      </MemoryRouter>
     </QueryClientProvider>,
   )
 }
@@ -178,6 +181,34 @@ describe('Katalog onarımı ekranı', () => {
     await act(async () => { fireEvent.click(geriAl) })
 
     await waitFor(() => expect(undoCatalogRepair).toHaveBeenCalledWith(SONUC.runId))
+  })
+
+  it('KO-E8. Fırsat başlığı detay ekranına götürür', async () => {
+    ekranaBas()
+
+    await screen.findByText('KOSGEB Destekler')
+
+    // İnceleyici karar vermeden önce kaydın ne olduğunu görebilmeli; daha önce
+    // elindeki tek bilgi başlık ve adresti.
+    const detay = document.querySelector('[data-alan="detay"]')!
+
+    expect(detay.getAttribute('href')).toBe(
+      '/platform/opportunities/01a05d9e-0000-7000-a000-000000000001',
+    )
+  })
+
+  it('KO-E9. Mevzuat kaydı için çalışmayan bağlantı gösterilmez', async () => {
+    catalogRepairPlan.mockResolvedValue({
+      ...PLAN,
+      matches: [{ ...PLAN.matches[1], willChange: true, skipReason: null }],
+    })
+
+    ekranaBas()
+
+    await screen.findByText('SUT Değişiklik Tebliği')
+
+    // Mevzuat kaydının fırsat detayı yoktur.
+    expect(document.querySelector('[data-alan="detay"]')).toBeNull()
   })
 
   it('KO-E7. Değişecek kayıt yoksa onay bölümü hiç görünmez', async () => {

@@ -373,6 +373,9 @@ export interface OpportunityDetail {
   /** Son başvuru tarihi geçmişse false; süresi geçmiş çağrı açık gösterilmez. */
   isOpen: boolean
   provenance: OpportunityProvenance | null
+  /** Karantinadaysa nedeni; değilse 'None'. İnceleme ekranı bunu gösterir. */
+  quarantineReason: QuarantineReason
+  quarantineNote: string | null
 }
 
 /**
@@ -848,6 +851,8 @@ export interface QuarantinedDocument {
   origin: DocumentOrigin
   /** Başlık yanlış karakter kümesiyle kaydedilmişti; ekranda gösterilen metin onarıldı. */
   titleRepaired: boolean
+  /** Bu belgeden türeyen fırsat kaydı; yoksa null. Detaya bu kimlikle gidilir. */
+  opportunityId: string | null
 }
 
 export interface TriageRow {

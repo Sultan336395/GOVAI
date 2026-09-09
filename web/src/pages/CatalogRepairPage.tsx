@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/api/client'
 import type { CatalogRepairPlanReport, CatalogRepairReport } from '@/api/types'
@@ -132,7 +133,15 @@ export default function CatalogRepairPage() {
                     {degisecekler.map((m) => (
                       <tr key={m.recordId}>
                         <td>
-                          <div>{m.currentTitle}</div>
+                          {/* Mevzuat kaydının fırsat detayı yoktur; yalnızca fırsatlar
+                              tıklanabilir. Çalışmayan bağlantı göstermeyiz. */}
+                          {m.target === 'Opportunity' ? (
+                            <Link to={`/platform/opportunities/${m.recordId}`} data-alan="detay">
+                              {m.currentTitle}
+                            </Link>
+                          ) : (
+                            <div>{m.currentTitle}</div>
+                          )}
                           {m.officialUrl && (
                             <a
                               className="muted small"

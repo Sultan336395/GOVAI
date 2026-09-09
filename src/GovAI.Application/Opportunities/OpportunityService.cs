@@ -19,6 +19,7 @@ public sealed class OpportunityService(
     IUnitOfWork unitOfWork,
     IDateTimeProvider clock,
     IEventPublisher events,
+    ICurrentUser currentUser,
     ILogger<OpportunityService> logger)
 {
     public async Task<PagedResult<OpportunitySummaryDto>> SearchAsync(OpportunityQuery query, CancellationToken cancellationToken = default)
@@ -38,9 +39,14 @@ public sealed class OpportunityService(
         var opportunity = await opportunities.GetWithRulesAsync(opportunityId, cancellationToken)
                           ?? throw new NotFoundException("Fırsat", opportunityId);
 
-        // Karantinadaki kayıt detay ekranında da AÇILMAZ. Listeden gizleyip detayını
-        // açık bırakmak korumayı işe yaramaz kılar: bağlantı elden ele dolaşabilir.
-        if (!opportunity.IsPublishable)
+        // Karantinadaki kayıt KİRACI kullanıcısına detay ekranında da AÇILMAZ. Listeden
+        // gizleyip detayını açık bırakmak korumayı işe yaramaz kılar: bağlantı elden ele
+        // dolaşabilir.
+        //
+        // Platform inceleme rolleri istisnadır ve bu bir gevşetme değil, rolün işidir:
+        // karantinadan çıkarma kararı ancak kaydın ne olduğu görülerek verilebilir.
+        // İstisna olmadan inceleyicinin elindeki tek bilgi başlık ve adres kalıyordu.
+        if (!opportunity.IsPublishable && !IsPlatformReviewer())
         {
             throw new NotFoundException("Fırsat", opportunityId);
         }
@@ -50,6 +56,18 @@ public sealed class OpportunityService(
 
         return ToDetail(opportunity, clock.UtcNow, provenance, evidenceContext);
     }
+
+    /// <summary>
+    /// Kullanıcı, ortak kataloğu denetleyen platform rollerinden biri mi?
+    ///
+    /// <para>
+    /// <see cref="UserRole.SystemIngest"/> BİLEREK dışarıdadır: worker kimliği belge
+    /// bırakır, karantina incelemez. Ele geçirilen bir worker kimliğinin elenmiş
+    /// kayıtların içeriğini okuyabilmesi için sebep yok.
+    /// </para>
+    /// </summary>
+    private bool IsPlatformReviewer() =>
+        currentUser.Role is UserRole.PlatformReviewer or UserRole.PlatformCatalogManager;
 
     /// <summary>
     /// Çağrıyı oluşturur ya da aynı kaynak dokümandan gelen kaydı günceller.
@@ -388,7 +406,9 @@ public sealed class OpportunityService(
             opportunity.FieldAvailability.OfficialDocumentUrl.ToString()),
         // Süresi geçmiş çağrı açık gibi gösterilmez.
         IsOpen: opportunity.IsOpenOn(now),
-        Provenance: provenance);
+        Provenance: provenance,
+        QuarantineReason: opportunity.QuarantineReason,
+        QuarantineNote: opportunity.QuarantineNote);
 
     /// <summary>
     /// Kaynağın kategorisi mevzuat mı? <see cref="GovAI.Application.Sources.SourceService"/>

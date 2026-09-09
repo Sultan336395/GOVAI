@@ -62,7 +62,18 @@ public sealed record OpportunityDetailDto(
     /// Kaydın dayandığı resmî belge ve kanıt parçaları. Elle açılmış ya da kaynak
     /// belgesi olmayan fırsatta <c>null</c>'dır.
     /// </summary>
-    OpportunityProvenanceDto? Provenance = null);
+    OpportunityProvenanceDto? Provenance = null,
+
+    /// <summary>
+    /// Kayıt karantinadaysa nedeni; değilse <see cref="QuarantineReason.None"/>.
+    ///
+    /// İnceleme ekranı için gerekli: karantinadaki bir kayda bakan inceleyici, kaydın
+    /// katalogda görünmediğini ekranın kendisinden anlamalıdır. Kiracı ekranları zaten
+    /// karantinadaki kaydı hiç listelemez, orada bu alanın bir etkisi olmaz.
+    /// </summary>
+    QuarantineReason QuarantineReason = QuarantineReason.None,
+
+    string? QuarantineNote = null);
 
 public sealed record BudgetDto(decimal? MinAmount, decimal? MaxAmount, string Currency, decimal? SupportRate);
 

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/api/client'
 import type { RuleEvidenceBackfillOutcome, RuleEvidenceBackfillReport } from '@/api/types'
@@ -167,7 +168,12 @@ export default function RuleEvidenceBackfillPage() {
                     {onemliler.map((i) => (
                       <tr key={i.opportunityId}>
                         <td>
-                          <div>{i.title}</div>
+                          <Link
+                            to={`/platform/opportunities/${i.opportunityId}`}
+                            data-alan="detay"
+                          >
+                            {i.title || i.opportunityId}
+                          </Link>
                           {i.officialUrl && (
                             <a
                               className="muted small"
@@ -200,8 +206,10 @@ export default function RuleEvidenceBackfillPage() {
                 <ul>
                   {digerleri.map((i) => (
                     <li key={i.opportunityId}>
-                      <strong>{i.title || i.opportunityId}</strong> —{' '}
-                      {sonucEtiketleri[i.outcome]}
+                      <Link to={`/platform/opportunities/${i.opportunityId}`}>
+                        {i.title || i.opportunityId}
+                      </Link>{' '}
+                      — {sonucEtiketleri[i.outcome]}
                     </li>
                   ))}
                 </ul>

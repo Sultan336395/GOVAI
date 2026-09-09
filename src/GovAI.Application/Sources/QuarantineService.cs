@@ -47,7 +47,16 @@ public sealed record QuarantinedDocumentDto(
     /// İnceleyici bunu bilmelidir: gördüğü metin belgede yazanın birebir kopyası değil,
     /// yeniden çözülmüş hâlidir. Ham belge değiştirilmez.
     /// </summary>
-    bool TitleRepaired = false);
+    bool TitleRepaired = false,
+
+    /// <summary>
+    /// Bu belgeden türemiş fırsat kaydının kimliği; yoksa <c>null</c>.
+    ///
+    /// İnceleyicinin "bu kayıt gerçekte ne?" sorusunu cevaplayabilmesi için gerekli:
+    /// başlık ve adres, karantinadan çıkarma kararını vermeye yetmez. Kimlik olmadan
+    /// ekran detaya bağlantı veremiyordu.
+    /// </summary>
+    Guid? OpportunityId = null);
 
 /// <summary>
 /// Karantina yönetimi (Faz 2).
@@ -65,6 +74,7 @@ public sealed class QuarantineService(
     IQuarantineQueryRepository query,
     IUnitOfWork unitOfWork,
     IEventPublisher events,
+    IDateTimeProvider clock,
     ILogger<QuarantineService> logger)
 {
     /// <summary>
@@ -212,10 +222,33 @@ public sealed class QuarantineService(
         document.ReleaseFromQuarantine();
 
         // Belge katalogdaki yerine dönüyorsa ondan türeyen fırsat da dönmelidir.
-        var released = await query.ReleaseOpportunitiesForDocumentAsync(documentId, cancellationToken);
-        released += await query.ReleaseRegulatoryChangesForDocumentAsync(documentId, cancellationToken);
+        var releasedOpportunities = await query.ReleaseOpportunitiesForDocumentAsync(documentId, cancellationToken);
+        var released = releasedOpportunities.Count
+                       + await query.ReleaseRegulatoryChangesForDocumentAsync(documentId, cancellationToken);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // KARANTİNADAN ÇIKAN FIRSAT HEMEN PUANLANIR.
+        //
+        // Eskiden yalnızca kayıt serbest bırakılıyordu: fırsat katalogda anında
+        // görünüyor ama firmaların "Fırsat Eşleşmelerim" listesine ancak gece 03:30
+        // toplu turundan sonra düşüyordu. İnceleyici sabah bir kaydı geri alıyor,
+        // danışman gün boyu onu eşleşmelerinde göremiyordu.
+        //
+        // Mesaj FIRSAT KİMLİĞİYLE gider; skorlama worker'ı bunu "çağrı değişti" olarak
+        // işler: eski değerlendirmeleri geçersizler ve firmaları yeniden değerlendirir.
+        foreach (var opportunityId in releasedOpportunities)
+        {
+            await events.PublishAsync(
+                QueueNames.ScoringRequested,
+                new
+                {
+                    OpportunityId = opportunityId,
+                    RequestedAt = clock.UtcNow,
+                    Reason = "QuarantineReleased"
+                },
+                cancellationToken);
+        }
 
         // Karantinadan çıkan kayıt YENİDEN AYRIŞTIRILIR. Ekran bunu zaten vaat ediyordu
         // ama mesaj yayımlanmıyordu: belge karantinadan çıkıyor, hiç işlenmiyordu.
