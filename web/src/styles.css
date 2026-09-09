@@ -283,12 +283,20 @@ select {
   gap: 1px;
 }
 
+/* Menüdeki ANA BAŞLIKLAR büyük harfle; alt bağlantılar yazıldığı gibi kalır.
+   Grup başlığı bir ad değil, bölüm ayracıdır — büyük harf onu bağlantılardan
+   ayırır ve göz menüyü daha hızlı tarar.
+
+   Türkçe büyütme `<html lang="tr">` sayesinde doğru çalışır: tarayıcı `i` harfini
+   `İ` yapar. Bu olmadan "Katalog Denetimi" ekranda "KATALOG DENETIMI" (noktasız I)
+   çıkardı. */
 .nav-group-title {
   margin: 0 0 4px;
   padding: 0 10px;
   font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 0.07em;
+  text-transform: uppercase;
   color: var(--text-muted);
 }
 
