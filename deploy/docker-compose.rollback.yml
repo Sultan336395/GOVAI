@@ -15,11 +15,11 @@
 # Yeniden derleme `latest`i üzerine yazar ve eski imaj isimsiz kalır — geri dönüş
 # imkânsızlaşır.
 #
-# ── 10.09.2026 · Eleme düzeltmesi yayını öncesi çalışan sürüm ───────────────
+# ── 10.09.2026 · Geri çekme düzeltmesi yayını öncesi çalışan sürüm ─────────
 #
-#   govai-api:c8bf41d
-#   govai-web:c8bf41d
-#   govai-worker:c8bf41d
+#   govai-api:0d42f3f
+#   govai-web:0d42f3f
+#   govai-worker:0d42f3f
 #
 # DÖRT WORKER AYNI İMAJI PAYLAŞIR. Bu dosya eskiden her worker'ı ayrı bir imaj
 # adına (`govai-collector:…`, `govai-parser:…`) sabitliyordu; o adlar artık
@@ -27,7 +27,7 @@
 # bölümüne düşerek SUNUCUDA DERLEME başlatırdı. Geri dönüşün kendisi arıza
 # üretmemelidir.
 #
-# ÖNCEKİ SÜRÜMLER (artık hedef değil): bc6a53a, 5cb1a7f, c202352, cffc2b5, 9c35582, c202352, b13f0c2, 3e9b9ab. O etiketli imajlar
+# ÖNCEKİ SÜRÜMLER (artık hedef değil): c8bf41d, bc6a53a, 5cb1a7f, c202352, cffc2b5, 9c35582, c202352, b13f0c2, 3e9b9ab. O etiketli imajlar
 # silinmedi; gerekirse bu dosyanın bir kopyasıyla hedeflenebilirler.
 #
 # VERİTABANI: Bu dosya veritabanına DOKUNMAZ. Geri dönüş otomatik restore İÇERMEZ —
@@ -37,25 +37,25 @@
 
 services:
   api:
-    image: govai-api:c8bf41d
+    image: govai-api:0d42f3f
     pull_policy: never
 
   web:
-    image: govai-web:c8bf41d
+    image: govai-web:0d42f3f
     pull_policy: never
 
   collector:
-    image: govai-worker:c8bf41d
+    image: govai-worker:0d42f3f
     pull_policy: never
 
   parser:
-    image: govai-worker:c8bf41d
+    image: govai-worker:0d42f3f
     pull_policy: never
 
   scoring:
-    image: govai-worker:c8bf41d
+    image: govai-worker:0d42f3f
     pull_policy: never
 
   scheduler:
-    image: govai-worker:c8bf41d
+    image: govai-worker:0d42f3f
     pull_policy: never
