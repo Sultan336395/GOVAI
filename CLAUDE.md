@@ -160,6 +160,7 @@ Burası en kolay ve en sessiz bozulan yer. Üç sözleşme iki ayrı yığında 
 | Alan beyaz listesi | `CompanyFieldResolver.SupportedFields` | `rule_extractor.ALLOWED_FIELDS` | AI tanınmayan alanla kural üretir, motor sessizce `Unknown` sayar |
 | Kuyruk adları | `QueueNames` | `messaging.RoutingKeys` | Mesajlar hiçbir tüketiciye ulaşmaz, hata da vermez |
 | API tipleri | Controller DTO'ları | `web/src/api/types.ts` | Panel `undefined` gösterir |
+| Ayrıştırma durumları | `DocumentParseStatus` | `parser/runner.py` içindeki `status=` | API 400 döner, mesaj ölü kuyruğa düşer |
 
 İlk ikisi otomatik denetlenir:
 
@@ -169,6 +170,10 @@ python scripts/check_contract_parity.py
 
 CI'da `contracts` işi olarak her push'ta koşar. **C# tarafı kaynak doğrudur** — uyuşmazlıkta
 Python'u ona uydur, tersini yapma.
+
+Dördüncüsü `workers/tests/test_ayristirma_durumlari.py` ile denetlenir: worker'ın bildirdiği
+her `status` değeri C# enum'unda aranır. Sahada `Skipped` bir süre yalnızca Python tarafında
+vardı; API her liste sayfasında 400 döndü ve eleme hiç kaydedilmedi.
 
 Üçüncüsü (TS tipleri) elle senkronize edilir. Bir DTO'ya alan eklersen
 `web/src/api/types.ts` içindeki karşılığını da güncelle.
