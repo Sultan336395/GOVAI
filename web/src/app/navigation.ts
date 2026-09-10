@@ -125,6 +125,12 @@ export function buildNavigation({
         { to: '/simulation', label: 'Senaryo Analizi', icon: 'scenario' },
       ],
     },
+    {
+      title: 'Raporlar',
+      items: [
+        { to: '/weekly-reports', label: 'Haftalık Raporlar', icon: 'report' },
+      ],
+    },
   ]
 
   // Mevzuat kiracı kullanıcılarına da açıktır: resmî ve doğrulanmış kayıtları okurlar.

@@ -39,6 +39,8 @@ import type {
   TenantUser,
   UpdateCompanyHierarchyRequest,
   VerificationRequest,
+  WeeklyReportSummary,
+  WeeklyReportDetail,
 } from './types'
 
 const TOKEN_STORAGE_KEY = 'govai.token'
@@ -242,6 +244,25 @@ export const api = {
 
   exportUrl: (companyId: string, format: 'excel' | 'pdf') =>
     `${BASE_URL}/api/reports/companies/${companyId}/export/${format}`,
+
+  // ---- haftalık rapor ----
+  listWeeklyReports: (companyId: string, limit?: number) =>
+    request<WeeklyReportSummary[]>(
+      `/api/reports/weekly/companies/${companyId}${query({ limit })}`,
+    ),
+
+  getWeeklyReport: (reportId: string) =>
+    request<WeeklyReportDetail>(`/api/reports/weekly/${reportId}`),
+
+  /** Dönem verilmezse tamamlanmış son hafta alınır. Aynı hafta ikinci kayıt açmaz. */
+  generateWeeklyReport: (companyId: string, weekOf?: string) =>
+    request<WeeklyReportDetail>(`/api/reports/weekly/companies/${companyId}`, {
+      method: 'POST',
+      body: JSON.stringify({ weekOf: weekOf ?? null }),
+    }),
+
+  weeklyReportExportUrl: (reportId: string, format: 'excel' | 'pdf') =>
+    `${BASE_URL}/api/reports/weekly/${reportId}/${format}`,
 
   // ---- bildirimler ----
   listNotifications: (params: { companyId?: string; onlyUnread?: boolean; pageSize?: number }) =>

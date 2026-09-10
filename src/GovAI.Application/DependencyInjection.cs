@@ -39,6 +39,7 @@ public static class DependencyInjection
         services.AddScoped<Opportunities.RuleEvidenceBackfillService>();
         services.AddScoped<ScenarioSimulationService>();
         services.AddScoped<ReportingService>();
+        services.AddScoped<WeeklyReportService>();
         services.AddScoped<NotificationService>();
         services.AddScoped<AuthenticationService>();
 

@@ -73,6 +73,32 @@ def _nightly_rescore(client: GovAiClient) -> None:
         log.exception("nightly_rescore_failed")
 
 
+def _weekly_reports(client: GovAiClient) -> None:
+    """Firmaların haftalık raporunu üretir.
+
+    Pazartesi sabahı çalışır ve GEÇEN haftayı raporlar. İçinde bulunulan haftayı
+    raporlamak yarım veri sunmak olurdu; hafta sınırı sunucu tarafında Türkiye
+    saatiyle çizilir.
+
+    Raporu worker KURMAZ, yalnızca tetikler: içerik ve yetki kararları sunucuda verilir
+    ve worker müşteri verisi görmez (yanıt yalnızca sayı taşır).
+    """
+    log.info("weekly_reports_started")
+
+    try:
+        result = client.generate_weekly_reports() or {}
+        log.info(
+            "weekly_reports_finished",
+            companies=result.get("companyCount"),
+            generated=result.get("generatedCount"),
+            failed=result.get("failedCount"),
+            period_start=result.get("periodStart"),
+            period_end=result.get("periodEnd"),
+        )
+    except ApiError:
+        log.exception("weekly_reports_failed")
+
+
 def main() -> int:
     configure_logging()
 
@@ -104,6 +130,20 @@ def main() -> int:
         CronTrigger(hour=3, minute=30),
         args=[client],
         id="nightly-rescore",
+        max_instances=1,
+        coalesce=True,
+    )
+
+    # Haftalık rapor: Pazartesi 07:30, gece skorlama turundan SONRA.
+    #
+    # Sıra önemli: rapor o anki skorların anlık görüntüsünü alır. Skorlama turundan
+    # önce çalışsa rapor bir gün eski skorlarla üretilir ve hafta boyunca öyle kalırdı
+    # (geçmiş rapor bilerek yeniden hesaplanmaz).
+    scheduler.add_job(
+        _weekly_reports,
+        CronTrigger(day_of_week="mon", hour=7, minute=30),
+        args=[client],
+        id="weekly-reports",
         max_instances=1,
         coalesce=True,
     )

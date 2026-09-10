@@ -22,6 +22,7 @@ export type NavIconName =
   | 'sources'
   | 'regulation'
   | 'quarantine'
+  | 'report'
   | 'menu'
   | 'close'
 
@@ -48,6 +49,15 @@ function Svg({ children, ...props }: IconProps) {
 }
 
 const icons: Record<NavIconName, (props: IconProps) => ReactElement> = {
+  // Rapor: satırları olan bir belge
+  report: (props) => (
+    <Svg {...props}>
+      <path d="M6 2h8l4 4v16H6z" />
+      <path d="M14 2v4h4" />
+      <path d="M9 12h6M9 16h6M9 8h2" />
+    </Svg>
+  ),
+
   // Panel: dört kutucuk
   overview: (p) => (
     <Svg {...p}>

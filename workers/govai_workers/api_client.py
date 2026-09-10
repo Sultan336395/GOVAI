@@ -191,6 +191,14 @@ class GovAiClient:
         """
         return self._request("POST", "/api/eligibility/rescore-batch")
 
+    def generate_weekly_reports(self) -> dict[str, Any]:
+        """Kiracıdaki tüm firmalar için haftalık raporu üretir.
+
+        Raporu sunucu kurar; worker yalnızca tetikler. Yanıt sayı içerir, firma verisi
+        içermez — worker müşteri verisi görmez.
+        """
+        return self._request("POST", "/api/reports/weekly-batch")
+
     def invalidate_opportunity(self, opportunity_id: str) -> dict[str, Any]:
         """Bir çağrının eski skorlarını geçersiz işaretler. Kayıt silinmez."""
         return self._request("POST", f"/api/eligibility/opportunities/{opportunity_id}/invalidate")

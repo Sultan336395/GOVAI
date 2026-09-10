@@ -34,6 +34,7 @@ public static class DependencyInjection
         services.AddScoped<IPlatformActivationRepository, PlatformActivationRepository>();
         services.AddScoped<IRegulatoryChangeRepository, RegulatoryChangeRepository>();
         services.AddScoped<IAssessmentRepository, AssessmentRepository>();
+        services.AddScoped<IWeeklyReportRepository, WeeklyReportRepository>();
         services.AddScoped<IAnalysisRunRepository, AnalysisRunRepository>();
         services.AddScoped<ICatalogRepairRepository, CatalogRepairRepository>();
         services.AddScoped<IRuleEvidenceBackfillRepository, RuleEvidenceBackfillRepository>();

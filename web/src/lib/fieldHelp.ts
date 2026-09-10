@@ -113,6 +113,11 @@ export const fieldHelp = {
   regulationDomain: 'Mevzuatın düzenlediği konu alanı.',
   regulationJurisdiction:
     'Mevzuatın yürürlükte olduğu hukuk düzeni; ulusal mevzuat ile AB mevzuatını ayırır.',
+
+  // ── Haftalık rapor ──
+  raporDonemi: 'Raporun anlattığı hafta; Pazartesi başlar, Pazar biter.',
+  raporKaynagi: 'Rapor haftalık takvimle mi yoksa sizin isteğinizle mi oluştu.',
+  acilSonBasvuru: 'İki hafta içinde kapanan çağrı sayısı.',
 } as const satisfies Record<string, string>
 
 export type FieldHelpKey = keyof typeof fieldHelp

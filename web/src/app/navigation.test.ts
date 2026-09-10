@@ -103,10 +103,12 @@ describe('kiracı kullanıcıları', () => {
     expect(gruplar(ctx)).toEqual([
       'Genel',
       'Fırsat ve Analiz',
+      'Raporlar',
       'Mevzuat ve Uyum',
       'Şirket Yönetimi',
     ])
     expect(etiketler(ctx)).toContain('Mevzuat Değişiklikleri')
+    expect(etiketler(ctx)).toContain('Haftalık Raporlar')
     expect(etiketler(ctx)).not.toContain('Veri Kaynakları')
     expect(etiketler(ctx)).not.toContain('Karantina İnceleme')
   })

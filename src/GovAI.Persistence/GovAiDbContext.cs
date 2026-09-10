@@ -9,6 +9,7 @@ using GovAI.Domain.Maintenance;
 using GovAI.Domain.Notifications;
 using GovAI.Domain.Opportunities;
 using GovAI.Domain.Regulatory;
+using GovAI.Domain.Reporting;
 using GovAI.Domain.Sources;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore;
@@ -63,6 +64,7 @@ public class GovAiDbContext(
     public DbSet<OpportunityRuleEvidence> OpportunityRuleEvidence => Set<OpportunityRuleEvidence>();
     public DbSet<MaintenanceRun> MaintenanceRuns => Set<MaintenanceRun>();
     public DbSet<ScenarioSimulation> ScenarioSimulations => Set<ScenarioSimulation>();
+    public DbSet<WeeklyReport> WeeklyReports => Set<WeeklyReport>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<AuditLogEntry> AuditLog => Set<AuditLogEntry>();
 
@@ -145,6 +147,9 @@ public class GovAiDbContext(
 
         modelBuilder.Entity<ScenarioSimulation>()
             .HasQueryFilter(s => s.TenantId == _tenantId);
+
+        modelBuilder.Entity<WeeklyReport>()
+            .HasQueryFilter(r => r.TenantId == _tenantId);
 
         modelBuilder.Entity<AnalysisRun>()
             .HasQueryFilter(r => r.TenantId == _tenantId);

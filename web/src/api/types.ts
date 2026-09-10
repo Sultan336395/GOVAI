@@ -1209,3 +1209,110 @@ export type DocumentProcessingStatus =
   | 'RulesExtracted'
   | 'Failed'
   | 'Discarded'
+
+// ---- haftalık rapor ----
+
+export type ReportTrigger = 'Scheduled' | 'Manual'
+
+export type ReportRiskKind = 'BlockingCondition' | 'MissingDocument' | 'DataGap'
+
+export type ReportTodoPriority = 'Urgent' | 'High' | 'Normal'
+
+export interface WeeklyReportSummary {
+  id: string
+  companyId: string
+  companyName: string
+  periodStart: string
+  periodEnd: string
+  generatedAt: string
+  trigger: ReportTrigger
+  opportunityCount: number
+  tenderCount: number
+  regulatoryChangeCount: number
+  riskCount: number
+  actionCount: number
+  urgentDeadlineCount: number
+}
+
+export interface ReportOpportunityItem {
+  opportunityId: string
+  title: string
+  publisher: string
+  category: SupportCategory
+  categoryLabel: string
+  score: number
+  verdict: EligibilityVerdict
+  verdictLabel: string
+  sectorFit: SectorFit
+  sectorFitLabel: string
+  deadline: string | null
+  daysToDeadline: number | null
+  sourceUrl: string | null
+  missingConditions: string[]
+}
+
+export interface ReportRegulatoryItem {
+  regulatoryChangeId: string
+  title: string
+  authority: string
+  publishedAt: string
+  summary: string | null
+  sourceUrl: string | null
+}
+
+export interface ReportRiskItem {
+  kind: ReportRiskKind
+  kindLabel: string
+  subject: string
+  description: string
+  action: string | null
+  affectedOpportunityCount: number
+}
+
+export interface ReportDeadlineItem {
+  opportunityId: string
+  title: string
+  deadline: string
+  daysRemaining: number
+  score: number
+  verdict: EligibilityVerdict
+  verdictLabel: string
+}
+
+export interface ReportTodoItem {
+  priority: ReportTodoPriority
+  priorityLabel: string
+  title: string
+  reason: string
+  dueAt: string | null
+  opportunityId: string | null
+}
+
+export interface WeeklyReportHeader {
+  companyId: string
+  companyName: string
+  periodStart: string
+  periodEnd: string
+  generatedAt: string
+  evaluatedOpportunityCount: number
+  eligibleCount: number
+  undeterminedCount: number
+}
+
+export interface WeeklyReportContent {
+  header: WeeklyReportHeader
+  supports: ReportOpportunityItem[]
+  technologyTenders: ReportOpportunityItem[]
+  regulatoryChanges: ReportRegulatoryItem[]
+  risks: ReportRiskItem[]
+  deadlines: ReportDeadlineItem[]
+  todos: ReportTodoItem[]
+  /** Boş bölümlerin sebebi. Boşluk sessizce geçilmez. */
+  notes: string[]
+}
+
+export interface WeeklyReportDetail {
+  id: string
+  trigger: ReportTrigger
+  content: WeeklyReportContent
+}

@@ -1,0 +1,406 @@
+using GovAI.Application.Reporting;
+using GovAI.Domain.Assessments;
+using GovAI.Domain.Common;
+using GovAI.Domain.Eligibility;
+using GovAI.Domain.Opportunities;
+using GovAI.Domain.Reporting;
+using GovAI.Domain.Scoring;
+
+namespace GovAI.Application.Tests;
+
+/// <summary>
+/// Haftalık raporun kurulması.
+///
+/// <para>
+/// Bu testler ürünün rapor sözleşmesidir. Rapor firmanın karar aldığı belgedir; üç şeyi
+/// birden tutmak zorundadır: <b>deterministik</b> olmak (aynı girdi → aynı rapor),
+/// <b>uydurmamak</b> (veri yoksa sebebini yazmak) ve <b>karantinadaki kaydı
+/// göstermemek</b>.
+/// </para>
+/// </summary>
+public class WeeklyReportBuilderTests
+{
+    private static readonly DateTimeOffset AsOf = new(2026, 9, 14, 7, 30, 0, TimeSpan.FromHours(3));
+
+    private static readonly Guid SourceId = Guid.NewGuid();
+
+    private static readonly Guid CompanyId = Guid.NewGuid();
+
+    // ── Kurulum yardımcıları ────────────────────────────────────────────────
+
+    private static Opportunity Cagri(
+        SupportCategory kategori,
+        string baslik,
+        DateTimeOffset? sonBasvuru = null,
+        string? naceKurali = null)
+    {
+        var cagri = new Opportunity(
+            SourceId, SourceType.KosgebOrSimilar, kategori, baslik, "KOSGEB",
+            AsOf.AddDays(-10));
+
+        cagri.SetSchedule(AsOf.AddDays(-10), sonBasvuru);
+
+        if (naceKurali is not null)
+        {
+            cagri.ReplaceRules(
+                [
+                    new OpportunityRule(
+                        "Company.NaceCodes", RuleOperator.NaceMatch, naceKurali,
+                        RuleDimension.Sector, RuleSeverity.Major,
+                        "İlanın konusu bilişim alanındadır.", confidence: 0.7m),
+                ],
+                0.7m);
+        }
+
+        return cagri;
+    }
+
+    private static EligibilityOutcome Sonuc(
+        Guid opportunityId,
+        EligibilityVerdict karar,
+        decimal skor,
+        IReadOnlyList<RuleEvaluation>? kurallar = null,
+        IReadOnlyList<DocumentCheckResult>? belgeler = null) =>
+        new()
+        {
+            CompanyId = CompanyId,
+            OpportunityId = opportunityId,
+            EvaluatedAt = AsOf.AddDays(-1),
+            Verdict = karar,
+            SectorFit = SectorFit.Matched,
+            RuleEvaluations = kurallar ?? [],
+            DocumentChecklist = belgeler ?? [],
+            Score = new ScoreBreakdown
+            {
+                Dimensions = [],
+                Weights = ScoreWeights.Default,
+                FinalScore = skor,
+                HasBlockingFailure = false,
+                Confidence = 0.9m,
+            },
+        };
+
+    private static AssessedOpportunity Cift(
+        Opportunity cagri,
+        EligibilityVerdict karar = EligibilityVerdict.Eligible,
+        decimal skor = 80m,
+        IReadOnlyList<RuleEvaluation>? kurallar = null,
+        IReadOnlyList<DocumentCheckResult>? belgeler = null)
+    {
+        var sonuc = Sonuc(cagri.Id, karar, skor, kurallar, belgeler);
+
+        return new AssessedOpportunity(
+            new EligibilityAssessment(Guid.NewGuid(), sonuc, 1, "{}"),
+            cagri,
+            sonuc);
+    }
+
+    private static WeeklyReportInput Girdi(params AssessedOpportunity[] cift) => new()
+    {
+        CompanyId = CompanyId,
+        CompanyName = "Örnek Teknoloji A.Ş.",
+        Week = ReportWeek.CompletedBefore(AsOf),
+        AsOf = AsOf,
+        Assessments = cift,
+        RegulatoryChanges = [],
+    };
+
+    private static RuleEvaluation Kural(
+        string alan,
+        string metin,
+        RuleOutcome sonuc,
+        RuleSeverity siddet,
+        string? aksiyon = null) =>
+        new()
+        {
+            RuleId = Guid.NewGuid(),
+            Field = alan,
+            Dimension = RuleDimension.Employment,
+            Severity = siddet,
+            Outcome = sonuc,
+            Requirement = metin,
+            ActualValue = "7",
+            ExpectedValue = ">= 10",
+            Strength = 0m,
+            SuggestedAction = aksiyon,
+        };
+
+    // ── Determinizm ─────────────────────────────────────────────────────────
+
+    [Fact(DisplayName = "HR1. Aynı girdi aynı raporu üretir")]
+    public void Ayni_girdi_ayni_raporu_uretir()
+    {
+        // Determinizm ürünün en temel iddiasıdır: iki kez üretilen rapor farklı
+        // çıkarsa firma hangisine göre karar verdiğini savunamaz.
+        var girdi = Girdi(
+            Cift(Cagri(SupportCategory.Grant, "B Hibesi", AsOf.AddDays(20)), skor: 70m),
+            Cift(Cagri(SupportCategory.Grant, "A Hibesi", AsOf.AddDays(10)), skor: 70m));
+
+        var bir = WeeklyReportBuilder.Build(girdi);
+        var iki = WeeklyReportBuilder.Build(girdi);
+
+        Assert.Equal(
+            bir.Supports.Select(s => s.Title),
+            iki.Supports.Select(s => s.Title));
+
+        // Eşit skorda sıra başlığa göre sabitlenir; sözlük sırası rastgele olamaz.
+        Assert.Equal(["A Hibesi", "B Hibesi"], bir.Supports.Select(s => s.Title));
+    }
+
+    // ── Bölüm ayrımı ────────────────────────────────────────────────────────
+
+    [Fact(DisplayName = "HR2. İhale destek bölümüne, destek ihale bölümüne GİRMEZ")]
+    public void Bolumler_karismaz()
+    {
+        var rapor = WeeklyReportBuilder.Build(Girdi(
+            Cift(Cagri(SupportCategory.Grant, "Hibe Çağrısı")),
+            Cift(Cagri(SupportCategory.Tender, "Yazılım Alımı", naceKurali: "62.01,62.02"))));
+
+        Assert.Equal(["Hibe Çağrısı"], rapor.Supports.Select(s => s.Title));
+        Assert.Equal(["Yazılım Alımı"], rapor.TechnologyTenders.Select(s => s.Title));
+    }
+
+    [Fact(DisplayName = "HR3. Teknoloji ihalesi başlığa değil KAYNAĞIN sınıflandırmasına bakar")]
+    public void Teknoloji_ihalesi_kurala_bakar()
+    {
+        // Başlıkta "yazılım" geçen bir temizlik ihalesi listeye girmemeli; sektör kuralı
+        // taşıyan bir ihale ise başlığında teknoloji kelimesi olmasa da girmeli.
+        var yaniltici = Cagri(SupportCategory.Tender, "Yazılım Binası Temizlik Hizmeti", naceKurali: "81.21");
+        var gercek = Cagri(SupportCategory.Tender, "Sunucu ve Lisans Alımı", naceKurali: "62.01,26.20");
+
+        var rapor = WeeklyReportBuilder.Build(Girdi(Cift(yaniltici), Cift(gercek)));
+
+        Assert.Equal(["Sunucu ve Lisans Alımı"], rapor.TechnologyTenders.Select(s => s.Title));
+    }
+
+    [Fact(DisplayName = "HR4. Sektör kuralı olmayan ihale teknoloji sayılmaz")]
+    public void Kuralsiz_ihale_teknoloji_sayilmaz()
+    {
+        var rapor = WeeklyReportBuilder.Build(Girdi(
+            Cift(Cagri(SupportCategory.Tender, "Konusu Belirsiz İhale"))));
+
+        Assert.Empty(rapor.TechnologyTenders);
+    }
+
+    // ── Karantina ve kapanmış çağrı ─────────────────────────────────────────
+
+    [Fact(DisplayName = "HR5. Karantinadaki çağrı rapora GİRMEZ")]
+    public void Karantinadaki_cagri_girmez()
+    {
+        // Katalogda gösterilmeyen bir kayıt için firmaya "başvurun" demek olurdu.
+        var karantinali = Cagri(SupportCategory.Grant, "Karantinadaki Hibe");
+        karantinali.Quarantine(QuarantineReason.InvalidSourcePage, "Liste sayfası.");
+
+        var rapor = WeeklyReportBuilder.Build(Girdi(
+            Cift(karantinali),
+            Cift(Cagri(SupportCategory.Grant, "Geçerli Hibe"))));
+
+        Assert.Equal(["Geçerli Hibe"], rapor.Supports.Select(s => s.Title));
+        Assert.Equal(1, rapor.Header.EvaluatedOpportunityCount);
+    }
+
+    [Fact(DisplayName = "HR6. Son başvurusu geçmiş çağrı rapora GİRMEZ")]
+    public void Kapanmis_cagri_girmez()
+    {
+        var rapor = WeeklyReportBuilder.Build(Girdi(
+            Cift(Cagri(SupportCategory.Grant, "Kapanmış Hibe", AsOf.AddDays(-1))),
+            Cift(Cagri(SupportCategory.Grant, "Açık Hibe", AsOf.AddDays(5)))));
+
+        Assert.Equal(["Açık Hibe"], rapor.Supports.Select(s => s.Title));
+        Assert.Empty(rapor.Deadlines.Where(d => d.Title == "Kapanmış Hibe"));
+    }
+
+    [Fact(DisplayName = "HR7. Uygun olmayan çağrı öneri listesine girmez")]
+    public void Uygun_olmayan_cagri_onerilmez()
+    {
+        var rapor = WeeklyReportBuilder.Build(Girdi(
+            Cift(Cagri(SupportCategory.Grant, "Uygun Değil"), EligibilityVerdict.NotEligible, 0m),
+            Cift(Cagri(SupportCategory.Grant, "Şartlı Uygun"), EligibilityVerdict.ConditionallyEligible, 55m)));
+
+        Assert.Equal(["Şartlı Uygun"], rapor.Supports.Select(s => s.Title));
+    }
+
+    // ── Sıralama ────────────────────────────────────────────────────────────
+
+    [Fact(DisplayName = "HR8. Sektör uyumu skordan ÖNCE gelir")]
+    public void Sektor_uyumu_birincil_olcuttur()
+    {
+        // CLAUDE.md §2.2.1: sektör uyumu sıralamanın birincil ölçütüdür. Yüksek skorlu
+        // ama sektörü uyumsuz bir çağrıyı başa koymak, danışmana yanlış işi gösterir.
+        var yuksekAmaUyumsuz = Cagri(SupportCategory.Grant, "Yüksek Skor Uyumsuz");
+        var dusukAmaUyumlu = Cagri(SupportCategory.Grant, "Düşük Skor Uyumlu");
+
+        var uyumsuzSonuc = Sonuc(yuksekAmaUyumsuz.Id, EligibilityVerdict.ConditionallyEligible, 95m)
+            with { SectorFit = SectorFit.NotMatched };
+
+        var rapor = WeeklyReportBuilder.Build(Girdi(
+            new AssessedOpportunity(
+                new EligibilityAssessment(Guid.NewGuid(), uyumsuzSonuc, 1, "{}"),
+                yuksekAmaUyumsuz,
+                uyumsuzSonuc),
+            Cift(dusukAmaUyumlu, skor: 40m)));
+
+        Assert.Equal("Düşük Skor Uyumlu", rapor.Supports[0].Title);
+    }
+
+    // ── Riskler ─────────────────────────────────────────────────────────────
+
+    [Fact(DisplayName = "HR9. Aynı eksik birden çok çağrıda TEK risk olur")]
+    public void Ayni_eksik_tekillestirilir()
+    {
+        // Aynı eksik belge on çağrıyı bloke ediyorsa bu on ayrı risk değildir; listeyi
+        // aynı satırın kopyalarıyla doldurmak asıl işi görünmez yapar.
+        var engel = Kural("Workforce.EmployeeCount", "Asgari 10 çalışan", RuleOutcome.NotSatisfied,
+            RuleSeverity.Blocking, "Çalışan sayısını 10'a çıkarın.");
+
+        var rapor = WeeklyReportBuilder.Build(Girdi(
+            Cift(Cagri(SupportCategory.Grant, "Hibe 1"), kurallar: [engel]),
+            Cift(Cagri(SupportCategory.Grant, "Hibe 2"), kurallar: [engel])));
+
+        var risk = Assert.Single(rapor.Risks);
+
+        Assert.Equal(ReportRiskKind.BlockingCondition, risk.Kind);
+        Assert.Equal(2, risk.AffectedOpportunityCount);
+    }
+
+    [Fact(DisplayName = "HR10. Eksik zorunlu belge risk olarak görünür, isteğe bağlı belge görünmez")]
+    public void Zorunlu_belge_eksigi_risktir()
+    {
+        var rapor = WeeklyReportBuilder.Build(Girdi(Cift(
+            Cagri(SupportCategory.Grant, "Belgeli Hibe"),
+            belgeler:
+            [
+                new DocumentCheckResult
+                {
+                    Code = "ISO9001", Name = "ISO 9001", IsMandatory = true,
+                    Status = DocumentStatus.Missing, Action = "ISO 9001 belgesini temin edin.",
+                },
+                new DocumentCheckResult
+                {
+                    Code = "ISO14001", Name = "ISO 14001", IsMandatory = false,
+                    Status = DocumentStatus.Missing,
+                },
+            ])));
+
+        var risk = Assert.Single(rapor.Risks);
+
+        Assert.Equal(ReportRiskKind.MissingDocument, risk.Kind);
+        Assert.Equal("ISO 9001", risk.Subject);
+        Assert.Equal("ISO 9001 belgesini temin edin.", risk.Action);
+    }
+
+    [Fact(DisplayName = "HR11. Eksik profil bilgisi ile engelleyici koşul AYRI cinstendir")]
+    public void Eksik_veri_engelle_karistirilmaz()
+    {
+        // "Bilmiyorum" ile "hayır" ayrı şeylerdir (CLAUDE.md §2.2). Eksik profil bilgisi
+        // başvuruyu engellemez, yalnızca kararı belirsiz bırakır.
+        var rapor = WeeklyReportBuilder.Build(Girdi(Cift(
+            Cagri(SupportCategory.Grant, "Hibe"),
+            kurallar:
+            [
+                Kural("Financials.Revenue", "Asgari 1M ciro", RuleOutcome.Unknown,
+                    RuleSeverity.Major, "Ciro bilgisini girin."),
+                Kural("Workforce.EmployeeCount", "Asgari 10 çalışan", RuleOutcome.NotSatisfied,
+                    RuleSeverity.Blocking, "Çalışan sayısını 10'a çıkarın."),
+            ])));
+
+        Assert.Contains(rapor.Risks, r => r.Kind == ReportRiskKind.DataGap);
+        Assert.Contains(rapor.Risks, r => r.Kind == ReportRiskKind.BlockingCondition);
+    }
+
+    // ── Yapılacaklar ────────────────────────────────────────────────────────
+
+    [Fact(DisplayName = "HR12. Yakın son başvuru ACİL, uzak olan değil")]
+    public void Aciliyet_son_tarihe_baglidir()
+    {
+        var rapor = WeeklyReportBuilder.Build(Girdi(
+            Cift(Cagri(SupportCategory.Grant, "Acil Hibe", AsOf.AddDays(5))),
+            Cift(Cagri(SupportCategory.Grant, "Rahat Hibe", AsOf.AddDays(45)))));
+
+        var acil = rapor.Todos.First();
+
+        Assert.Equal(ReportTodoPriority.Urgent, acil.Priority);
+        Assert.Contains("Acil Hibe", acil.Title);
+        Assert.Contains("gün kaldı", acil.Reason);
+
+        Assert.Contains(rapor.Todos, t => t.Priority == ReportTodoPriority.Normal
+                                          && t.Title.Contains("Rahat Hibe", StringComparison.Ordinal));
+    }
+
+    [Fact(DisplayName = "HR13. Gerekçesiz risk yapılacaklar listesine girmez")]
+    public void Aksiyonu_olmayan_risk_is_uretmez()
+    {
+        // Ne yapılacağını söyleyemiyorsak yapılacaklar listesine satır eklemek,
+        // kullanıcıya kapatamayacağı bir iş vermek olurdu.
+        var rapor = WeeklyReportBuilder.Build(Girdi(Cift(
+            Cagri(SupportCategory.Grant, "Hibe"),
+            kurallar:
+            [
+                Kural("Workforce.EmployeeCount", "Asgari 10 çalışan",
+                    RuleOutcome.NotSatisfied, RuleSeverity.Blocking),
+            ])));
+
+        Assert.Single(rapor.Risks);
+        Assert.Empty(rapor.Todos);
+    }
+
+    [Fact(DisplayName = "HR14. Her yapılacak işin gerekçesi YAZILIDIR")]
+    public void Her_isin_gerekcesi_vardir()
+    {
+        var rapor = WeeklyReportBuilder.Build(Girdi(
+            Cift(Cagri(SupportCategory.Grant, "Hibe", AsOf.AddDays(7)),
+                kurallar:
+                [
+                    Kural("Workforce.EmployeeCount", "Asgari 10 çalışan", RuleOutcome.NotSatisfied,
+                        RuleSeverity.Blocking, "Çalışan sayısını 10'a çıkarın."),
+                ])));
+
+        Assert.NotEmpty(rapor.Todos);
+        Assert.All(rapor.Todos, t => Assert.False(string.IsNullOrWhiteSpace(t.Reason)));
+    }
+
+    // ── Boşluk uydurulmaz ───────────────────────────────────────────────────
+
+    [Fact(DisplayName = "HR15. Boş bölüm SESSİZCE geçilmez, sebebi yazılır")]
+    public void Bos_bolumun_sebebi_yazilir()
+    {
+        var rapor = WeeklyReportBuilder.Build(Girdi(
+            Cift(Cagri(SupportCategory.Grant, "Tek Hibe", AsOf.AddDays(10)))));
+
+        Assert.Empty(rapor.TechnologyTenders);
+        Assert.Empty(rapor.RegulatoryChanges);
+
+        Assert.Contains(rapor.Notes, n => n.Contains("ihale bulunamadı", StringComparison.Ordinal));
+        Assert.Contains(rapor.Notes, n => n.Contains("mevzuat değişikliği yayımlanmadı", StringComparison.Ordinal));
+    }
+
+    [Fact(DisplayName = "HR16. Değerlendirmesi olmayan firmaya boş rapor değil AÇIKLAMA verilir")]
+    public void Degerlendirmesiz_firma_aciklama_alir()
+    {
+        var rapor = WeeklyReportBuilder.Build(Girdi());
+
+        Assert.Empty(rapor.Supports);
+
+        var not = Assert.Single(rapor.Notes);
+        Assert.Contains("henüz değerlendirme yapılmamış", not, StringComparison.Ordinal);
+    }
+
+    // ── Sayaçlar ────────────────────────────────────────────────────────────
+
+    [Fact(DisplayName = "HR17. Sayaçlar gövdeyle tutarlıdır")]
+    public void Sayaclar_govdeyle_tutarlidir()
+    {
+        var rapor = WeeklyReportBuilder.Build(Girdi(
+            Cift(Cagri(SupportCategory.Grant, "Acil Hibe", AsOf.AddDays(3))),
+            Cift(Cagri(SupportCategory.Tender, "Yazılım Alımı", AsOf.AddDays(40), "62.01"))));
+
+        var sayac = WeeklyReportBuilder.Counters(rapor);
+
+        Assert.Equal(rapor.Supports.Count, sayac.OpportunityCount);
+        Assert.Equal(rapor.TechnologyTenders.Count, sayac.TenderCount);
+        Assert.Equal(rapor.Todos.Count, sayac.ActionCount);
+
+        // 3 gün kalan acil, 40 gün kalan değil.
+        Assert.Equal(1, sayac.UrgentDeadlineCount);
+    }
+}

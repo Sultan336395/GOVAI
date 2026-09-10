@@ -19,6 +19,8 @@ import EligibilityDetailPage from '@/pages/EligibilityDetailPage'
 import ActivatePage from '@/pages/ActivatePage'
 import LoginPage from '@/pages/LoginPage'
 import MatchesPage from '@/pages/MatchesPage'
+import WeeklyReportPage from '@/pages/WeeklyReportPage'
+import WeeklyReportsPage from '@/pages/WeeklyReportsPage'
 import MyCompaniesPage from '@/pages/MyCompaniesPage'
 import NewCompanyPage from '@/pages/NewCompanyPage'
 import NotificationsPage from '@/pages/NotificationsPage'
@@ -88,6 +90,8 @@ export default function App() {
 
         <Route path="/company" element={<CompanyPage />} />
         <Route path="/simulation" element={<SimulationPage />} />
+        <Route path="/weekly-reports" element={<WeeklyReportsPage />} />
+        <Route path="/weekly-reports/:reportId" element={<WeeklyReportPage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/sources" element={<SourcesPage />} />
 
