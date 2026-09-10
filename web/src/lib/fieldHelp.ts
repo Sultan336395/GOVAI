@@ -118,6 +118,8 @@ export const fieldHelp = {
   raporDonemi: 'Raporun anlattığı hafta; Pazartesi başlar, Pazar biter.',
   raporKaynagi: 'Rapor haftalık takvimle mi yoksa sizin isteğinizle mi oluştu.',
   acilSonBasvuru: 'İki hafta içinde kapanan çağrı sayısı.',
+  gecmisDonemEksigi:
+    'Başvuru süresi geçmiş çağrılardan kalan eksikler; şimdi yapılacak bir iş yoktur.',
 } as const satisfies Record<string, string>
 
 export type FieldHelpKey = keyof typeof fieldHelp

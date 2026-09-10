@@ -42,10 +42,22 @@ public sealed record WeeklyReportContent
     /// <summary>Bölüm 5 — riskler ve zorunlu aksiyonlar.</summary>
     public required IReadOnlyList<ReportRiskItem> Risks { get; init; }
 
-    /// <summary>Bölüm 6 — son başvuru takvimi.</summary>
+    /// <summary>
+    /// Bölüm 6 — geçmiş dönem eksikleri.
+    ///
+    /// <para>
+    /// Başvuru süresi geçmiş çağrılardan kalan eksikler. <b>Bilgilendiricidir, iş
+    /// listesi değildir</b>: kapanmış bir çağrı için iş vermek, yapılamayacak bir iş
+    /// vermektir. Ama eksiğin kendisi kaybolmamıştır — aynı koşulu isteyen yeni bir
+    /// çağrı açıldığında güncel listeye geçer.
+    /// </para>
+    /// </summary>
+    public required IReadOnlyList<ReportRiskItem> PastPeriodGaps { get; init; }
+
+    /// <summary>Bölüm 7 — son başvuru takvimi.</summary>
     public required IReadOnlyList<ReportDeadlineItem> Deadlines { get; init; }
 
-    /// <summary>Bölüm 7 — önceliklendirilmiş yapılacaklar.</summary>
+    /// <summary>Bölüm 8 — önceliklendirilmiş yapılacaklar.</summary>
     public required IReadOnlyList<ReportTodoItem> Todos { get; init; }
 
     /// <summary>
@@ -176,7 +188,8 @@ public sealed record WeeklyReportSummaryDto(
     int RiskCount,
     int ActionCount,
     int UrgentDeadlineCount,
-    int DeadlineCount);
+    int DeadlineCount,
+    int PastGapCount);
 
 public sealed record WeeklyReportDetailDto(
     Guid Id,

@@ -122,10 +122,11 @@ public static class WeeklyReportBuilder
             .ToHashSet();
 
         var risks = BuildRisks(canli.Where(a => listelenen.Contains(a.Opportunity.Id)).ToList());
+        var pastGaps = BuildPastGaps(canli, listelenen, input.AsOf);
         var deadlines = BuildDeadlines(canli, input.AsOf);
         var todos = BuildTodos(risks, deadlines, input.AsOf);
 
-        AddNotes(notes, input, canli, supports, tenders, others, regulatory, risks, deadlines);
+        AddNotes(notes, input, canli, supports, tenders, others, regulatory, risks, pastGaps, deadlines);
 
         return new WeeklyReportContent
         {
@@ -143,6 +144,7 @@ public static class WeeklyReportBuilder
             OtherOpportunities = others,
             RegulatoryChanges = regulatory,
             Risks = risks,
+            PastPeriodGaps = pastGaps,
             Deadlines = deadlines,
             Todos = todos,
             Notes = notes,
@@ -166,7 +168,8 @@ public static class WeeklyReportBuilder
         content.Risks.Count,
         content.Todos.Count,
         content.Deadlines.Count(d => d.DaysRemaining <= UrgentDeadlineDays),
-        content.Deadlines.Count);
+        content.Deadlines.Count,
+        content.PastPeriodGaps.Count);
 
     // ── Bölüm 1: fon, hibe, teşvik ──────────────────────────────────────────
 
@@ -268,7 +271,33 @@ public static class WeeklyReportBuilder
     /// ediyorsa bu on ayrı risk değil, on çağrıyı etkileyen tek bir risktir; listeyi
     /// aynı satırın kopyalarıyla doldurmak asıl işi görünmez yapar.
     /// </summary>
-    private static List<ReportRiskItem> BuildRisks(IReadOnlyList<AssessedOpportunity> assessments)
+    private static List<ReportRiskItem> BuildRisks(IReadOnlyList<AssessedOpportunity> assessments) =>
+        Siralı(Topla(assessments));
+
+    /// <summary>Toplanan eksikleri rapora giren satırlara çevirir ve sırasını sabitler.</summary>
+    private static List<ReportRiskItem> Siralı(
+        Dictionary<(ReportRiskKind, string),
+            (string Subject, string Description, string? Action, HashSet<Guid> Opportunities)> toplanan) =>
+        toplanan
+            .Select(kv => new ReportRiskItem(
+                kv.Key.Item1,
+                RiskLabel(kv.Key.Item1),
+                kv.Value.Subject,
+                kv.Value.Description,
+                kv.Value.Action,
+                kv.Value.Opportunities.Count))
+            .OrderBy(r => r.Kind)
+            .ThenByDescending(r => r.AffectedOpportunityCount)
+            .ThenBy(r => r.Subject, StringComparer.Ordinal)
+            .ToList();
+
+    /// <summary>
+    /// Eksikleri cinsine ve konusuna göre toplar. Aynı eksik birden çok çağrıda
+    /// geçiyorsa tek satır olur; kaç çağrıyı etkilediği sayılır.
+    /// </summary>
+    private static Dictionary<(ReportRiskKind, string),
+        (string Subject, string Description, string? Action, HashSet<Guid> Opportunities)> Topla(
+        IReadOnlyList<AssessedOpportunity> assessments)
     {
         var toplanan = new Dictionary<(ReportRiskKind, string),
             (string Subject, string Description, string? Action, HashSet<Guid> Opportunities)>();
@@ -341,18 +370,52 @@ public static class WeeklyReportBuilder
             }
         }
 
-        return toplanan
-            .Select(kv => new ReportRiskItem(
-                kv.Key.Item1,
-                RiskLabel(kv.Key.Item1),
-                kv.Value.Subject,
-                kv.Value.Description,
-                kv.Value.Action,
-                kv.Value.Opportunities.Count))
-            .OrderBy(r => r.Kind)
-            .ThenByDescending(r => r.AffectedOpportunityCount)
-            .ThenBy(r => r.Subject, StringComparer.Ordinal)
+        return toplanan;
+    }
+
+    // -- Gecmis donem eksikleri ---------------------------------------------
+
+    /// <summary>
+    /// Son başvurusu geçmiş çağrılardan kalan eksikler.
+    ///
+    /// <para>
+    /// Bu bölüm <b>bilgilendiricidir, iş listesi değildir</b>. Kapanmış bir çağrı için
+    /// "belgeyi temin edin" demek yapılamayacak bir iş vermektir; ama o eksiğin kendisi
+    /// kaybolmuş değildir — aynı koşulu isteyen yeni bir çağrı açıldığında yine
+    /// karşınıza çıkar. Eksiği hiç göstermemek, firmanın kendi durumunu görmesini
+    /// engellerdi.
+    /// </para>
+    ///
+    /// <para>
+    /// Hâlâ açık bir çağrıda geçen eksik buraya <b>girmez</b>: o eksik güncel risk
+    /// listesindedir ve aynı satırı iki bölümde göstermek, hangisinin üzerine iş
+    /// verildiğini belirsizleştirir.
+    /// </para>
+    /// </summary>
+    private static List<ReportRiskItem> BuildPastGaps(
+        IReadOnlyList<AssessedOpportunity> assessments,
+        IReadOnlyCollection<Guid> listelenen,
+        DateTimeOffset asOf)
+    {
+        var kapanmis = assessments
+            .Where(a => !listelenen.Contains(a.Opportunity.Id))
+            .Where(a => Kapandi(a.Opportunity, asOf))
             .ToList();
+
+        if (kapanmis.Count == 0)
+        {
+            return [];
+        }
+
+        var guncel = Topla(assessments.Where(a => listelenen.Contains(a.Opportunity.Id)).ToList())
+            .Keys
+            .ToHashSet();
+
+        var gecmis = Topla(kapanmis)
+            .Where(kv => !guncel.Contains(kv.Key))
+            .ToDictionary(kv => kv.Key, kv => kv.Value);
+
+        return Siralı(gecmis);
     }
 
     private static string RiskLabel(ReportRiskKind kind) => kind switch
@@ -464,6 +527,7 @@ public static class WeeklyReportBuilder
         IReadOnlyList<ReportOpportunityItem> others,
         IReadOnlyList<ReportRegulatoryItem> regulatory,
         IReadOnlyList<ReportRiskItem> risks,
+        IReadOnlyList<ReportRiskItem> pastGaps,
         IReadOnlyList<ReportDeadlineItem> deadlines)
     {
         if (input.EmptyReason is { } sebep)
@@ -517,6 +581,14 @@ public static class WeeklyReportBuilder
         if (risks.Count == 0 && input.UnreadableDetailCount == 0)
         {
             notes.Add("Firma profilinde başvuruyu engelleyen bir eksik görünmüyor.");
+        }
+
+        if (pastGaps.Count > 0)
+        {
+            notes.Add(
+                $"Başvuru süresi geçmiş çağrılardan {pastGaps.Count} eksik kaydı duruyor. " +
+                "Bunlar için şimdi yapılacak bir iş yoktur; aynı koşulu isteyen yeni bir " +
+                "çağrı açıldığında güncel listeye geçerler.");
         }
 
         if (deadlines.Count == 0)

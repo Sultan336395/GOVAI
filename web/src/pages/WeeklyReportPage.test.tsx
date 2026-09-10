@@ -42,6 +42,7 @@ const bosIcerik: WeeklyReportContent = {
   otherOpportunities: [],
   regulatoryChanges: [],
   risks: [],
+  pastPeriodGaps: [],
   deadlines: [],
   todos: [],
   notes: ['Firma için henüz değerlendirme yapılmamış.'],
@@ -86,6 +87,7 @@ describe('WeeklyReportPage', () => {
     for (const baslik of [
       'Öncelikli Yapılacaklar',
       'Riskler ve Zorunlu Aksiyonlar',
+      'Geçmiş Dönem Eksikleri',
       'En Uygun Fon, Hibe ve Teşvikler',
       'Teknoloji ve Yazılım İhaleleri',
       'Diğer Açık Çağrı ve İhaleler',
@@ -127,6 +129,30 @@ describe('WeeklyReportPage', () => {
 
     expect(screen.getByText('Danışman değerlendirmesi gerekiyor')).toBeTruthy()
     expect(screen.getByText('3')).toBeTruthy()
+  })
+
+  it('HRW6. Geçmiş dönem eksiği İŞ OLARAK sunulmaz', async () => {
+    // Kapanmış çağrı için "yapılması gereken" demek, yapılamayacak bir iş vermektir.
+    getWeeklyReport.mockResolvedValue(rapor({
+      pastPeriodGaps: [
+        {
+          kind: 'MissingDocument',
+          kindLabel: 'Eksik zorunlu belge',
+          subject: 'SGK Borcu Yoktur Yazısı',
+          description: 'SGK Borcu Yoktur Yazısı belgesi firma kaydında yok.',
+          action: 'SGK üzerinden temin edin.',
+          affectedOpportunityCount: 2,
+        },
+      ],
+    }))
+
+    ekranaBas()
+
+    await waitFor(() => expect(screen.getByText('Geçmiş Dönem Eksikleri')).toBeTruthy())
+
+    expect(screen.getByText('SGK Borcu Yoktur Yazısı')).toBeTruthy()
+    expect(screen.getByText('Gelecek Çağrılar İçin')).toBeTruthy()
+    expect(screen.getByText(/şimdi yapılacak bir iş yoktur/)).toBeTruthy()
   })
 
   it('HRW4. PDF ve Excel bağlantıları raporun kendisine gider', async () => {

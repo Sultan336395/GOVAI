@@ -35,7 +35,7 @@ export default function WeeklyReportPage() {
 
   const {
     header, supports, technologyTenders, otherOpportunities,
-    regulatoryChanges, risks, deadlines, todos, notes,
+    regulatoryChanges, risks, pastPeriodGaps, deadlines, todos, notes,
   } = data.content
 
   return (
@@ -82,6 +82,27 @@ export default function WeeklyReportPage() {
 
       <Bolum baslik="Riskler ve Zorunlu Aksiyonlar" bos="Başvuruyu engelleyen bir eksik görünmüyor.">
         {risks.length > 0 ? <RiskTablosu satirlar={risks} /> : null}
+      </Bolum>
+
+      {/*
+        Geçmiş dönem eksikleri güncel risklerin ARDINDAN gelir ve başlığı bunun bir iş
+        listesi olmadığını söyler. İkisini aynı görünümde vermek, okuyucunun
+        başvurulamayacak bir çağrı için iş planlamasına yol açardı.
+      */}
+      <Bolum
+        baslik="Geçmiş Dönem Eksikleri"
+        bos="Başvuru süresi geçmiş çağrılardan kalan bir eksik yok."
+      >
+        {pastPeriodGaps.length > 0 ? (
+          <>
+            <p className="muted">
+              Bu çağrıların başvuru süresi geçti; şimdi yapılacak bir iş yoktur. Eksikler
+              yine de geçerli: aynı koşulu isteyen yeni bir çağrı açıldığında güncel
+              risk listesine geçerler.
+            </p>
+            <GecmisEksikTablosu satirlar={pastPeriodGaps} />
+          </>
+        ) : null}
       </Bolum>
 
       <Bolum baslik="En Uygun Fon, Hibe ve Teşvikler" bos="Bu dönemde uygun açık destek bulunamadı.">
@@ -183,6 +204,42 @@ function RiskTablosu({ satirlar }: { satirlar: ReportRiskItem[] }) {
         <tbody>
           {satirlar.map((r) => (
             <tr key={`${r.kind}-${r.subject}`}>
+              <td>{r.kindLabel}</td>
+              <td>{r.subject}</td>
+              <td>{r.description}</td>
+              {/* Sistem öneri üretemediyse uydurulmaz. */}
+              <td>{r.action ?? 'Danışman değerlendirmesi gerekiyor'}</td>
+              <td>{r.affectedOpportunityCount}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+/**
+ * Geçmiş dönem eksikleri.
+ *
+ * Güncel risk tablosundan bilerek ayrı: sütun adları "yapılması gereken" değil
+ * "gelecek çağrılar için" diyor, çünkü bu satırlar üzerine şimdi iş verilmez.
+ */
+function GecmisEksikTablosu({ satirlar }: { satirlar: ReportRiskItem[] }) {
+  return (
+    <div className="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Cinsi</th>
+            <th>Konu</th>
+            <th>Durum</th>
+            <th>Gelecek Çağrılar İçin</th>
+            <th>İlgili Kapanmış Çağrı</th>
+          </tr>
+        </thead>
+        <tbody>
+          {satirlar.map((r) => (
+            <tr key={`gecmis-${r.kind}-${r.subject}`}>
               <td>{r.kindLabel}</td>
               <td>{r.subject}</td>
               <td>{r.description}</td>

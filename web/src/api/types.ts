@@ -1233,6 +1233,7 @@ export interface WeeklyReportSummary {
   actionCount: number
   urgentDeadlineCount: number
   deadlineCount: number
+  pastGapCount: number
 }
 
 export interface ReportOpportunityItem {
@@ -1310,6 +1311,8 @@ export interface WeeklyReportContent {
   otherOpportunities: ReportOpportunityItem[]
   regulatoryChanges: ReportRegulatoryItem[]
   risks: ReportRiskItem[]
+  /** Başvuru süresi geçmiş çağrılardan kalan eksikler. Bilgilendiricidir, iş listesi değildir. */
+  pastPeriodGaps: ReportRiskItem[]
   deadlines: ReportDeadlineItem[]
   todos: ReportTodoItem[]
   /** Boş bölümlerin sebebi. Boşluk sessizce geçilmez. */

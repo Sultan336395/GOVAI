@@ -91,6 +91,7 @@ export default function WeeklyReportsPage() {
                 <th>Teknoloji İhalesi</th>
                 <th>Mevzuat</th>
                 <th>Riskler</th>
+                <th>Geçmiş Eksik <HelpTip field="gecmisDonemEksigi" /></th>
                 <th>Takvimde</th>
                 <th>Acil Son Başvuru <HelpTip field="acilSonBasvuru" /></th>
                 <th>Çıktılar</th>
@@ -111,6 +112,7 @@ export default function WeeklyReportsPage() {
                   <td>{adet(rapor.tenderCount, 'İhale')}</td>
                   <td>{adet(rapor.regulatoryChangeCount, 'Değişiklik')}</td>
                   <td>{adet(rapor.riskCount, 'Risk')}</td>
+                  <td>{adet(rapor.pastGapCount, 'Eksik')}</td>
                   <td>{adet(rapor.deadlineCount, 'Çağrı')}</td>
                   <td>{adet(rapor.urgentDeadlineCount, 'Çağrı')}</td>
                   <td>

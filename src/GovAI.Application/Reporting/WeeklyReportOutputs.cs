@@ -83,6 +83,18 @@ public static class WeeklyReportHtml
                 i.Action ?? "—", i.AffectedOpportunityCount.ToString(CultureInfo.InvariantCulture),
             ]);
 
+        // Geçmiş dönem eksikleri risklerin ARDINDAN gelir ve başlığı bunun bir iş
+        // listesi olmadığını söyler. Güncel risklerle aynı görünmesi, okuyucunun
+        // başvurulamayacak bir çağrı için iş planlamasına yol açardı.
+        Bolum(html, "Geçmiş Dönem Eksikleri (Başvuru Süresi Geçmiş Çağrılar)",
+            content.PastPeriodGaps,
+            ["Cinsi", "Konu", "Durum", "Gelecek Çağrılar İçin", "İlgili Kapanmış Çağrı"],
+            i =>
+            [
+                i.KindLabel, i.Subject, i.Description,
+                i.Action ?? "—", i.AffectedOpportunityCount.ToString(CultureInfo.InvariantCulture),
+            ]);
+
         Bolum(html, "Son Başvuru Takvimi",
             content.Deadlines,
             ["Çağrı", "Son Başvuru", "Kalan Gün", "Skor", "Karar", "Sektör Uyumu"],
@@ -202,6 +214,12 @@ public static class WeeklyReportSheet
         foreach (var i in content.Risks)
         {
             rows.Add(["Risk", i.Subject, null, i.KindLabel, null,
+                null, null, null, i.Action ?? i.Description]);
+        }
+
+        foreach (var i in content.PastPeriodGaps)
+        {
+            rows.Add(["Geçmiş Dönem Eksiği", i.Subject, null, i.KindLabel, null,
                 null, null, null, i.Action ?? i.Description]);
         }
 

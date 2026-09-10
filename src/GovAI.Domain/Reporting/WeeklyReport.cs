@@ -89,6 +89,9 @@ public class WeeklyReport : AggregateRoot, IAuditable, ITenantScoped
     /// <summary>Son başvuru takviminde yer alan çağrı sayısı.</summary>
     public int DeadlineCount { get; private set; }
 
+    /// <summary>Başvuru süresi geçmiş çağrılardan kalan eksik sayısı.</summary>
+    public int PastGapCount { get; private set; }
+
     public DateTimeOffset CreatedAt { get; set; }
     public string? CreatedBy { get; set; }
     public DateTimeOffset? UpdatedAt { get; set; }
@@ -130,6 +133,7 @@ public class WeeklyReport : AggregateRoot, IAuditable, ITenantScoped
         ActionCount = counters.ActionCount;
         UrgentDeadlineCount = counters.UrgentDeadlineCount;
         DeadlineCount = counters.DeadlineCount;
+        PastGapCount = counters.PastGapCount;
     }
 }
 
@@ -142,7 +146,9 @@ public sealed record WeeklyReportCounters(
     int RiskCount,
     int ActionCount,
     int UrgentDeadlineCount,
-    int DeadlineCount);
+    int DeadlineCount,
+    /// <summary>Başvuru süresi geçmiş çağrılardan kalan eksik sayısı.</summary>
+    int PastGapCount);
 
 /// <summary>Raporu kimin istediği.</summary>
 public enum ReportTrigger

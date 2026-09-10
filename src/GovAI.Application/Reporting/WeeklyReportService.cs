@@ -241,7 +241,8 @@ public sealed class WeeklyReportService(
             r.RiskCount,
             r.ActionCount,
             r.UrgentDeadlineCount,
-            r.DeadlineCount)).ToList();
+            r.DeadlineCount,
+            r.PastGapCount)).ToList();
     }
 
     public async Task<WeeklyReportDetailDto> GetAsync(

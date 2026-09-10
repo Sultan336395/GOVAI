@@ -431,6 +431,101 @@ public class WeeklyReportBuilderTests
         Assert.Equal(1, risk.AffectedOpportunityCount);
     }
 
+    // ── Geçmiş dönem eksikleri ──────────────────────────────────────────────
+
+    private static DocumentCheckResult SgkBelgesi() => new()
+    {
+        Code = "SGK_BORCU_YOKTUR",
+        Name = "SGK Borcu Yoktur Yazısı",
+        IsMandatory = true,
+        Status = DocumentStatus.Missing,
+        Action = "SGK üzerinden temin edin.",
+    };
+
+    [Fact(DisplayName = "HR27. Kapanmış çağrının eksiği GEÇMİŞ DÖNEM bölümünde görünür")]
+    public void Kapanmis_cagri_eksigi_gecmiste_gorunur()
+    {
+        // Eksiği hiç göstermemek, firmanın kendi durumunu görmesini engellerdi:
+        // aynı belgeyi isteyen yeni bir çağrı açıldığında yine karşısına çıkacak.
+        var rapor = WeeklyReportBuilder.Build(Girdi(
+            Cift(Cagri(SupportCategory.Grant, "Kapanmış Hibe", AsOf.AddDays(-1)),
+                belgeler: [SgkBelgesi()])));
+
+        var eksik = Assert.Single(rapor.PastPeriodGaps);
+
+        Assert.Equal(ReportRiskKind.MissingDocument, eksik.Kind);
+        Assert.Equal("SGK Borcu Yoktur Yazısı", eksik.Subject);
+        Assert.Equal(1, eksik.AffectedOpportunityCount);
+    }
+
+    [Fact(DisplayName = "HR28. Geçmiş dönem eksiği YAPILACAK İŞ üretmez")]
+    public void Gecmis_eksik_is_uretmez()
+    {
+        // Kapanmış çağrı için iş vermek, yapılamayacak bir iş vermektir. Kusurun
+        // kendisi buydu: kapanmış hibeden gelen eksikler acil iş olarak listelenmişti.
+        var rapor = WeeklyReportBuilder.Build(Girdi(
+            Cift(Cagri(SupportCategory.Grant, "Kapanmış Hibe", AsOf.AddDays(-1)),
+                belgeler: [SgkBelgesi()])));
+
+        Assert.NotEmpty(rapor.PastPeriodGaps);
+        Assert.Empty(rapor.Risks);
+        Assert.Empty(rapor.Todos);
+    }
+
+    [Fact(DisplayName = "HR29. Aynı eksik iki bölümde AYNI ANDA görünmez")]
+    public void Ayni_eksik_iki_bolumde_gorunmez()
+    {
+        // Aynı satırı hem güncel hem geçmiş listede göstermek, hangisinin üzerine iş
+        // verildiğini belirsizleştirir. Açık çağrı varsa eksik GÜNCEL listededir.
+        var rapor = WeeklyReportBuilder.Build(Girdi(
+            Cift(Cagri(SupportCategory.Grant, "Açık Hibe", AsOf.AddDays(10)),
+                belgeler: [SgkBelgesi()]),
+            Cift(Cagri(SupportCategory.Grant, "Kapanmış Hibe", AsOf.AddDays(-1)),
+                belgeler: [SgkBelgesi()])));
+
+        var guncel = Assert.Single(rapor.Risks);
+
+        Assert.Equal("SGK Borcu Yoktur Yazısı", guncel.Subject);
+        Assert.Empty(rapor.PastPeriodGaps);
+    }
+
+    [Fact(DisplayName = "HR30. Geçmiş dönem eksiği varsa ne anlama geldiği YAZILIR")]
+    public void Gecmis_eksigin_anlami_yazilir()
+    {
+        var rapor = WeeklyReportBuilder.Build(Girdi(
+            Cift(Cagri(SupportCategory.Grant, "Kapanmış Hibe", AsOf.AddDays(-1)),
+                belgeler: [SgkBelgesi()])));
+
+        Assert.Contains(
+            rapor.Notes,
+            n => n.Contains("şimdi yapılacak bir iş yoktur", StringComparison.Ordinal));
+    }
+
+    [Fact(DisplayName = "HR31. Açık çağrı yoksa geçmiş eksik güvenceyi BOZMAZ")]
+    public void Gecmis_eksik_guvenceyi_bozmaz()
+    {
+        // "Engelleyen bir eksik görünmüyor" güncel durumu anlatır. Geçmiş dönem eksiği
+        // bu cümleyi yanlış yapmaz; ikisi ayrı sorulara cevap verir.
+        var rapor = WeeklyReportBuilder.Build(Girdi(
+            Cift(Cagri(SupportCategory.Grant, "Açık Hibe", AsOf.AddDays(10))),
+            Cift(Cagri(SupportCategory.Grant, "Kapanmış Hibe", AsOf.AddDays(-1)),
+                belgeler: [SgkBelgesi()])));
+
+        Assert.Empty(rapor.Risks);
+        Assert.Single(rapor.PastPeriodGaps);
+        Assert.Contains(rapor.Notes, n => n.Contains("eksik görünmüyor", StringComparison.Ordinal));
+    }
+
+    [Fact(DisplayName = "HR32. Geçmiş eksik sayacı gövdeyle tutarlıdır")]
+    public void Gecmis_eksik_sayaci_tutarlidir()
+    {
+        var rapor = WeeklyReportBuilder.Build(Girdi(
+            Cift(Cagri(SupportCategory.Grant, "Kapanmış Hibe", AsOf.AddDays(-1)),
+                belgeler: [SgkBelgesi()])));
+
+        Assert.Equal(rapor.PastPeriodGaps.Count, WeeklyReportBuilder.Counters(rapor).PastGapCount);
+    }
+
     // ── Kullanıcıya iç terim gösterilmez ────────────────────────────────────
 
     [Fact(DisplayName = "HR23. Eksik profil bilgisi iç alan adıyla DEĞİL okunabilir adla yazılır")]
