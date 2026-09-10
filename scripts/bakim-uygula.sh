@@ -34,12 +34,51 @@ command -v curl >/dev/null || hata "curl bulunamadı."
 
 curl -fsS --max-time 10 "${API}/health" >/dev/null 2>&1 || hata "API yanıt vermiyor: ${API}"
 
+# Parola ve onay KLAVYEDEN okunur, standart girdiden değil.
+#
+# Sahada görülen arıza: `ssh sunucu 'bash betik.sh'` biçiminde çalıştırıldığında
+# uzak tarafta terminal açılmaz. `read` o zaman anında dosya sonu görür, parola
+# BOŞ okunur ve betik "parola boş" deyip çıkar — kullanıcı parolasını yazmaya
+# fırsat bile bulamaz. Klavyeyi doğrudan /dev/tty üzerinden okumak bunu çözer;
+# terminal gerçekten yoksa da sessizce boş dönmek yerine ne yapılacağını söyler.
+TERMINAL=""
+
+terminali_bul() {
+    [ -n "$TERMINAL" ] && return 0
+
+    if [ -r /dev/tty ] && { : < /dev/tty; } 2>/dev/null; then
+        TERMINAL=/dev/tty
+    elif [ -t 0 ]; then
+        TERMINAL=/dev/stdin
+    else
+        cat >&2 <<'YOK'
+
+HATA: Klavye okunamıyor, bu yüzden parola sorulamıyor.
+
+Betik uzaktan, terminal açılmadan çalıştırılmış olabilir. İki çözümden biri:
+
+  1) Önce sunucuya girin, sonra betiği çalıştırın:
+       ssh root@72.62.146.195
+       bash /opt/govai/scripts/bakim-uygula.sh
+
+  2) Ya da tek satırda terminal isteyin (-t):
+       ssh -t root@72.62.146.195 'bash /opt/govai/scripts/bakim-uygula.sh'
+
+Hiçbir şey değiştirilmedi.
+YOK
+        exit 1
+    fi
+}
+
 gizli_oku() {
     local soru="$1" cevap=""
+
+    terminali_bul
+
     printf '%s' "$soru" >&2
-    stty -echo 2>/dev/null || true
-    IFS= read -r cevap
-    stty echo 2>/dev/null || true
+    stty -F "$TERMINAL" -echo 2>/dev/null || stty -echo 2>/dev/null || true
+    IFS= read -r cevap < "$TERMINAL"
+    stty -F "$TERMINAL" echo 2>/dev/null || stty echo 2>/dev/null || true
     printf '\n' >&2
     printf '%s' "$cevap"
 }
@@ -74,7 +113,7 @@ BILGI
 
 echo "Hesap: ${EPOSTA}"
 PAROLA="$(gizli_oku 'Parola: ')"
-[ -n "$PAROLA" ] || hata "Parola boş. Hiçbir şey değiştirilmedi."
+[ -n "$PAROLA" ] || hata "Parola girilmedi. Hiçbir şey değiştirilmedi."
 
 GOVDE="$(python3 -c "
 import json, sys
@@ -113,8 +152,11 @@ cagir() {
 
 onayla() {
     local soru="$1" cevap=""
+
+    terminali_bul
+
     printf '%s [e/H]: ' "$soru"
-    IFS= read -r cevap
+    IFS= read -r cevap < "$TERMINAL"
     [ "$cevap" = "e" ] || [ "$cevap" = "E" ]
 }
 
