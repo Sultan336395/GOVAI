@@ -32,7 +32,27 @@ hata() { echo "HATA: $*" >&2; exit 1; }
 command -v python3 >/dev/null || hata "python3 bulunamadı."
 command -v curl >/dev/null || hata "curl bulunamadı."
 
-curl -fsS --max-time 10 "${API}/health" >/dev/null 2>&1 || hata "API yanıt vermiyor: ${API}"
+if ! curl -fsS --max-time 10 "${API}/health" >/dev/null 2>&1; then
+    # Sık yapılan hata: betik sunucu yerine kendi bilgisayarında çalıştırılıyor.
+    # Orada 127.0.0.1:8080 diye bir şey yok ve adresi nasıl değiştireceği
+    # söylenmezse kullanıcı burada tıkanıp kalıyor.
+    cat >&2 <<YOK
+
+HATA: Uygulamaya ulaşılamadı: ${API}
+
+Betik kendi bilgisayarınızda çalışıyorsa bu normaldir — uygulama orada değil.
+İki çözümden biri:
+
+  1) Sunucuda çalıştırın:
+       ssh -t root@72.62.146.195 'bash /opt/govai/scripts/bakim-uygula.sh'
+
+  2) Ya da kendi bilgisayarınızdan canlı adrese bağlanın:
+       GOVAI_API_URL=https://govai.yuppi.cloud bash scripts/bakim-uygula.sh
+
+Hiçbir şey değiştirilmedi.
+YOK
+    exit 1
+fi
 
 # Parola ve onay KLAVYEDEN okunur, standart girdiden değil.
 #
