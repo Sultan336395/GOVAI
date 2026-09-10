@@ -386,6 +386,47 @@ public class WeeklyReportBuilderTests
         Assert.Contains("henüz değerlendirme yapılmamış", not, StringComparison.Ordinal);
     }
 
+    // ── Kullanıcıya iç terim gösterilmez ────────────────────────────────────
+
+    [Fact(DisplayName = "HR23. Eksik profil bilgisi iç alan adıyla DEĞİL okunabilir adla yazılır")]
+    public void Eksik_bilgi_okunabilir_adla_yazilir()
+    {
+        // Raporda "Company.Nuts2Codes" yazıyordu. Sistemin iç terimleri kullanıcıya
+        // sızmaz; kullanıcı profilinde böyle bir alan adı aramaz.
+        var rapor = WeeklyReportBuilder.Build(Girdi(Cift(
+            Cagri(SupportCategory.Grant, "Hibe"),
+            kurallar:
+            [
+                Kural("Company.Nuts2Codes", "Bölge kuralı", RuleOutcome.Unknown,
+                    RuleSeverity.Major, "Bölge kodlarını girin."),
+            ])));
+
+        var risk = Assert.Single(rapor.Risks);
+
+        Assert.Equal(ReportRiskKind.DataGap, risk.Kind);
+        Assert.DoesNotContain("Company.", risk.Subject, StringComparison.Ordinal);
+        Assert.Equal("İstatistiki bölge kodları", risk.Subject);
+    }
+
+    [Fact(DisplayName = "HR24. Aynı alanın iki ayrı kuralı TEK risk olur")]
+    public void Ayni_alan_tek_risk_olur()
+    {
+        // Eksiklik alanın kendisindedir, kuralın değil: ciro bilgisi girilmemişse bu
+        // iki ayrı eksik değil, iki çağrıyı etkileyen tek eksiktir.
+        var rapor = WeeklyReportBuilder.Build(Girdi(
+            Cift(Cagri(SupportCategory.Grant, "Hibe 1"), kurallar:
+                [Kural("Financials.AnnualRevenue", "Asgari 1M ciro", RuleOutcome.Unknown,
+                    RuleSeverity.Major, "Ciro girin.")]),
+            Cift(Cagri(SupportCategory.Grant, "Hibe 2"), kurallar:
+                [Kural("Financials.AnnualRevenue", "Asgari 5M ciro", RuleOutcome.Unknown,
+                    RuleSeverity.Major, "Ciro girin.")])));
+
+        var risk = Assert.Single(rapor.Risks);
+
+        Assert.Equal("Yıllık ciro", risk.Subject);
+        Assert.Equal(2, risk.AffectedOpportunityCount);
+    }
+
     // ── Rapor kendisiyle çelişmez ───────────────────────────────────────────
 
     [Fact(DisplayName = "HR18. Üzerine iş verilen her çağrı raporda GÖRÜNÜR")]

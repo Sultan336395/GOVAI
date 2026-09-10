@@ -197,10 +197,7 @@ public static class RuleEvaluator
     {
         if (outcome == RuleOutcome.Unknown)
         {
-            var label = CompanyFieldResolver.SupportedFields.TryGetValue(rule.Field, out var description)
-                ? description
-                : rule.Field;
-            return $"Firma profilinde eksik alanı doldurun: {label}.";
+            return $"Firma profilinde eksik alanı doldurun: {CompanyFieldResolver.Label(rule.Field)}.";
         }
 
         return rule.Operator switch
@@ -213,7 +210,22 @@ public static class RuleEvaluator
                 $"Eksik belge/sertifika temin edin: {rule.Value}.",
             RuleOperator.NaceMatch =>
                 $"Çağrı şu NACE kodlarını hedefliyor: {rule.Value}. Faaliyet kodunuz kapsam dışında.",
-            _ => $"Koşul sağlanmıyor: {rule.HumanReadable}."
+            _ => $"Koşul sağlanmıyor: {Cumle(rule.HumanReadable)}"
         };
+    }
+
+    /// <summary>
+    /// Metni tek bir noktayla bitirir.
+    ///
+    /// <para>
+    /// Kural metinleri çoğu zaman kendi noktasıyla gelir ("Firma ihracat yapıyor
+    /// olmalıdır."). Sonuna bir nokta daha eklemek raporda "olmalıdır.." üretiyordu.
+    /// </para>
+    /// </summary>
+    private static string Cumle(string metin)
+    {
+        var kirpilmis = metin.TrimEnd();
+
+        return kirpilmis.EndsWith('.') ? kirpilmis : kirpilmis + ".";
     }
 }

@@ -263,7 +263,13 @@ public static class WeeklyReportBuilder
         var toplanan = new Dictionary<(ReportRiskKind, string),
             (string Subject, string Description, string? Action, HashSet<Guid> Opportunities)>();
 
-        void Ekle(ReportRiskKind kind, string subject, string description, string? action, Guid opportunityId)
+        void Ekle(
+            ReportRiskKind kind,
+            string subject,
+            string description,
+            string? action,
+            Guid opportunityId,
+            string? gosterilecekAd = null)
         {
             // Tekilleştirme Türkçe katlamayla yapılır: "İŞ GÜVENLİĞİ" ile "İş Güvenliği"
             // aynı eksiktir. ToUpperInvariant bunu yapamaz (noktasız ı / noktalı İ).
@@ -278,7 +284,7 @@ public static class WeeklyReportBuilder
                 return;
             }
 
-            toplanan[anahtar] = (subject, description, action, [opportunityId]);
+            toplanan[anahtar] = (gosterilecekAd ?? subject, description, action, [opportunityId]);
         }
 
         foreach (var a in assessments)
@@ -312,12 +318,16 @@ public static class WeeklyReportBuilder
 
             foreach (var kural in detail.DataGaps)
             {
+                // Tekilleştirme ALAN ADINA göre yapılır (aynı eksik bilgi, tek risk),
+                // ama kullanıcıya iç tanımlayıcı değil okunabilir ad gösterilir:
+                // raporda "Company.Nuts2Codes" yazıyordu.
                 Ekle(
                     ReportRiskKind.DataGap,
                     kural.Field,
                     $"{kural.Requirement} — firma profilinde bu bilgi girilmemiş.",
                     kural.SuggestedAction,
-                    a.Opportunity.Id);
+                    a.Opportunity.Id,
+                    CompanyFieldResolver.Label(kural.Field));
             }
         }
 

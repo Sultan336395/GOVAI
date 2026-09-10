@@ -44,6 +44,43 @@ public static class CompanyFieldResolver
             ["Financials.NetProfitOrLoss"] = "Net kâr/zarar (yıllık toplu mali veriden)"
         };
 
+    /// <summary>
+    /// Alanın <b>kullanıcıya gösterilecek</b> adı.
+    ///
+    /// <para>
+    /// <see cref="SupportedFields"/> değerleri geliştiriciye yazılmıştır ve teknik
+    /// ipuçları taşır: "(küme)", "(0..1)", "ör. TR62". Haftalık raporda risk satırının
+    /// konusu olarak bunlar görünüyordu — daha kötüsü, eşleşme bulunamayan alanlarda
+    /// doğrudan <c>Company.Nuts2Codes</c> gibi iç tanımlayıcılar görünüyordu. Arayüzde
+    /// sistemin iç terimleri gösterilmez.
+    /// </para>
+    ///
+    /// <para>
+    /// Ad <b>uydurulmaz</b>: karşılığı olmayan alan için alanın kendi adı döner, çünkü
+    /// yanlış bir ad kullanıcıyı profilinde olmayan bir yere gönderir.
+    /// </para>
+    /// </summary>
+    public static string Label(string field)
+    {
+        if (!SupportedFields.TryGetValue(field, out var description))
+        {
+            return field;
+        }
+
+        // Teknik ipucu parantezle ya da "ör." ile başlar; ilk görüleni kesmek yeter.
+        var kesme = description.IndexOf('(', StringComparison.Ordinal);
+        var ornek = description.IndexOf(", ör.", StringComparison.Ordinal);
+
+        if (ornek >= 0 && (kesme < 0 || ornek < kesme))
+        {
+            kesme = ornek;
+        }
+
+        var temiz = (kesme > 0 ? description[..kesme] : description).TrimEnd(' ', ',');
+
+        return temiz.Length == 0 ? field : temiz;
+    }
+
     public static FieldValue Resolve(Company company, string field, DateOnly asOf)
     {
         return field.Trim() switch
