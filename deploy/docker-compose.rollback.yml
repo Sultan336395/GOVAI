@@ -15,11 +15,11 @@
 # Yeniden derleme `latest`i üzerine yazar ve eski imaj isimsiz kalır — geri dönüş
 # imkânsızlaşır.
 #
-# ── 10.09.2026 · Kapanmış çağrı düzeltmesi öncesi çalışan sürüm ────────────
+# ── 10.09.2026 · Geçmiş dönem eksikleri yayını öncesi çalışan sürüm ────────
 #
-#   govai-api:398f84e
-#   govai-web:398f84e
-#   govai-worker:398f84e
+#   govai-api:cc49454
+#   govai-web:cc49454
+#   govai-worker:cc49454
 #
 # DÖRT WORKER AYNI İMAJI PAYLAŞIR. Bu dosya eskiden her worker'ı ayrı bir imaj
 # adına (`govai-collector:…`, `govai-parser:…`) sabitliyordu; o adlar artık
@@ -27,7 +27,7 @@
 # bölümüne düşerek SUNUCUDA DERLEME başlatırdı. Geri dönüşün kendisi arıza
 # üretmemelidir.
 #
-# ÖNCEKİ SÜRÜMLER (artık hedef değil): cff2322, 2a5382d, 492b40c, 0d42f3f, c8bf41d, bc6a53a, 5cb1a7f, c202352, cffc2b5, 9c35582, c202352, b13f0c2, 3e9b9ab. O etiketli imajlar
+# ÖNCEKİ SÜRÜMLER (artık hedef değil): 398f84e, cff2322, 2a5382d, 492b40c, 0d42f3f, c8bf41d, bc6a53a, 5cb1a7f, c202352, cffc2b5, 9c35582, c202352, b13f0c2, 3e9b9ab. O etiketli imajlar
 # silinmedi; gerekirse bu dosyanın bir kopyasıyla hedeflenebilirler.
 #
 # VERİTABANI: Bu dosya veritabanına DOKUNMAZ. Geri dönüş otomatik restore İÇERMEZ —
@@ -37,25 +37,25 @@
 
 services:
   api:
-    image: govai-api:398f84e
+    image: govai-api:cc49454
     pull_policy: never
 
   web:
-    image: govai-web:398f84e
+    image: govai-web:cc49454
     pull_policy: never
 
   collector:
-    image: govai-worker:398f84e
+    image: govai-worker:cc49454
     pull_policy: never
 
   parser:
-    image: govai-worker:398f84e
+    image: govai-worker:cc49454
     pull_policy: never
 
   scoring:
-    image: govai-worker:398f84e
+    image: govai-worker:cc49454
     pull_policy: never
 
   scheduler:
-    image: govai-worker:398f84e
+    image: govai-worker:cc49454
     pull_policy: never
