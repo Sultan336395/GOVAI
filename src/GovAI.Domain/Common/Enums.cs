@@ -172,7 +172,21 @@ public enum DocumentParseStatus
     Failed = 2,
 
     /// <summary>Taranmış PDF; metin katmanı yok, OCR gerekiyor.</summary>
-    NeedsOcr = 3
+    NeedsOcr = 3,
+
+    /// <summary>
+    /// Metin OKUNDU, ama belgeden çağrı kaydı açılmadı: içerik kurumsal bir sayfa
+    /// ya da tek bir çağrı olmayan liste sayfası.
+    ///
+    /// <para>
+    /// <see cref="Failed"/> ile karıştırılamaz. Başarısızlıkta elimizde metin yoktur ve
+    /// belge karantinaya alınır — inceleyici bakmalıdır. Burada ise ayrıştırma sonuna
+    /// kadar çalışmıştır; kanıt parçaları kaydedilmiştir ve yapılacak bir şey yoktur.
+    /// Böyle bir belgeyi karantinaya almak, inceleyicinin listesini düzgün çalışan
+    /// sistemin ürünüyle doldurur.
+    /// </para>
+    /// </summary>
+    Skipped = 4
 }
 
 /// <summary>Destek türü sınıflandırması (Modül 4 – Teşvik / Hibe / İhale ayrıştırması).</summary>

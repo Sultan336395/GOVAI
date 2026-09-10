@@ -791,7 +791,7 @@ export type SourceCategory =
 
 export type SourceHealth = 'Unverified' | 'Healthy' | 'Degraded' | 'Failing'
 
-export type DocumentParseStatus = 'Pending' | 'Parsed' | 'Failed' | 'NeedsOcr'
+export type DocumentParseStatus = 'Pending' | 'Parsed' | 'Failed' | 'NeedsOcr' | 'Skipped'
 
 export interface RegulatoryChangeSummary {
   id: string

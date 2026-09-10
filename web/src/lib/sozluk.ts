@@ -84,6 +84,7 @@ export const belgeOkunabilirlik = {
   Parsed: 'Metni okundu',
   Failed: 'Metni okunamadı',
   NeedsOcr: 'Taranmış belge — metni çıkarılamadı',
+  Skipped: 'Metni okundu, çağrı kaydı açılmadı',
 } as const
 
 /** Kaydın sisteme nasıl girdiği. */

@@ -542,6 +542,27 @@ public sealed class SourceService(
                 version.Id, DocumentParseStatus.Parsed, chunks.Count, document.QuarantineReason);
         }
 
+        // Elenen belge KARANTİNAYA ALINMAZ.
+        //
+        // Ayrıştırıcı kurumsal sayfayı ya da liste sayfasını bilerek eler; metni okumuş,
+        // kanıt parçalarını kaydetmiş ve yalnızca uydurma bir çağrı kaydı açmaktan
+        // kaçınmıştır. Bunu "ayrıştırma başarısız" saymak iki şeyi birden bozar: düzgün
+        // çalışan sistemin ürünü inceleyicinin önüne iş olarak düşer ve gerçek arızalar
+        // bu yığının içinde görünmez olur.
+        if (request.Status == DocumentParseStatus.Skipped)
+        {
+            version.RecordSkipped(request.Error ?? "Belgeden çağrı kaydı açılmadı.");
+
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+
+            logger.LogInformation(
+                "Belgeden kayıt açılmadı. DocumentId={DocumentId} Neden={Reason}",
+                document.Id, version.ParseError);
+
+            return new RecordParseResultResult(
+                version.Id, DocumentParseStatus.Skipped, version.Chunks.Count, document.QuarantineReason);
+        }
+
         var requiresOcr = request.Status == DocumentParseStatus.NeedsOcr;
 
         // Ayrıştırıcının gerekçesi EZİLMEZ. OCR gereken iki ayrı durum vardır ve bunlar

@@ -79,6 +79,7 @@ export const parseStatusLabels: Record<DocumentParseStatus, string> = {
   Parsed: 'Ayrıştırıldı',
   Failed: 'Başarısız',
   NeedsOcr: 'OCR gerekiyor',
+  Skipped: 'Kayıt açılmadı',
 }
 
 export const documentOriginLabels: Record<DocumentOrigin, string> = {

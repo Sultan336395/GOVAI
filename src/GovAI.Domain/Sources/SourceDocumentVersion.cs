@@ -133,6 +133,17 @@ public class SourceDocumentVersion : Entity, IAuditable
         RequiresOcr = false;
     }
 
+    /// <summary>
+    /// Belge okundu ama kayıt açılmadı. Metin ve kanıt parçaları KORUNUR: bu bir
+    /// başarısızlık değil, ayrıştırıcının bilinçli kararıdır ve gerekçesi yazılır.
+    /// </summary>
+    public void RecordSkipped(string reason)
+    {
+        ParseStatus = DocumentParseStatus.Skipped;
+        RequiresOcr = false;
+        ParseError = reason?[..Math.Min(reason.Length, 1000)];
+    }
+
     public void RecordParseFailure(string reason, bool requiresOcr = false)
     {
         ParseStatus = requiresOcr ? DocumentParseStatus.NeedsOcr : DocumentParseStatus.Failed;
