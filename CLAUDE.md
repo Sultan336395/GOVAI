@@ -153,7 +153,7 @@ Doğrudan DB erişimi eklersen tekilleştirme, yetki ve bildirim kuralları atla
 
 ## 3. Çapraz sözleşmeler — derleyicinin koruyamadığı yerler
 
-Burası en kolay ve en sessiz bozulan yer. Üç sözleşme iki ayrı yığında tanımlıdır:
+Burası en kolay ve en sessiz bozulan yer. Dört sözleşme iki ayrı yığında tanımlıdır:
 
 | Sözleşme | C# tarafı | Python / TS tarafı | Bozulursa |
 |---|---|---|---|
@@ -171,12 +171,12 @@ python scripts/check_contract_parity.py
 CI'da `contracts` işi olarak her push'ta koşar. **C# tarafı kaynak doğrudur** — uyuşmazlıkta
 Python'u ona uydur, tersini yapma.
 
+Üçüncüsü (TS tipleri) elle senkronize edilir. Bir DTO'ya alan eklersen
+`web/src/api/types.ts` içindeki karşılığını da güncelle.
+
 Dördüncüsü `workers/tests/test_ayristirma_durumlari.py` ile denetlenir: worker'ın bildirdiği
 her `status` değeri C# enum'unda aranır. Sahada `Skipped` bir süre yalnızca Python tarafında
 vardı; API her liste sayfasında 400 döndü ve eleme hiç kaydedilmedi.
-
-Üçüncüsü (TS tipleri) elle senkronize edilir. Bir DTO'ya alan eklersen
-`web/src/api/types.ts` içindeki karşılığını da güncelle.
 
 ---
 
