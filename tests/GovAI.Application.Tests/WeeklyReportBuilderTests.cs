@@ -386,6 +386,51 @@ public class WeeklyReportBuilderTests
         Assert.Contains("henüz değerlendirme yapılmamış", not, StringComparison.Ordinal);
     }
 
+    [Fact(DisplayName = "HR25. Kapanmış çağrı RİSK ÜRETMEZ")]
+    public void Kapanmis_cagri_risk_uretmez()
+    {
+        // Son başvurusu geçmiş bir çağrı yüzünden "belgeyi temin edin" demek, artık
+        // başvurulamayacak bir iş vermektir. Rapor göstermediği kaydın üzerinden iş
+        // veremez.
+        var belge = new DocumentCheckResult
+        {
+            Code = "SGK_BORCU_YOKTUR",
+            Name = "SGK Borcu Yoktur Yazısı",
+            IsMandatory = true,
+            Status = DocumentStatus.Missing,
+            Action = "SGK üzerinden temin edin.",
+        };
+
+        var rapor = WeeklyReportBuilder.Build(Girdi(
+            Cift(Cagri(SupportCategory.Grant, "Kapanmış Hibe", AsOf.AddDays(-1)), belgeler: [belge])));
+
+        Assert.Empty(rapor.Supports);
+        Assert.Empty(rapor.OtherOpportunities);
+        Assert.Empty(rapor.Risks);
+    }
+
+    [Fact(DisplayName = "HR26. Açık çağrıdan gelen risk sayılır, kapanmış olan sayıya KATILMAZ")]
+    public void Kapanmis_cagri_risk_sayisina_katilmaz()
+    {
+        var belge = new DocumentCheckResult
+        {
+            Code = "SGK_BORCU_YOKTUR",
+            Name = "SGK Borcu Yoktur Yazısı",
+            IsMandatory = true,
+            Status = DocumentStatus.Missing,
+            Action = "SGK üzerinden temin edin.",
+        };
+
+        var rapor = WeeklyReportBuilder.Build(Girdi(
+            Cift(Cagri(SupportCategory.Grant, "Açık Hibe", AsOf.AddDays(10)), belgeler: [belge]),
+            Cift(Cagri(SupportCategory.Grant, "Kapanmış Hibe", AsOf.AddDays(-1)), belgeler: [belge])));
+
+        var risk = Assert.Single(rapor.Risks);
+
+        // Aynı belge iki çağrıda eksikti; yalnızca AÇIK olan sayılır.
+        Assert.Equal(1, risk.AffectedOpportunityCount);
+    }
+
     // ── Kullanıcıya iç terim gösterilmez ────────────────────────────────────
 
     [Fact(DisplayName = "HR23. Eksik profil bilgisi iç alan adıyla DEĞİL okunabilir adla yazılır")]

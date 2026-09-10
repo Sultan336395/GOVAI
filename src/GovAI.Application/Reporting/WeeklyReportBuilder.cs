@@ -111,7 +111,17 @@ public static class WeeklyReportBuilder
         var tenders = BuildTenders(canli, input.AsOf);
         var others = BuildOthers(canli, input.AsOf, supports, tenders);
         var regulatory = BuildRegulatory(input.RegulatoryChanges);
-        var risks = BuildRisks(canli);
+        // Riskler raporun LİSTELEDİĞİ çağrılardan çıkarılır.
+        //
+        // Eskiden bütün değerlendirmelerden çıkarılıyordu: son başvurusu dün kapanmış
+        // bir çağrı yüzünden "SGK borcu yoktur yazısını temin edin" satırı üretiliyor
+        // ve "1 çağrıyı etkiliyor" deniyordu — oysa o çağrıya artık başvurulamaz.
+        // Rapor, göstermediği bir kaydın üzerinden iş veremez.
+        var listelenen = supports.Concat(tenders).Concat(others)
+            .Select(i => i.OpportunityId)
+            .ToHashSet();
+
+        var risks = BuildRisks(canli.Where(a => listelenen.Contains(a.Opportunity.Id)).ToList());
         var deadlines = BuildDeadlines(canli, input.AsOf);
         var todos = BuildTodos(risks, deadlines, input.AsOf);
 
