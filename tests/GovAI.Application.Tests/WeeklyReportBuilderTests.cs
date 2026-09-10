@@ -1,3 +1,4 @@
+using GovAI.Application.Eligibility;
 using GovAI.Application.Reporting;
 using GovAI.Domain.Assessments;
 using GovAI.Domain.Common;
@@ -92,7 +93,7 @@ public class WeeklyReportBuilderTests
         return new AssessedOpportunity(
             new EligibilityAssessment(Guid.NewGuid(), sonuc, 1, "{}"),
             cagri,
-            sonuc);
+            AssessmentDetailSnapshot.From(sonuc));
     }
 
     private static WeeklyReportInput Girdi(params AssessedOpportunity[] cift) => new()
@@ -207,7 +208,7 @@ public class WeeklyReportBuilderTests
             Cift(Cagri(SupportCategory.Grant, "Açık Hibe", AsOf.AddDays(5)))));
 
         Assert.Equal(["Açık Hibe"], rapor.Supports.Select(s => s.Title));
-        Assert.Empty(rapor.Deadlines.Where(d => d.Title == "Kapanmış Hibe"));
+        Assert.DoesNotContain(rapor.Deadlines, d => d.Title == "Kapanmış Hibe");
     }
 
     [Fact(DisplayName = "HR7. Uygun olmayan çağrı öneri listesine girmez")]
@@ -237,7 +238,7 @@ public class WeeklyReportBuilderTests
             new AssessedOpportunity(
                 new EligibilityAssessment(Guid.NewGuid(), uyumsuzSonuc, 1, "{}"),
                 yuksekAmaUyumsuz,
-                uyumsuzSonuc),
+                AssessmentDetailSnapshot.From(uyumsuzSonuc)),
             Cift(dusukAmaUyumlu, skor: 40m)));
 
         Assert.Equal("Düşük Skor Uyumlu", rapor.Supports[0].Title);
@@ -385,6 +386,98 @@ public class WeeklyReportBuilderTests
         Assert.Contains("henüz değerlendirme yapılmamış", not, StringComparison.Ordinal);
     }
 
+    // ── Rapor kendisiyle çelişmez ───────────────────────────────────────────
+
+    [Fact(DisplayName = "HR18. Üzerine iş verilen her çağrı raporda GÖRÜNÜR")]
+    public void Her_is_raporda_gorunur()
+    {
+        // Sahadaki kusur: taşınmaz, dikili ağaç ve sigorta ihaleleri ne destek bölümüne
+        // (destek türü değil) ne teknoloji bölümüne (konusu teknoloji değil) giriyordu,
+        // ama takvime ve yapılacaklara giriyordu. Rapor "uygun destek bulunamadı" derken
+        // aynı anda "Acil: başvuruyu hazırla — DİKİLİ AĞAÇ SATILACAKTIR" diyordu.
+        var rapor = WeeklyReportBuilder.Build(Girdi(
+            Cift(Cagri(SupportCategory.Tender, "DİKİLİ AĞAÇ SATILACAKTIR", AsOf.AddDays(8))),
+            Cift(Cagri(SupportCategory.Tender, "TAŞINMAZ SATILACAKTIR", AsOf.AddDays(15))),
+            Cift(Cagri(SupportCategory.Other, "SİGORTA ARACILIK HİZMETİ", AsOf.AddDays(27)))));
+
+        var listelenen = rapor.Supports
+            .Concat(rapor.TechnologyTenders)
+            .Concat(rapor.OtherOpportunities)
+            .Select(i => i.OpportunityId)
+            .ToHashSet();
+
+        Assert.NotEmpty(rapor.Todos);
+
+        foreach (var is_ in rapor.Todos.Where(t => t.OpportunityId is not null))
+        {
+            Assert.Contains(is_.OpportunityId!.Value, listelenen);
+        }
+
+        foreach (var tarih in rapor.Deadlines)
+        {
+            Assert.Contains(tarih.OpportunityId, listelenen);
+        }
+    }
+
+    [Fact(DisplayName = "HR19. Bir çağrı aynı anda iki bölümde listelenmez")]
+    public void Cagri_tek_bolumde_listelenir()
+    {
+        var rapor = WeeklyReportBuilder.Build(Girdi(
+            Cift(Cagri(SupportCategory.Grant, "Hibe")),
+            Cift(Cagri(SupportCategory.Tender, "Sunucu Alımı", naceKurali: "62.01")),
+            Cift(Cagri(SupportCategory.Tender, "Taşınmaz Satışı"))));
+
+        var hepsi = rapor.Supports
+            .Concat(rapor.TechnologyTenders)
+            .Concat(rapor.OtherOpportunities)
+            .Select(i => i.OpportunityId)
+            .ToList();
+
+        Assert.Equal(hepsi.Count, hepsi.Distinct().Count());
+        Assert.Equal(3, hepsi.Count);
+    }
+
+    [Fact(DisplayName = "HR20. Takvim sektör uyumunu da yazar")]
+    public void Takvim_sektor_uyumunu_yazar()
+    {
+        // Yalnızca skor gösteren bir takvim, sektörü doğrulanamamış yüksek puanlı bir
+        // çağrıyı güvenli gibi gösterir (CLAUDE.md §2.2.1).
+        var rapor = WeeklyReportBuilder.Build(Girdi(
+            Cift(Cagri(SupportCategory.Grant, "Hibe", AsOf.AddDays(10)))));
+
+        var satir = Assert.Single(rapor.Deadlines);
+
+        Assert.Equal(SectorFit.Matched, satir.SectorFit);
+        Assert.False(string.IsNullOrWhiteSpace(satir.SectorFitLabel));
+    }
+
+    // ── Okunamayan ayrıntı sessizce "sorun yok"a dönüşmez ───────────────────
+
+    [Fact(DisplayName = "HR21. Ayrıntı okunamadıysa rapor YALAN GÜVENCE vermez")]
+    public void Okunamayan_ayrinti_guvenceye_donusmez()
+    {
+        // Sahadaki en tehlikeli kusur buydu: 36 değerlendirmenin ayrıntısı okunamıyordu,
+        // risk listesi boş kalıyordu ve rapor "engelleyen bir eksik görünmüyor" yazıyordu.
+        var girdi = Girdi(Cift(Cagri(SupportCategory.Grant, "Hibe", AsOf.AddDays(10))))
+            with { UnreadableDetailCount = 36 };
+
+        var rapor = WeeklyReportBuilder.Build(girdi);
+
+        Assert.Empty(rapor.Risks);
+        Assert.DoesNotContain(rapor.Notes, n => n.Contains("eksik görünmüyor", StringComparison.Ordinal));
+        Assert.Contains(rapor.Notes, n => n.Contains("okunamadı", StringComparison.Ordinal));
+        Assert.Contains(rapor.Notes, n => n.Contains("36", StringComparison.Ordinal));
+    }
+
+    [Fact(DisplayName = "HR22. Her şey okunabildiyse güvence VERİLİR")]
+    public void Her_sey_okunduysa_guvence_verilir()
+    {
+        var rapor = WeeklyReportBuilder.Build(Girdi(
+            Cift(Cagri(SupportCategory.Grant, "Hibe", AsOf.AddDays(10)))));
+
+        Assert.Contains(rapor.Notes, n => n.Contains("eksik görünmüyor", StringComparison.Ordinal));
+    }
+
     // ── Sayaçlar ────────────────────────────────────────────────────────────
 
     [Fact(DisplayName = "HR17. Sayaçlar gövdeyle tutarlıdır")]
@@ -396,9 +489,16 @@ public class WeeklyReportBuilderTests
 
         var sayac = WeeklyReportBuilder.Counters(rapor);
 
-        Assert.Equal(rapor.Supports.Count, sayac.OpportunityCount);
+        // Sayaç BÜTÜN çağrıları sayar. Eskiden yalnızca destekleri sayıyordu ve destek
+        // bölümü boş olan rapor listede baştan sona sıfır görünüyordu — oysa içinde
+        // üç acil iş vardı.
+        Assert.Equal(
+            rapor.Supports.Count + rapor.TechnologyTenders.Count + rapor.OtherOpportunities.Count,
+            sayac.OpportunityCount);
+
         Assert.Equal(rapor.TechnologyTenders.Count, sayac.TenderCount);
         Assert.Equal(rapor.Todos.Count, sayac.ActionCount);
+        Assert.Equal(rapor.Deadlines.Count, sayac.DeadlineCount);
 
         // 3 gün kalan acil, 40 gün kalan değil.
         Assert.Equal(1, sayac.UrgentDeadlineCount);

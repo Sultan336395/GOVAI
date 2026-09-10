@@ -87,10 +87,11 @@ export default function WeeklyReportsPage() {
               <tr>
                 <th>Dönem <HelpTip field="raporDonemi" /></th>
                 <th>Nasıl Oluştu <HelpTip field="raporKaynagi" /></th>
-                <th>Destekler</th>
-                <th>İhaleler</th>
+                <th>Çağrılar</th>
+                <th>Teknoloji İhalesi</th>
                 <th>Mevzuat</th>
                 <th>Riskler</th>
+                <th>Takvimde</th>
                 <th>Acil Son Başvuru <HelpTip field="acilSonBasvuru" /></th>
                 <th>Çıktılar</th>
               </tr>
@@ -110,6 +111,7 @@ export default function WeeklyReportsPage() {
                   <td>{adet(rapor.tenderCount, 'İhale')}</td>
                   <td>{adet(rapor.regulatoryChangeCount, 'Değişiklik')}</td>
                   <td>{adet(rapor.riskCount, 'Risk')}</td>
+                  <td>{adet(rapor.deadlineCount, 'Çağrı')}</td>
                   <td>{adet(rapor.urgentDeadlineCount, 'Çağrı')}</td>
                   <td>
                     <a href={api.weeklyReportExportUrl(rapor.id, 'pdf')}>PDF</a>

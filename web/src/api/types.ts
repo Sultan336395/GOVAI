@@ -1232,6 +1232,7 @@ export interface WeeklyReportSummary {
   riskCount: number
   actionCount: number
   urgentDeadlineCount: number
+  deadlineCount: number
 }
 
 export interface ReportOpportunityItem {
@@ -1277,6 +1278,8 @@ export interface ReportDeadlineItem {
   score: number
   verdict: EligibilityVerdict
   verdictLabel: string
+  sectorFit: SectorFit
+  sectorFitLabel: string
 }
 
 export interface ReportTodoItem {
@@ -1303,6 +1306,8 @@ export interface WeeklyReportContent {
   header: WeeklyReportHeader
   supports: ReportOpportunityItem[]
   technologyTenders: ReportOpportunityItem[]
+  /** Destek ve teknoloji bölümlerine girmeyen ama firmaya açık olan çağrılar. */
+  otherOpportunities: ReportOpportunityItem[]
   regulatoryChanges: ReportRegulatoryItem[]
   risks: ReportRiskItem[]
   deadlines: ReportDeadlineItem[]

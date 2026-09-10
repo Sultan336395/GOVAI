@@ -86,6 +86,9 @@ public class WeeklyReport : AggregateRoot, IAuditable, ITenantScoped
     /// <summary>Rapor haftasından sonraki 14 gün içinde kapanan çağrı sayısı.</summary>
     public int UrgentDeadlineCount { get; private set; }
 
+    /// <summary>Son başvuru takviminde yer alan çağrı sayısı.</summary>
+    public int DeadlineCount { get; private set; }
+
     public DateTimeOffset CreatedAt { get; set; }
     public string? CreatedBy { get; set; }
     public DateTimeOffset? UpdatedAt { get; set; }
@@ -126,17 +129,20 @@ public class WeeklyReport : AggregateRoot, IAuditable, ITenantScoped
         RiskCount = counters.RiskCount;
         ActionCount = counters.ActionCount;
         UrgentDeadlineCount = counters.UrgentDeadlineCount;
+        DeadlineCount = counters.DeadlineCount;
     }
 }
 
 /// <summary>Liste ekranının gövdeyi açmadan okuduğu sayılar.</summary>
 public sealed record WeeklyReportCounters(
+    /// <summary>Raporda listelenen bütün çağrılar — destek, teknoloji ihalesi ve diğerleri.</summary>
     int OpportunityCount,
     int TenderCount,
     int RegulatoryChangeCount,
     int RiskCount,
     int ActionCount,
-    int UrgentDeadlineCount);
+    int UrgentDeadlineCount,
+    int DeadlineCount);
 
 /// <summary>Raporu kimin istediği.</summary>
 public enum ReportTrigger

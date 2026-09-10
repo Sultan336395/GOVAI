@@ -8,7 +8,9 @@ import type {
   ReportRiskItem,
   ReportTodoItem,
 } from '@/api/types'
-import { EmptyState, ErrorBox, InfoBox, Kpi, Loading, ScoreCell, VerdictBadge } from '@/components/Common'
+import {
+  EmptyState, ErrorBox, InfoBox, Kpi, Loading, ScoreCell, SectorFitBadge, VerdictBadge,
+} from '@/components/Common'
 import { formatDate, formatDeadline } from '@/lib/format'
 
 /**
@@ -31,8 +33,10 @@ export default function WeeklyReportPage() {
   if (error) return <ErrorBox error={error} />
   if (!data) return <EmptyState>Rapor bulunamadı.</EmptyState>
 
-  const { header, supports, technologyTenders, regulatoryChanges, risks, deadlines, todos, notes } =
-    data.content
+  const {
+    header, supports, technologyTenders, otherOpportunities,
+    regulatoryChanges, risks, deadlines, todos, notes,
+  } = data.content
 
   return (
     <>
@@ -59,6 +63,11 @@ export default function WeeklyReportPage() {
         <Kpi label="Kararı Belirsiz" value={String(header.undeterminedCount)} />
       </div>
 
+      {/*
+        Notlar tabloların ÜSTÜNDE durur. İçlerinde "şu kadar değerlendirmenin ayrıntısı
+        okunamadı" gibi raporun kapsamını sınırlayan uyarılar olabilir; bunu en alta
+        koymak okuyucunun tabloları eksiksiz sanarak karar vermesine yol açar.
+      */}
       {notes.length > 0 ? (
         <InfoBox>
           {notes.map((not) => (
@@ -81,6 +90,13 @@ export default function WeeklyReportPage() {
 
       <Bolum baslik="Teknoloji ve Yazılım İhaleleri" bos="Bu dönemde teknoloji konulu açık ihale bulunamadı.">
         {technologyTenders.length > 0 ? <CagriTablosu satirlar={technologyTenders} /> : null}
+      </Bolum>
+
+      <Bolum
+        baslik="Diğer Açık Çağrı ve İhaleler"
+        bos="Destek ve teknoloji dışında açık başka bir çağrı bulunamadı."
+      >
+        {otherOpportunities.length > 0 ? <CagriTablosu satirlar={otherOpportunities} /> : null}
       </Bolum>
 
       <Bolum baslik="Son Başvuru Takvimi" bos="Yakın dönemde kapanan bir çağrı yok.">
@@ -192,6 +208,7 @@ function TakvimTablosu({ satirlar }: { satirlar: ReportDeadlineItem[] }) {
             <th>Kalan</th>
             <th>Skor</th>
             <th>Karar</th>
+            <th>Sektör Uyumu</th>
           </tr>
         </thead>
         <tbody>
@@ -202,6 +219,9 @@ function TakvimTablosu({ satirlar }: { satirlar: ReportDeadlineItem[] }) {
               <td>{formatDeadline(d.daysRemaining)}</td>
               <td><ScoreCell score={d.score} /></td>
               <td><VerdictBadge verdict={d.verdict} /></td>
+              {/* Yalnızca skor gösteren bir takvim, sektörü doğrulanamamış yüksek
+                  puanlı bir çağrıyı güvenli gibi gösterirdi (CLAUDE.md §2.2.1). */}
+              <td><SectorFitBadge fit={d.sectorFit} /></td>
             </tr>
           ))}
         </tbody>

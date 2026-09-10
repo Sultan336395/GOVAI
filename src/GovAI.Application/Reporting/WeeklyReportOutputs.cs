@@ -33,6 +33,19 @@ public static class WeeklyReportHtml
             .Append($"Uygun: {h.EligibleCount} · ")
             .Append($"Kararı belirsiz: {h.UndeterminedCount}</p>");
 
+        // Notlar EN BAŞTA yazılır. İçlerinde "şu kadar değerlendirmenin ayrıntısı
+        // okunamadı" gibi raporun kapsamını sınırlayan uyarılar olabilir; bunu en sonda
+        // göstermek, okuyucunun tabloları eksiksiz sanarak karar vermesine yol açar.
+        if (content.Notes.Count > 0)
+        {
+            html.Append("<h2>Dikkat Edilmesi Gerekenler</h2>");
+
+            foreach (var not in content.Notes)
+            {
+                html.Append($"<p>· {Kod(not)}</p>");
+            }
+        }
+
         Bolum(html, "En Uygun Fon, Hibe ve Teşvikler",
             content.Supports,
             ["Çağrı", "Kurum", "Tür", "Skor", "Karar", "Son Başvuru"],
@@ -46,6 +59,15 @@ public static class WeeklyReportHtml
             content.TechnologyTenders,
             ["İhale", "İdare", "Skor", "Karar", "Son Başvuru"],
             i => [i.Title, i.Publisher, Sayi(i.Score), i.VerdictLabel, Tarih(i.Deadline)]);
+
+        Bolum(html, "Diğer Açık Çağrı ve İhaleler",
+            content.OtherOpportunities,
+            ["Çağrı", "İdare", "Tür", "Skor", "Karar", "Son Başvuru"],
+            i =>
+            [
+                i.Title, i.Publisher, i.CategoryLabel,
+                Sayi(i.Score), i.VerdictLabel, Tarih(i.Deadline),
+            ]);
 
         Bolum(html, "Mevzuat Değişiklikleri",
             content.RegulatoryChanges,
@@ -63,28 +85,18 @@ public static class WeeklyReportHtml
 
         Bolum(html, "Son Başvuru Takvimi",
             content.Deadlines,
-            ["Çağrı", "Son Başvuru", "Kalan Gün", "Skor", "Karar"],
+            ["Çağrı", "Son Başvuru", "Kalan Gün", "Skor", "Karar", "Sektör Uyumu"],
             i =>
             [
                 i.Title, Tarih(i.Deadline),
                 i.DaysRemaining.ToString(CultureInfo.InvariantCulture),
-                Sayi(i.Score), i.VerdictLabel,
+                Sayi(i.Score), i.VerdictLabel, i.SectorFitLabel,
             ]);
 
         Bolum(html, "Önceliklendirilmiş Yapılacaklar",
             content.Todos,
             ["Öncelik", "İş", "Gerekçe", "Tarih"],
             i => [i.PriorityLabel, i.Title, i.Reason, Tarih(i.DueAt)]);
-
-        if (content.Notes.Count > 0)
-        {
-            html.Append("<h2>Notlar</h2>");
-
-            foreach (var not in content.Notes)
-            {
-                html.Append($"<p>· {Kod(not)}</p>");
-            }
-        }
 
         return html.ToString();
     }
@@ -174,6 +186,13 @@ public static class WeeklyReportSheet
                 i.MissingConditions.Count == 0 ? "Eksik koşul yok" : string.Join("; ", i.MissingConditions)]);
         }
 
+        foreach (var i in content.OtherOpportunities)
+        {
+            rows.Add(["Diğer Çağrı", i.Title, i.Publisher, i.CategoryLabel, i.Score,
+                i.VerdictLabel, i.Deadline?.DateTime, i.DaysToDeadline,
+                i.MissingConditions.Count == 0 ? "Eksik koşul yok" : string.Join("; ", i.MissingConditions)]);
+        }
+
         foreach (var i in content.RegulatoryChanges)
         {
             rows.Add(["Mevzuat Değişikliği", i.Title, i.Authority, null, null,
@@ -189,7 +208,7 @@ public static class WeeklyReportSheet
         foreach (var i in content.Deadlines)
         {
             rows.Add(["Son Başvuru", i.Title, null, null, i.Score,
-                i.VerdictLabel, i.Deadline.DateTime, i.DaysRemaining, null]);
+                i.VerdictLabel, i.Deadline.DateTime, i.DaysRemaining, i.SectorFitLabel]);
         }
 
         foreach (var i in content.Todos)

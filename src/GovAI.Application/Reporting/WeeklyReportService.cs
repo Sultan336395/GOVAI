@@ -3,8 +3,8 @@ using System.Text.Json.Serialization;
 using GovAI.Application.Abstractions.Persistence;
 using GovAI.Application.Abstractions.Services;
 using GovAI.Application.Common;
+using GovAI.Application.Eligibility;
 using GovAI.Domain.Common;
-using GovAI.Domain.Eligibility;
 using GovAI.Domain.Reporting;
 using Microsoft.Extensions.Logging;
 
@@ -31,16 +31,6 @@ public sealed class WeeklyReportService(
     ILogger<WeeklyReportService> logger)
 {
     private const int DefaultHistoryLimit = 52;
-
-    /// <summary>
-    /// Değerlendirme gövdesi bu ayarlarla yazılmıştı; aynısıyla okunmalı. Farklı bir
-    /// ayarla okumak alanları sessizce <c>null</c> bırakır ve rapor eksik çıkardı.
-    /// </summary>
-    private static readonly JsonSerializerOptions DetailJsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-        Converters = { new JsonStringEnumConverter() },
-    };
 
     private static readonly JsonSerializerOptions ContentJsonOptions = new()
     {
@@ -163,9 +153,21 @@ public sealed class WeeklyReportService(
 
         var index = opportunities.ToDictionary(o => o.Id);
 
+        var okunamayan = 0;
+
         var pairs = latest
             .Where(a => index.ContainsKey(a.OpportunityId))
-            .Select(a => new AssessedOpportunity(a, index[a.OpportunityId], ReadDetail(a.DetailJson, a.Id)))
+            .Select(a =>
+            {
+                var detail = ReadDetail(a.DetailJson, a.Id);
+
+                if (detail is null)
+                {
+                    okunamayan++;
+                }
+
+                return new AssessedOpportunity(a, index[a.OpportunityId], detail);
+            })
             .ToList();
 
         var regulatory = await reports.ListPublishedBetweenAsync(
@@ -179,6 +181,7 @@ public sealed class WeeklyReportService(
             AsOf = now,
             Assessments = pairs,
             RegulatoryChanges = regulatory,
+            UnreadableDetailCount = okunamayan,
         };
     }
 
@@ -187,18 +190,26 @@ public sealed class WeeklyReportService(
     /// skorlar ve son tarihler kolonlardan gelir, yalnızca risk ve eksik listesi
     /// o değerlendirme için boş kalır. Tek bir bozuk gövde yüzünden firmanın haftalık
     /// raporunu hiç üretmemek, ona hiçbir şey anlatmamak olurdu.
+    ///
+    /// <para>
+    /// Ama sessiz de kalınmaz: okunamayan kayıt sayısı rapora taşınır ve rapor "eksik
+    /// görünmüyor" demek yerine okuyamadığını söyler. Sahada bu ayrım hayatidir —
+    /// gövde şekli tutmadığında rapor dört eksik zorunlu belgeyi "eksik yok" diye
+    /// yazmıştı.
+    /// </para>
     /// </summary>
-    private EligibilityOutcome? ReadDetail(string detailJson, Guid assessmentId)
+    private AssessmentDetailSnapshot? ReadDetail(string detailJson, Guid assessmentId)
     {
         try
         {
-            return JsonSerializer.Deserialize<EligibilityOutcome>(detailJson, DetailJsonOptions);
+            return JsonSerializer.Deserialize<AssessmentDetailSnapshot>(
+                detailJson, AssessmentDetailSnapshot.JsonOptions);
         }
         catch (JsonException exception)
         {
             logger.LogWarning(
                 exception,
-                "Değerlendirme ayrıntısı okunamadı; rapor bu kaydın risklerini içermeyecek. AssessmentId={AssessmentId}",
+                "Değerlendirme ayrıntısı okunamadı; rapor bunu açıkça belirtecek. AssessmentId={AssessmentId}",
                 assessmentId);
 
             return null;
@@ -229,7 +240,8 @@ public sealed class WeeklyReportService(
             r.RegulatoryChangeCount,
             r.RiskCount,
             r.ActionCount,
-            r.UrgentDeadlineCount)).ToList();
+            r.UrgentDeadlineCount,
+            r.DeadlineCount)).ToList();
     }
 
     public async Task<WeeklyReportDetailDto> GetAsync(

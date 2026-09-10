@@ -39,6 +39,7 @@ const bosIcerik: WeeklyReportContent = {
   },
   supports: [],
   technologyTenders: [],
+  otherOpportunities: [],
   regulatoryChanges: [],
   risks: [],
   deadlines: [],
@@ -75,7 +76,7 @@ describe('WeeklyReportPage', () => {
 
   afterEach(cleanup)
 
-  it('HRW1. Yedi bölümün başlığı da görünür', async () => {
+  it('HRW1. Bütün bölüm başlıkları görünür', async () => {
     getWeeklyReport.mockResolvedValue(rapor())
 
     ekranaBas()
@@ -87,6 +88,7 @@ describe('WeeklyReportPage', () => {
       'Riskler ve Zorunlu Aksiyonlar',
       'En Uygun Fon, Hibe ve Teşvikler',
       'Teknoloji ve Yazılım İhaleleri',
+      'Diğer Açık Çağrı ve İhaleler',
       'Son Başvuru Takvimi',
       'Mevzuat Değişiklikleri',
     ]) {

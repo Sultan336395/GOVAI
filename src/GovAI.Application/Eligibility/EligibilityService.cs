@@ -33,12 +33,6 @@ public sealed class EligibilityService(
     AnalysisInvalidationService analysisInvalidation,
     ILogger<EligibilityService> logger)
 {
-    private static readonly JsonSerializerOptions DetailJsonOptions = new()
-    {
-        WriteIndented = false,
-        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
-    };
-
     /// <summary>
     /// Tek bir firma–çağrı çiftini değerlendirir ve sonucu kalıcılaştırır.
     /// </summary>
@@ -269,15 +263,12 @@ public sealed class EligibilityService(
         var previous = await assessments.GetLatestAsync(company.Id, opportunity.Id, cancellationToken);
         await assessments.SupersedePreviousAsync(company.Id, opportunity.Id, cancellationToken);
 
+        // Gövde isimsiz nesneyle DEĞİL, okuyan tarafın da kullandığı tiple yazılır.
+        // Eskiden iki taraf birbirini tanımıyordu ve şekiller ayrıştığında haftalık
+        // rapor risk listesini sessizce boş üretiyordu (bkz. AssessmentDetailSnapshot).
         var detailJson = JsonSerializer.Serialize(
-            new
-            {
-                outcome.RuleEvaluations,
-                outcome.DocumentChecklist,
-                Dimensions = outcome.Score.Dimensions,
-                outcome.Score.Weights
-            },
-            DetailJsonOptions);
+            AssessmentDetailSnapshot.From(outcome),
+            AssessmentDetailSnapshot.JsonOptions);
 
         var assessment = new EligibilityAssessment(company.TenantId, outcome, company.ProfileVersion, detailJson);
         await assessments.AddAsync(assessment, cancellationToken);

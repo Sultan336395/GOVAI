@@ -1,3 +1,4 @@
+using GovAI.Application.Eligibility;
 using GovAI.Domain.Assessments;
 using GovAI.Domain.Companies;
 using GovAI.Domain.Common;
@@ -28,13 +29,19 @@ public sealed record WeeklyReportInput
 
     /// <summary>Firmanın hiç değerlendirmesi yoksa sebebini açıklayan not.</summary>
     public string? EmptyReason { get; init; }
+
+    /// <summary>
+    /// Ayrıntı gövdesi okunamayan değerlendirme sayısı. Sıfırdan büyükse rapor
+    /// "eksik görünmüyor" demez; okuyamadığını söyler.
+    /// </summary>
+    public int UnreadableDetailCount { get; init; }
 }
 
 /// <summary>Bir değerlendirme ve dayandığı çağrı.</summary>
 public sealed record AssessedOpportunity(
     EligibilityAssessment Assessment,
     Opportunity Opportunity,
-    EligibilityOutcome? Detail);
+    AssessmentDetailSnapshot? Detail);
 
 /// <summary>
 /// Haftalık raporu kuran <b>deterministik</b> çekirdek.
@@ -102,12 +109,13 @@ public static class WeeklyReportBuilder
 
         var supports = BuildSupports(canli, input.AsOf);
         var tenders = BuildTenders(canli, input.AsOf);
+        var others = BuildOthers(canli, input.AsOf, supports, tenders);
         var regulatory = BuildRegulatory(input.RegulatoryChanges);
         var risks = BuildRisks(canli);
         var deadlines = BuildDeadlines(canli, input.AsOf);
         var todos = BuildTodos(risks, deadlines, input.AsOf);
 
-        AddNotes(notes, input, canli, supports, tenders, regulatory, risks, deadlines);
+        AddNotes(notes, input, canli, supports, tenders, others, regulatory, risks, deadlines);
 
         return new WeeklyReportContent
         {
@@ -122,6 +130,7 @@ public static class WeeklyReportBuilder
                 canli.Count(a => a.Assessment.Verdict == EligibilityVerdict.Indeterminate)),
             Supports = supports,
             TechnologyTenders = tenders,
+            OtherOpportunities = others,
             RegulatoryChanges = regulatory,
             Risks = risks,
             Deadlines = deadlines,
@@ -130,13 +139,24 @@ public static class WeeklyReportBuilder
         };
     }
 
+    /// <summary>
+    /// Liste ekranının okuduğu sayılar.
+    ///
+    /// <para>
+    /// <see cref="WeeklyReportCounters.OpportunityCount"/> rapordaki <b>bütün</b>
+    /// çağrıları sayar. Eskiden yalnızca destekleri sayıyordu: destek bölümü boş olan
+    /// bir rapor listede baştan sona sıfır görünüyor, oysa içinde üç acil iş
+    /// bulunuyordu. Liste satırının işi raporu doğru temsil etmektir.
+    /// </para>
+    /// </summary>
     public static WeeklyReportCounters Counters(WeeklyReportContent content) => new(
-        content.Supports.Count,
+        content.Supports.Count + content.TechnologyTenders.Count + content.OtherOpportunities.Count,
         content.TechnologyTenders.Count,
         content.RegulatoryChanges.Count,
         content.Risks.Count,
         content.Todos.Count,
-        content.Deadlines.Count(d => d.DaysRemaining <= UrgentDeadlineDays));
+        content.Deadlines.Count(d => d.DaysRemaining <= UrgentDeadlineDays),
+        content.Deadlines.Count);
 
     // ── Bölüm 1: fon, hibe, teşvik ──────────────────────────────────────────
 
@@ -169,6 +189,40 @@ public static class WeeklyReportBuilder
             .Take(MaximumTenders)
             .Select(a => ToItem(a, asOf))
             .ToList();
+
+    // ── Bölüm 3: diğer açık çağrı ve ihaleler ───────────────────────────────
+
+    /// <summary>
+    /// Destek ve teknoloji bölümlerine girmeyen, ama firmaya hâlâ açık olan çağrılar.
+    ///
+    /// <para>
+    /// Rapor üzerine iş verdiği hiçbir çağrıyı gizlemez. Taşınmaz satışı, dikili ağaç
+    /// satışı, sigorta aracılığı gibi ihaleler destek türü değildir ve konusu teknoloji
+    /// de değildir; iki bölümün arasından düşüp yalnızca takvimde ve yapılacaklarda
+    /// görünüyorlardı. Kullanıcı "başvuruyu hazırla" satırını okuyup o çağrıyı raporun
+    /// hiçbir yerinde bulamıyordu.
+    /// </para>
+    /// </summary>
+    private static List<ReportOpportunityItem> BuildOthers(
+        IReadOnlyList<AssessedOpportunity> assessments,
+        DateTimeOffset asOf,
+        IReadOnlyList<ReportOpportunityItem> supports,
+        IReadOnlyList<ReportOpportunityItem> tenders)
+    {
+        var gosterilen = supports.Select(s => s.OpportunityId)
+            .Concat(tenders.Select(t => t.OpportunityId))
+            .ToHashSet();
+
+        return assessments
+            .Where(a => !gosterilen.Contains(a.Opportunity.Id))
+            .Where(a => !Kapandi(a.Opportunity, asOf))
+            .Where(a => a.Assessment.Verdict != EligibilityVerdict.NotEligible)
+            .OrderByDescending(a => a.Assessment.SectorFit == SectorFit.Matched)
+            .ThenByDescending(a => a.Assessment.FinalScore)
+            .ThenBy(a => a.Opportunity.Title, StringComparer.Ordinal)
+            .Select(a => ToItem(a, asOf))
+            .ToList();
+    }
 
     /// <summary>Çağrının sektör kuralı teknoloji NACE köklerinden birine dokunuyor mu?</summary>
     private static bool TeknolojiIhalesiMi(Opportunity opportunity) =>
@@ -244,7 +298,7 @@ public static class WeeklyReportBuilder
                     a.Opportunity.Id);
             }
 
-            foreach (var belge in detail.DocumentChecklist.Where(d => d.IsMandatory && d.Status != DocumentStatus.Provided))
+            foreach (var belge in detail.MissingMandatoryDocuments)
             {
                 Ekle(
                     ReportRiskKind.MissingDocument,
@@ -307,7 +361,9 @@ public static class WeeklyReportBuilder
                 GunFarki(a.Opportunity.Deadline!.Value, asOf),
                 a.Assessment.FinalScore,
                 a.Assessment.Verdict,
-                VerdictLabels.Of(a.Assessment.Verdict)))
+                VerdictLabels.Of(a.Assessment.Verdict),
+                a.Assessment.SectorFit,
+                SectorFitLabels.Of(a.Assessment.SectorFit)))
             .ToList();
 
     // ── Bölüm 6: önceliklendirilmiş yapılacaklar ────────────────────────────
@@ -385,6 +441,7 @@ public static class WeeklyReportBuilder
         IReadOnlyList<AssessedOpportunity> canli,
         IReadOnlyList<ReportOpportunityItem> supports,
         IReadOnlyList<ReportOpportunityItem> tenders,
+        IReadOnlyList<ReportOpportunityItem> others,
         IReadOnlyList<ReportRegulatoryItem> regulatory,
         IReadOnlyList<ReportRiskItem> risks,
         IReadOnlyList<ReportDeadlineItem> deadlines)
@@ -402,6 +459,20 @@ public static class WeeklyReportBuilder
             return;
         }
 
+        // Okunamayan değerlendirme varsa rapor ÖNCE bunu söyler.
+        //
+        // Sahada en tehlikeli kusur buydu: ayrıntı gövdesi hiç okunamıyordu, risk listesi
+        // boş kalıyordu ve rapor "başvuruyu engelleyen bir eksik görünmüyor" diye
+        // yazıyordu — oysa her değerlendirmede dört eksik zorunlu belge vardı. Eksik
+        // bilgiyi "sorun yok" diye sunmak, hiç bilgi vermemekten kötüdür.
+        if (input.UnreadableDetailCount > 0)
+        {
+            notes.Add(
+                $"{input.UnreadableDetailCount} değerlendirmenin ayrıntısı okunamadı; " +
+                "bu kayıtların riskleri ve eksik koşulları raporda YER ALMIYOR. " +
+                "Skorlar ve son başvuru tarihleri etkilenmedi.");
+        }
+
         if (supports.Count == 0)
         {
             notes.Add("Bu dönemde firmaya uygun açık fon, hibe veya teşvik bulunamadı.");
@@ -412,12 +483,18 @@ public static class WeeklyReportBuilder
             notes.Add("Bu dönemde teknoloji veya yazılım konulu açık ihale bulunamadı.");
         }
 
+        if (others.Count == 0)
+        {
+            notes.Add("Destek ve teknoloji dışında açık başka bir çağrı bulunamadı.");
+        }
+
         if (regulatory.Count == 0)
         {
             notes.Add("Bu hafta firmayı ilgilendiren mevzuat değişikliği yayımlanmadı.");
         }
 
-        if (risks.Count == 0)
+        // "Eksik yok" demek bir GÜVENCEDİR; yalnızca bütün ayrıntılar okunabildiyse verilir.
+        if (risks.Count == 0 && input.UnreadableDetailCount == 0)
         {
             notes.Add("Firma profilinde başvuruyu engelleyen bir eksik görünmüyor.");
         }

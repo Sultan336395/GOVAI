@@ -22,16 +22,30 @@ public sealed record WeeklyReportContent
     /// <summary>Bölüm 2 — teknoloji ve yazılım ihaleleri.</summary>
     public required IReadOnlyList<ReportOpportunityItem> TechnologyTenders { get; init; }
 
-    /// <summary>Bölüm 3 — bu hafta yayımlanan mevzuat değişiklikleri.</summary>
+    /// <summary>
+    /// Bölüm 3 — diğer açık çağrı ve ihaleler.
+    ///
+    /// <para>
+    /// Bu bölüm bir artık değil, <b>boşluk kapatıcıdır</b>. Sahada rapor "uygun destek
+    /// bulunamadı" yazarken aynı anda "Acil: başvuruyu hazırla — DİKİLİ AĞAÇ
+    /// SATILACAKTIR" diyordu: taşınmaz, ağaç ve sigorta ihaleleri ne destek
+    /// bölümüne (destek türü değil) ne teknoloji bölümüne (konusu teknoloji değil)
+    /// giriyor, ama takvime ve yapılacaklara giriyordu. Rapor kendisiyle çelişiyor ve
+    /// üzerine iş verdiği çağrıyı hiç göstermiyordu.
+    /// </para>
+    /// </summary>
+    public required IReadOnlyList<ReportOpportunityItem> OtherOpportunities { get; init; }
+
+    /// <summary>Bölüm 4 — bu hafta yayımlanan mevzuat değişiklikleri.</summary>
     public required IReadOnlyList<ReportRegulatoryItem> RegulatoryChanges { get; init; }
 
-    /// <summary>Bölüm 4 — riskler ve zorunlu aksiyonlar.</summary>
+    /// <summary>Bölüm 5 — riskler ve zorunlu aksiyonlar.</summary>
     public required IReadOnlyList<ReportRiskItem> Risks { get; init; }
 
-    /// <summary>Bölüm 5 — son başvuru takvimi.</summary>
+    /// <summary>Bölüm 6 — son başvuru takvimi.</summary>
     public required IReadOnlyList<ReportDeadlineItem> Deadlines { get; init; }
 
-    /// <summary>Bölüm 6 — önceliklendirilmiş yapılacaklar.</summary>
+    /// <summary>Bölüm 7 — önceliklendirilmiş yapılacaklar.</summary>
     public required IReadOnlyList<ReportTodoItem> Todos { get; init; }
 
     /// <summary>
@@ -116,7 +130,14 @@ public sealed record ReportDeadlineItem(
     int DaysRemaining,
     decimal Score,
     EligibilityVerdict Verdict,
-    string VerdictLabel);
+    string VerdictLabel,
+    /// <summary>
+    /// Sektör uyumu takvimde de yazılır. Sıralamanın birincil ölçütü budur
+    /// (CLAUDE.md §2.2.1); yalnızca skor gösteren bir takvim, sektörü doğrulanamamış
+    /// yüksek puanlı bir çağrıyı güvenli gibi gösterirdi.
+    /// </summary>
+    SectorFit SectorFit,
+    string SectorFitLabel);
 
 /// <summary>Yapılacak işin aciliyeti.</summary>
 public enum ReportTodoPriority
@@ -154,7 +175,8 @@ public sealed record WeeklyReportSummaryDto(
     int RegulatoryChangeCount,
     int RiskCount,
     int ActionCount,
-    int UrgentDeadlineCount);
+    int UrgentDeadlineCount,
+    int DeadlineCount);
 
 public sealed record WeeklyReportDetailDto(
     Guid Id,
