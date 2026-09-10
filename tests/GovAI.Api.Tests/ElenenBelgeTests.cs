@@ -198,6 +198,102 @@ public sealed class ElenenBelgeTests(GovAiApiFactory factory)
         Assert.Equal(surum.Chunks.Count, sonuc.GetProperty("chunkCount").GetInt32());
     }
 
+    /// <summary>Belgeden gerçek bir çağrı kaydı açtırır; sonrasını testler kurar.</summary>
+    private async Task<Guid> FirsatAcAsync(Guid sourceId, Guid documentId, string baslik)
+    {
+        var cevap = await _ingest.PostAsJsonAsync("/api/opportunities", new
+        {
+            sourceId,
+            sourceDocumentId = documentId,
+            sourceType = "KosgebOrSimilar",
+            supportCategory = "Grant",
+            title = baslik,
+            publisher = "KOSGEB",
+            summary = "KOSGEB tarafından açılan örnek destek çağrısının özeti.",
+            sourceUrl = "https://www.kosgeb.gov.tr/destekler/ornek",
+            publishedAt = DateTimeOffset.UtcNow.AddDays(-1),
+            deadline = DateTimeOffset.UtcNow.AddDays(30),
+        });
+
+        cevap.EnsureSuccessStatusCode();
+
+        return (await cevap.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+    }
+
+    [Fact(DisplayName = "EB6. Belge çağrı sayfası olmaktan çıkınca kayıt katalogdan çekilir")]
+    public async Task Elenen_belgenin_eski_kaydi_katalogdan_cekilir()
+    {
+        // Sahadaki boşluk: ayrıştırıcı liste sayfasından artık kayıt AÇMIYOR, ama daha
+        // önce açılmış kayıt katalogda kalıyordu. Kurum sayfasının içeriğini değiştirince
+        // aynısı yeniden olurdu.
+        var sourceId = await KaynakAcAsync("Geri Çekme Testi");
+        var documentId = await BelgeAlAsync(sourceId, "https://www.kosgeb.gov.tr/destekler/6");
+        var opportunityId = await FirsatAcAsync(sourceId, documentId, "Örnek Destek Çağrısı");
+
+        var once = await SorguAsync(db => db.Opportunities.SingleAsync(o => o.Id == opportunityId));
+        Assert.True(once.IsPublishable);
+
+        await _ingest.PostAsJsonAsync(
+            $"/api/sources/documents/{documentId}/parse-result",
+            new { status = "Skipped", error = "Liste sayfası; tek bir çağrı değildir." });
+
+        var sonra = await SorguAsync(db => db.Opportunities.SingleAsync(o => o.Id == opportunityId));
+
+        Assert.False(sonra.IsPublishable);
+        Assert.Equal(QuarantineReason.InvalidSourcePage, sonra.QuarantineReason);
+        Assert.Equal("Liste sayfası; tek bir çağrı değildir.", sonra.QuarantineNote);
+    }
+
+    [Fact(DisplayName = "EB7. Geri çekilen kayıt SİLİNMEZ")]
+    public async Task Geri_cekilen_kayit_silinmez()
+    {
+        var sourceId = await KaynakAcAsync("Geri Çekme Silme Testi");
+        var documentId = await BelgeAlAsync(sourceId, "https://www.kosgeb.gov.tr/destekler/7");
+        var opportunityId = await FirsatAcAsync(sourceId, documentId, "Silinmeyecek Çağrı");
+
+        await _ingest.PostAsJsonAsync(
+            $"/api/sources/documents/{documentId}/parse-result",
+            new { status = "Skipped", error = "Liste sayfası; tek bir çağrı değildir." });
+
+        var kayit = await SorguAsync(db => db.Opportunities
+            .IgnoreQueryFilters()
+            .SingleAsync(o => o.Id == opportunityId));
+
+        Assert.False(kayit.IsDeleted);
+        Assert.Equal("Silinmeyecek Çağrı", kayit.Title);
+    }
+
+    [Fact(DisplayName = "EB8. İnceleyicinin kendi kararı EZİLMEZ")]
+    public async Task Inceleyicinin_karari_ezilmez()
+    {
+        // Kayıt zaten karantinadaysa oradaki gerekçe insanın verdiği karardır.
+        // Onu makine gerekçesiyle değiştirmek, inceleyicinin niçin öyle karar verdiğini
+        // silmek olurdu.
+        var sourceId = await KaynakAcAsync("Karar Ezilmez Testi");
+        var documentId = await BelgeAlAsync(sourceId, "https://www.kosgeb.gov.tr/destekler/8");
+        var opportunityId = await FirsatAcAsync(sourceId, documentId, "İnceleyici Kararı Testi");
+
+        // İnceleyicinin kararı doğrudan kurulur: bu testin konusu kararın nasıl
+        // verildiği değil, verilmiş bir kararın korunması.
+        using (var kapsam = _factory.Services.CreateScope())
+        {
+            var db = kapsam.ServiceProvider.GetRequiredService<GovAiDbContext>();
+            var oncekiKarar = await db.Opportunities.SingleAsync(o => o.Id == opportunityId);
+
+            oncekiKarar.Quarantine(QuarantineReason.Duplicate, "Aynı ihale başka kayıtta duruyor.");
+            await db.SaveChangesAsync();
+        }
+
+        await _ingest.PostAsJsonAsync(
+            $"/api/sources/documents/{documentId}/parse-result",
+            new { status = "Skipped", error = "Liste sayfası; tek bir çağrı değildir." });
+
+        var kayit = await SorguAsync(db => db.Opportunities.SingleAsync(o => o.Id == opportunityId));
+
+        Assert.Equal(QuarantineReason.Duplicate, kayit.QuarantineReason);
+        Assert.Equal("Aynı ihale başka kayıtta duruyor.", kayit.QuarantineNote);
+    }
+
     [Fact(DisplayName = "EB5. Elenen belgeden fırsat kaydı açılmaz")]
     public async Task Elenen_belgeden_firsat_acilmaz()
     {

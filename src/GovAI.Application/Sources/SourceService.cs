@@ -184,6 +184,7 @@ public sealed class SourceService(
     ISourceRepository sources,
     ISourceDocumentRepository documents,
     IRegulatoryChangeRepository regulatoryChanges,
+    IOpportunityRepository opportunities,
     IUnitOfWork unitOfWork,
     IDateTimeProvider clock,
     IEventPublisher events,
@@ -553,6 +554,8 @@ public sealed class SourceService(
         {
             version.RecordSkipped(request.Error ?? "Belgeden çağrı kaydı açılmadı.");
 
+            await WithdrawOpportunityAsync(document, version, cancellationToken);
+
             await unitOfWork.SaveChangesAsync(cancellationToken);
 
             logger.LogInformation(
@@ -826,6 +829,47 @@ public sealed class SourceService(
         document.MediaType,
         document.CollectedAt,
     };
+
+    /// <summary>
+    /// Belgeden kayıt açılmayacaksa, DAHA ÖNCE açılmış kayıt katalogdan çekilir.
+    ///
+    /// <para>
+    /// Sahada iki KOSGEB liste sayfası kataloğa çağrı olarak girdi. Ayrıştırıcı artık
+    /// böyle bir sayfadan kayıt açmıyor, ama bu yalnızca YENİ kayıtları engelliyordu;
+    /// düzeltme öncesinde açılmış ikisi katalogda kaldı ve elle karantinaya alınmaları
+    /// gerekti. Aynısı ileride de olur: bir kurum sayfasının içeriğini değiştirdiğinde
+    /// belge liste sayfasına dönüşür, sistem "bu bir çağrı değil" der ve o kayıt yine de
+    /// yayında kalırdı. Sistemin kendi kararını daha önce açtığı kayda uygulamaması
+    /// yapısal bir boşluktur.
+    /// </para>
+    ///
+    /// <para>
+    /// Kayıt <b>silinmez</b>: karantinaya alınır, gerekçesi yazılır ve inceleyici geri
+    /// alabilir. İnceleyicinin kendi kararı da EZİLMEZ — zaten karantinadaki bir kayda
+    /// dokunulmaz, çünkü oradaki gerekçe insanın verdiği karardır.
+    /// </para>
+    /// </summary>
+    private async Task WithdrawOpportunityAsync(
+        SourceDocument document,
+        SourceDocumentVersion version,
+        CancellationToken cancellationToken)
+    {
+        var opportunity = await opportunities.GetBySourceDocumentAsync(document.Id, cancellationToken);
+
+        if (opportunity is null || !opportunity.IsPublishable)
+        {
+            return;
+        }
+
+        opportunity.Quarantine(
+            QuarantineReason.InvalidSourcePage,
+            version.ParseError ?? "Belge artık çağrı sayfası değil; kayıt katalogdan çekildi.");
+
+        logger.LogInformation(
+            "Belge çağrı sayfası olmaktan çıktı, kayıt katalogdan çekildi. " +
+            "OpportunityId={OpportunityId} DocumentId={DocumentId}",
+            opportunity.Id, document.Id);
+    }
 
     /// <summary>
     /// Yeniden ayrıştırma mesajı: ham içeriği <b>taşır</b>.
