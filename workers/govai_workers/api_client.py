@@ -191,6 +191,15 @@ class GovAiClient:
         """
         return self._request("POST", "/api/eligibility/rescore-batch")
 
+    def collect_ai_second_opinions(self) -> dict[str, Any]:
+        """Kural motorunun kararlarına yapay zekâdan bağımsız ikinci görüş toplar.
+
+        Bu görüş HİÇBİR SKORU DEĞİŞTİRMEZ; ayrışan vakaları insana işaret eder.
+        Yapay zekâ anahtarı yoksa yanıt ``aiEnabled: false`` döner ve hiçbir görüş
+        kaydedilmez — sahte görüş üretilmez.
+        """
+        return self._request("POST", "/api/calibration/ai-review-batch")
+
     def generate_weekly_reports(self) -> dict[str, Any]:
         """Kiracıdaki tüm firmalar için haftalık raporu üretir.
 

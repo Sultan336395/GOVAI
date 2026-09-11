@@ -73,6 +73,38 @@ def _nightly_rescore(client: GovAiClient) -> None:
         log.exception("nightly_rescore_failed")
 
 
+def _ai_second_opinions(client: GovAiClient) -> None:
+    """Kural motorunun kararlarına bağımsız ikinci görüş toplar.
+
+    Gece skorlama turundan SONRA çalışır: görüş, o anki karara karşı verilir ve skor
+    turdan sonra değişirse karşılaştırma eski karara bakmış olurdu.
+
+    Görüş HİÇBİR SKORU DEĞİŞTİRMEZ. İşi taramadır: iki taraf ayrı yollardan aynı
+    sonuca varıyorsa kayıt büyük olasılıkla doğrudur, ayrılıyorsa insan bakmalıdır.
+    """
+    log.info("ai_second_opinions_started")
+
+    try:
+        result = client.collect_ai_second_opinions() or {}
+
+        if not result.get("aiEnabled", True):
+            # Anahtar yok. Bu bir arıza DEĞİLDİR: sistem kural tabanlı çalışmaya
+            # devam eder, yalnızca ikinci görüş toplanmaz.
+            log.info("ai_second_opinions_disabled")
+            return
+
+        log.info(
+            "ai_second_opinions_finished",
+            examined=result.get("examinedCount"),
+            recorded=result.get("recordedCount"),
+            agreed=result.get("agreedCount"),
+            disagreed=result.get("disagreedCount"),
+            skipped=result.get("skippedCount"),
+        )
+    except ApiError:
+        log.exception("ai_second_opinions_failed")
+
+
 def _weekly_reports(client: GovAiClient) -> None:
     """Firmaların haftalık raporunu üretir.
 
@@ -130,6 +162,19 @@ def main() -> int:
         CronTrigger(hour=3, minute=30),
         args=[client],
         id="nightly-rescore",
+        max_instances=1,
+        coalesce=True,
+    )
+
+    # İkinci görüş: her gece 04:15, skorlama turundan (03:30) SONRA.
+    #
+    # Sıra önemli: görüş o anki karara karşı verilir. Skorlamadan önce çalışsa görüş
+    # bir gün eski karara bakmış olur ve ayrışma gerçek değil takvim kaynaklı çıkardı.
+    scheduler.add_job(
+        _ai_second_opinions,
+        CronTrigger(hour=4, minute=15),
+        args=[client],
+        id="ai-second-opinions",
         max_instances=1,
         coalesce=True,
     )

@@ -178,7 +178,8 @@ public sealed class CalibrationTests(GovAiApiFactory factory)
         var rapor = await _tenantAdmin.GetFromJsonAsync<JsonElement>(
             $"/api/calibration/report?companyId={_companyId}");
 
-        var ozet = rapor.GetProperty("summary");
+        // Rapor iki ölçümü AYRI döner; danışman kaydı insan tarafına girer.
+        var ozet = rapor.GetProperty("human");
 
         Assert.True(ozet.GetProperty("totalVerdicts").GetInt32() >= 1);
 
@@ -206,7 +207,7 @@ public sealed class CalibrationTests(GovAiApiFactory factory)
         var rapor = await _tenantAdmin.GetFromJsonAsync<JsonElement>(
             $"/api/calibration/report?companyId={_companyId}");
 
-        Assert.False(rapor.GetProperty("summary").GetProperty("isSampleSufficient").GetBoolean());
+        Assert.False(rapor.GetProperty("human").GetProperty("isSampleSufficient").GetBoolean());
     }
 
     [Fact(DisplayName = "KA7. Başka kiracı kalibrasyon verisini göremez")]

@@ -70,9 +70,51 @@ kuralları düzeltiyor (`OpportunityRule.IsManuallyOverridden`). Ayrı bir veri 
 kurmak yerine bu alan sayılır: ölçüm için yeni iş yaratmamak, ölçümün sürdürülebilirliğinin ön
 koşuludur.
 
+## İkinci görüşü yapay zekâ verirse
+
+İnsan değerlendirmesi seyrektir: danışman her hafta otuz kaydı tek tek okuyamaz ve ölçüm
+birikmezse kalibrasyon hiç yapılamaz. Bu yüzden ikinci görüşü **yapay zekâ da verebilir**
+(`VerdictSource.Ai`) ve gece turu bunu kendiliğinden toplar.
+
+Ama iki kaynak **eşdeğer değildir ve hiçbir yerde toplanmaz**:
+
+| Kaynak | İşi | Ağırlık kalibrasyonunda |
+|---|---|---|
+| Danışman | Kalibrasyon ölçütü | **Geçerli tek ölçüt** |
+| Yapay zekâ | Tarama — nereye bakılmalı | **Gerekçe olamaz** |
+
+Ağırlıkları modelin görüşüne göre ayarlamak, sistemi gerçeğe değil modelin eğilimine
+kalibre etmek olurdu. Daha kötüsü: kural motoru da, ikinci görüşü veren model de aynı
+resmî metni okur. Aynı yanlışı birlikte yapabilirler ve ortaya çıkan yüksek uyum oranı
+doğruluk değil, ortak körlük olur.
+
+Bu yüzden `CalibrationReportDto` iki ayrı özet döner (`Human`, `Ai`) ve **ortak bir toplam
+alanı yoktur**. Tek bir "uyum oranı" üretmek, ayrımı arayüzde kaybederdi.
+
+Üç ek karar bu ayrımı ayakta tutar:
+
+**Modele hesaplanmış skor verilmez.** Verilseydi model onu onaylama eğilimine girer ve
+"bağımsız" görüş, sistemin kendi cevabının yankısı olurdu; ayrışma hiç görünmez, ölçüm işe
+yaramazdı. Modele yalnızca çağrı koşulları ve firma profili gider.
+
+**Eksik alanlar modele açıkça bildirilir.** Bildirilmezse model bilinmeyeni "hayır" sayıp
+firmayı eler ve ürünün üçüncü iddiası (eksik veri elemez, ADR-0003) ikinci görüş tarafında
+çiğnenmiş olur.
+
+**Anahtar yoksa görüş uydurulmaz.** `ReviewEligibilityAsync` `null` döner, hiçbir kayıt
+açılmaz ve yanıt bunu `aiEnabled=false` ile söyler. Sahte bir ikinci görüş ölçümü
+olduğundan iyi ya da kötü gösterir; hiç görüş vermemek dürüst olandır.
+
+Model adı her kayıtta saklanır: model değişince ölçüm de değişir ve eski kayıtlar yeni
+modelin performansı sanılamaz.
+
 ## Koruyan testler
 
 `CalibrationReportTests` (14) ölçümün kendisini sabitler: hata türleri, yönü, örneklem uyarısı,
 determinizm ve sebep zorunluluğu. `CalibrationTests` (9) sınırları korur: uzman görüşü kaydı
 sonrası skorun **değişmediği**, aynı değerlendirme için ikinci kayıt açılmadığı, başka kiracının
 göremediği ve platform rollerinin giremediği.
+
+`AiSecondOpinionTests` (7) yapay zekâ tarafını korur: anahtar yokken görüşün **uydurulmadığı**,
+ikinci görüş turunun skoru **değiştirmediği**, raporun iki ölçümü **ayrı** döndüğü (ortak
+`summary` alanı bulunmadığı) ve danışman kaydının yapay zekâ ölçümüne karışmadığı.

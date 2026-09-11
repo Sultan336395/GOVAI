@@ -14,7 +14,23 @@ namespace GovAI.Application.Abstractions.Persistence;
 /// </summary>
 public interface IExpertVerdictRepository
 {
-    Task<ExpertVerdict?> GetByAssessmentAsync(Guid assessmentId, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Bir değerlendirmenin belirli kaynaktan gelen görüşü.
+    ///
+    /// <para>
+    /// Kaynak anahtarın parçasıdır: aynı değerlendirme için hem danışman hem yapay zekâ
+    /// görüşü olabilir ve ikisi birbirinin yerine geçmez.
+    /// </para>
+    /// </summary>
+    Task<ExpertVerdict?> GetByAssessmentAsync(
+        Guid assessmentId,
+        VerdictSource source,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Yapay zekânın daha önce görüş verdiği değerlendirmeler; aynı vaka iki kez sorulmasın.</summary>
+    Task<IReadOnlySet<Guid>> ListAiReviewedAssessmentsAsync(
+        Guid companyId,
+        CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<ExpertVerdictDto>> ListForCompanyAsync(
         Guid companyId,

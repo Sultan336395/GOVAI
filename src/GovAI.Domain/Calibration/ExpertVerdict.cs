@@ -3,7 +3,20 @@ using GovAI.Domain.Common;
 namespace GovAI.Domain.Calibration;
 
 /// <summary>
-/// Bir danışmanın, sistemin ürettiği değerlendirmeye karşı verdiği <b>kendi kararı</b>.
+/// Sistemin ürettiği değerlendirmeye karşı verilen <b>bağımsız ikinci görüş</b>.
+///
+/// <para>
+/// Görüşü ya bir danışman ya da yapay zekâ verir (<see cref="VerdictSource"/>). İkisi aynı
+/// tabloda durur ama <b>asla tek sayıda toplanmaz</b>: yapay zekânın görüşü ağırlık
+/// kalibrasyonu için "doğru cevap" yerine geçemez. Ağırlıkları modelin görüşüne göre
+/// ayarlamak, sistemi gerçeğe değil modelin eğilimine kalibre etmek olurdu — ve iki taraf
+/// da aynı metni okuduğu için aynı yanlışı birlikte yapabilirler.
+/// </para>
+///
+/// <para>
+/// Bu yüzden iki kaynağın işi farklıdır: yapay zekâ görüşü <b>tarama</b> yapar (nereye
+/// bakılmalı), insan görüşü <b>kalibrasyon ölçütüdür</b> (ağırlıklar doğru mu).
+/// </para>
 ///
 /// <para>
 /// Projenin Ar-Ge iddiası, skorun uzman görüşüyle tutarlı olduğunun <b>ölçülebilmesine</b>
@@ -38,9 +51,26 @@ public class ExpertVerdict : AggregateRoot, IAuditable, ITenantScoped
         VerdictDisagreementReason disagreementReason,
         string? note,
         DateTimeOffset recordedAt,
-        string recordedBy)
+        string recordedBy,
+        VerdictSource source = VerdictSource.Human,
+        string? reviewerModel = null,
+        decimal? aiConfidence = null)
     {
         DomainException.ThrowIf(string.IsNullOrWhiteSpace(recordedBy), "Değerlendirmeyi veren kişi zorunludur.");
+
+        // Yapay zekâ görüşü hangi modelden geldiğini söylemek zorundadır: model değişince
+        // ölçüm de değişir ve eski kayıtlar yeni modelin performansı sanılamaz.
+        DomainException.ThrowIf(
+            source == VerdictSource.Ai && string.IsNullOrWhiteSpace(reviewerModel),
+            "Yapay zekâ görüşünde model adı zorunludur.");
+
+        DomainException.ThrowIf(
+            aiConfidence is < 0m or > 1m,
+            "Güven değeri 0 ile 1 arasında olmalıdır.");
+
+        Source = source;
+        ReviewerModel = reviewerModel?.Trim();
+        AiConfidence = aiConfidence;
 
         TenantId = tenantId;
         CompanyId = companyId;
@@ -82,7 +112,23 @@ public class ExpertVerdict : AggregateRoot, IAuditable, ITenantScoped
     /// </summary>
     public bool SystemHadDataGap { get; private set; }
 
-    /// <summary>Uzmanın kararı.</summary>
+    /// <summary>Görüşü kim verdi: danışman mı, yapay zekâ mı?</summary>
+    public VerdictSource Source { get; private set; } = VerdictSource.Human;
+
+    /// <summary>
+    /// Yapay zekâ görüşünde kullanılan model adı.
+    ///
+    /// <para>
+    /// Model değişince ölçüm de değişir. Adı saklamadan yapılan bir karşılaştırma, eski
+    /// modelin sonuçlarını yeni modelin performansı sanmaya yol açar.
+    /// </para>
+    /// </summary>
+    public string? ReviewerModel { get; private set; }
+
+    /// <summary>Modelin kendi kararına dair güveni (0..1). İnsan görüşünde <c>null</c>.</summary>
+    public decimal? AiConfidence { get; private set; }
+
+    /// <summary>Görüş sahibinin kararı.</summary>
     public EligibilityVerdict ExpertOpinion { get; private set; }
 
     /// <summary>Uzman ile sistem ayrıştıysa uzmanın belirttiği sebep.</summary>
@@ -135,9 +181,27 @@ public class ExpertVerdict : AggregateRoot, IAuditable, ITenantScoped
         VerdictDisagreementReason disagreementReason,
         string? note,
         DateTimeOffset recordedAt,
-        string recordedBy)
+        string recordedBy,
+        string? reviewerModel = null,
+        decimal? aiConfidence = null)
     {
         DomainException.ThrowIf(string.IsNullOrWhiteSpace(recordedBy), "Değerlendirmeyi veren kişi zorunludur.");
+
+        DomainException.ThrowIf(
+            aiConfidence is < 0m or > 1m,
+            "Güven değeri 0 ile 1 arasında olmalıdır.");
+
+        // Görüş yenilendiğinde model adı da tazelenir: yeni modelin verdiği karar, eski
+        // modelin adıyla saklanırsa ölçüm hangi modeli ölçtüğünü söyleyemez.
+        if (reviewerModel is not null)
+        {
+            ReviewerModel = reviewerModel.Trim();
+        }
+
+        if (aiConfidence is not null)
+        {
+            AiConfidence = aiConfidence;
+        }
 
         // Sebep yalnızca ayrışma varken anlamlıdır; uyum hâlinde saklamak, raporda
         // olmayan bir hatanın gerekçesini gösterirdi.
@@ -156,7 +220,26 @@ public class ExpertVerdict : AggregateRoot, IAuditable, ITenantScoped
 }
 
 /// <summary>
-/// Uzmanın sistemden neden ayrıldığı.
+/// İkinci görüşü kimin verdiği.
+///
+/// <para>
+/// Ayrım kayıt düzeyinde tutulur, çünkü iki kaynak <b>farklı sorulara</b> cevap verir ve
+/// tek bir orana karıştırılamaz. Yapay zekâ görüşü kendi kendine birikir ve ayrışan
+/// vakaları insana işaret eder; insan görüşü seyrektir ama ağırlıkların doğruluğunu
+/// sınayabilecek tek ölçüttür.
+/// </para>
+/// </summary>
+public enum VerdictSource
+{
+    /// <summary>Danışman. Kalibrasyonun ölçütü budur.</summary>
+    Human = 1,
+
+    /// <summary>Yapay zekâ. Tarama sinyalidir; ağırlık kalibrasyonunda ölçüt sayılmaz.</summary>
+    Ai = 2,
+}
+
+/// <summary>
+/// Görüş sahibinin sistemden neden ayrıldığı.
 ///
 /// <para>
 /// Serbest metin yerine sabit bir liste kullanılır: hata türlerinin sayılabilmesi

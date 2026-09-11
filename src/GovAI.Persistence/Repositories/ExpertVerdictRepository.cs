@@ -18,8 +18,20 @@ public sealed class ExpertVerdictRepository(GovAiDbContext context) : IExpertVer
 {
     public Task<ExpertVerdict?> GetByAssessmentAsync(
         Guid assessmentId,
+        VerdictSource source,
         CancellationToken cancellationToken = default) =>
-        context.ExpertVerdicts.FirstOrDefaultAsync(v => v.AssessmentId == assessmentId, cancellationToken);
+        context.ExpertVerdicts.FirstOrDefaultAsync(
+            v => v.AssessmentId == assessmentId && v.Source == source, cancellationToken);
+
+    public async Task<IReadOnlySet<Guid>> ListAiReviewedAssessmentsAsync(
+        Guid companyId,
+        CancellationToken cancellationToken = default) =>
+        (await context.ExpertVerdicts
+            .AsNoTracking()
+            .Where(v => v.CompanyId == companyId && v.Source == VerdictSource.Ai)
+            .Select(v => v.AssessmentId)
+            .ToListAsync(cancellationToken))
+        .ToHashSet();
 
     public async Task<IReadOnlyList<ExpertVerdictDto>> ListForCompanyAsync(
         Guid companyId,
@@ -51,6 +63,9 @@ public sealed class ExpertVerdictRepository(GovAiDbContext context) : IExpertVer
                 x.Verdict.Note,
                 x.Verdict.RecordedAt,
                 x.Verdict.RecordedBy,
+                x.Verdict.Source,
+                x.Verdict.ReviewerModel,
+                x.Verdict.AiConfidence,
                 x.Verdict.Agrees,
                 x.Verdict.IsFalsePositive,
                 x.Verdict.IsFalseNegative))

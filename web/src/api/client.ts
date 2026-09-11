@@ -44,6 +44,7 @@ import type {
   ExpertVerdict,
   CalibrationReport,
   RecordExpertVerdictRequest,
+  AiSecondOpinionResult,
 } from './types'
 
 const TOKEN_STORAGE_KEY = 'govai.token'
@@ -282,6 +283,12 @@ export const api = {
   /** Firma verilmezse kiracının tamamı ölçülür. */
   getCalibrationReport: (companyId?: string) =>
     request<CalibrationReport>(`/api/calibration/report${query({ companyId })}`),
+
+  /** Yapay zekâdan bağımsız ikinci görüş toplar. Skoru DEĞİŞTİRMEZ. */
+  collectAiSecondOpinions: (companyId: string) =>
+    request<AiSecondOpinionResult>(`/api/calibration/companies/${companyId}/ai-review`, {
+      method: 'POST',
+    }),
 
   // ---- bildirimler ----
   listNotifications: (params: { companyId?: string; onlyUnread?: boolean; pageSize?: number }) =>

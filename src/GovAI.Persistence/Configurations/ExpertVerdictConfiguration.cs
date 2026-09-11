@@ -23,6 +23,9 @@ public sealed class ExpertVerdictConfiguration : IEntityTypeConfiguration<Expert
         builder.Property(v => v.SystemVerdict).HasConversion<int>();
         builder.Property(v => v.ExpertOpinion).HasConversion<int>();
         builder.Property(v => v.DisagreementReason).HasConversion<int>();
+        builder.Property(v => v.Source).HasConversion<int>();
+        builder.Property(v => v.ReviewerModel).HasMaxLength(120);
+        builder.Property(v => v.AiConfidence).HasPrecision(5, 4);
         builder.Property(v => v.SystemScore).HasPrecision(6, 2);
         builder.Property(v => v.Note).HasMaxLength(2000);
         builder.Property(v => v.RecordedBy).HasMaxLength(320).IsRequired();
@@ -32,14 +35,15 @@ public sealed class ExpertVerdictConfiguration : IEntityTypeConfiguration<Expert
             .HasForeignKey(v => v.CompanyId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Bir değerlendirme için tek uzman kaydı: aynı vaka kalibrasyon sayımına iki kez
-        // giremez. Değerlendirme silinirse kayıt da anlamını yitirir.
+        // Bir değerlendirme için her KAYNAKTAN tek kayıt: aynı vaka kalibrasyon sayımına
+        // iki kez giremez. Kaynak anahtarın parçasıdır, çünkü danışman ve yapay zekâ aynı
+        // değerlendirmeye ayrı ayrı görüş verebilir ve ikisi birbirinin yerine geçmez.
         builder.HasOne<EligibilityAssessment>()
             .WithMany()
             .HasForeignKey(v => v.AssessmentId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        builder.HasIndex(v => v.AssessmentId).IsUnique();
+        builder.HasIndex(v => new { v.AssessmentId, v.Source }).IsUnique();
         builder.HasIndex(v => new { v.CompanyId, v.RecordedAt });
     }
 }

@@ -1,23 +1,33 @@
-import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/api/client'
-import type { EligibilityVerdict, VerdictDisagreementReason } from '@/api/types'
+import type {
+  CalibrationSummary,
+  EligibilityVerdict,
+  VerdictDisagreementReason,
+} from '@/api/types'
 import { useCompanies } from '@/app/contexts'
 import { EmptyState, ErrorBox, InfoBox, Kpi, Loading } from '@/components/Common'
 import { HelpTip } from '@/components/HelpTip'
 import { formatDate, formatPercent, verdictLabels } from '@/lib/format'
 
 /**
- * Karar Doğruluğu — sistemin kararlarının danışman görüşüyle karşılaştırılması.
+ * Karar Doğruluğu — kural motorunun kararlarının bağımsız ikinci görüşle karşılaştırılması.
  *
- * Bu ekran karar üretmez, karar mekanizmasını ÖLÇER. Danışman görüşü hiçbir skoru
- * değiştirmez; motor deterministik kalır ve buradaki sayılar ağırlıkların doğruluğunu
- * sınamak için kullanılır.
+ * İkinci görüşü iki taraf verebilir ve ekran ikisini ASLA tek sayıda toplamaz:
  *
- * Ekran öneri de üretmez: hangi ağırlığın nasıl değişeceği insan kararıdır. Buradaki
- * iş, hatayı türüne göre sayıp nerede durduğunu göstermektir.
+ *   * Yapay zekâ görüşü her gece kendiliğinden birikir ve TARAMA yapar: nereye bakılmalı.
+ *   * Danışman görüşü seyrektir ama ağırlıkların doğruluğunu sınayabilecek TEK ölçüttür.
+ *
+ * Ağırlıkları modelin görüşüne göre ayarlamak, sistemi gerçeğe değil modelin eğilimine
+ * kalibre etmek olurdu; üstelik iki taraf da aynı metni okuduğu için aynı yanlışı birlikte
+ * yapabilirler. Ekran bu ayrımı başlıkta ve açıklamada açıkça söyler.
  */
 export default function CalibrationPage() {
   const { selectedCompanyId } = useCompanies()
+  const queryClient = useQueryClient()
+  const [hata, setHata] = useState<unknown>(null)
+  const [tur, setTur] = useState<string | null>(null)
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['calibration-report', selectedCompanyId],
@@ -31,6 +41,23 @@ export default function CalibrationPage() {
     enabled: Boolean(selectedCompanyId),
   })
 
+  const ikinciGorus = useMutation({
+    mutationFn: () => api.collectAiSecondOpinions(selectedCompanyId!),
+    onSuccess: async (sonuc) => {
+      setHata(null)
+
+      // Anahtar yoksa bu bir arıza DEĞİLDİR: sistem kural tabanlı çalışmaya devam eder,
+      // yalnızca ikinci görüş toplanmaz. Kullanıcıya bunu ayırt ettirmek gerekir.
+      setTur(sonuc.aiEnabled
+        ? `${sonuc.recordedCount} görüş alındı · ${sonuc.disagreedCount} ayrışma`
+        : 'Yapay zekâ bağlantısı tanımlı değil; görüş toplanmadı.')
+
+      await queryClient.invalidateQueries({ queryKey: ['calibration-report', selectedCompanyId] })
+      await queryClient.invalidateQueries({ queryKey: ['expert-verdicts', selectedCompanyId] })
+    },
+    onError: (e) => setHata(e),
+  })
+
   if (!selectedCompanyId) {
     return <EmptyState>Ölçümü görmek için önce bir firma seçin.</EmptyState>
   }
@@ -39,7 +66,7 @@ export default function CalibrationPage() {
   if (error) return <ErrorBox error={error} />
   if (!data) return <EmptyState>Ölçüm bulunamadı.</EmptyState>
 
-  const { summary, ruleExtraction } = data
+  const { human, ai, ruleExtraction } = data
 
   return (
     <>
@@ -47,162 +74,54 @@ export default function CalibrationPage() {
         <div>
           <h1>Karar Doğruluğu</h1>
           <p>
-            Sistemin verdiği kararlar ile danışmanın kendi kararının karşılaştırması.
-            Danışman görüşü hiçbir skoru değiştirmez; yalnızca sistemin ne kadar isabetli
-            olduğunu ölçmek için saklanır.
+            Kural motorunun kararları, bağımsız bir ikinci görüşle karşılaştırılır. İkinci
+            görüş hiçbir skoru değiştirmez; yalnızca sistemin nerede isabet ettiğini ve
+            nereye bakılması gerektiğini gösterir.
           </p>
         </div>
+
+        <button
+          type="button"
+          className="primary"
+          onClick={() => ikinciGorus.mutate()}
+          disabled={ikinciGorus.isPending}
+        >
+          {ikinciGorus.isPending ? 'Görüş alınıyor…' : 'Yapay Zekâdan Görüş Al'}
+        </button>
       </div>
 
-      {summary.totalVerdicts === 0 ? (
-        <EmptyState>
-          Henüz danışman değerlendirmesi kaydedilmemiş. Bir fırsatın detay ekranında
-          kendi kararınızı işaretlediğinizde ölçüm burada oluşmaya başlar.
-        </EmptyState>
-      ) : (
-        <>
-          {/*
-            Örneklem uyarısı EN ÜSTTE durur. Az sayıda vakayla hesaplanan bir oran
-            istatistik değil gürültüdür; bu sayıya bakarak ağırlık değiştirmek modeli bozar.
-          */}
-          {!summary.isSampleSufficient ? (
-            <InfoBox>
-              Ölçüm {summary.totalVerdicts} vakaya dayanıyor. Oranları yorumlamak için bu
-              sayı henüz yeterli değil; aşağıdaki değerler eğilim olarak okunmalı, ağırlık
-              değişikliğine gerekçe yapılmamalıdır.
-            </InfoBox>
-          ) : null}
+      {hata ? <ErrorBox error={hata} /> : null}
+      {tur ? <InfoBox>{tur}</InfoBox> : null}
 
-          <div className="kpi-row">
-            <Kpi
-              label="Uyum Oranı"
-              value={formatPercent(summary.agreementRate)}
-              hint={`${summary.agreementCount} / ${summary.totalVerdicts} vaka`}
-            />
-            <Kpi
-              label="Yanlış Pozitif"
-              value={String(summary.falsePositiveCount)}
-              hint={formatPercent(summary.falsePositiveRate)}
-            />
-            <Kpi
-              label="Yanlış Negatif"
-              value={String(summary.falseNegativeCount)}
-              hint={formatPercent(summary.falseNegativeRate)}
-            />
-            <Kpi
-              label="Eksik Veriden Ayrışma"
-              value={String(summary.dataGapDisagreementCount)}
-              hint="Model değil, veri sorunu"
-            />
-          </div>
+      <InfoBox>
+        <div>
+          <strong>Yapay zekâ görüşü</strong> her gece kendiliğinden toplanır ve{' '}
+          <strong>tarama</strong> yapar: iki taraf ayrı yollardan aynı sonuca varıyorsa kayıt
+          büyük olasılıkla doğrudur, ayrılıyorsa insan bakmalıdır.
+        </div>
+        <div>
+          <strong>Danışman görüşü</strong> seyrektir ama ağırlıkların doğruluğunu
+          sınayabilecek tek ölçüttür. Ağırlıkları modelin görüşüne göre ayarlamak, sistemi
+          gerçeğe değil modelin eğilimine kalibre etmek olurdu.
+        </div>
+      </InfoBox>
 
-          <InfoBox>
-            <div>
-              <strong>Yanlış pozitif</strong> <HelpTip field="yanlisPozitif" /> — sistem uygun
-              dedi, danışman uygun değil dedi. Firma uygun olmadığı bir programa zaman ayırır.
-            </div>
-            <div>
-              <strong>Yanlış negatif</strong> <HelpTip field="yanlisNegatif" /> — sistem uygun
-              değil dedi, danışman uygun dedi. Bu hata sessizdir: firma fırsatı hiç görmez.
-            </div>
-            <div>
-              <strong>Eksik veriden ayrışma</strong> — ayrışmanın sebebi modelin yanlışlığı
-              değil, firma profilindeki eksik bilgidir. İkisi ayrı düzeltme gerektirir.
-            </div>
-          </InfoBox>
+      <Olcum
+        baslik="Danışman Görüşüne Karşı Ölçüm"
+        aciklama="Ağırlık kalibrasyonunun tek geçerli ölçütü budur."
+        bos="Henüz danışman değerlendirmesi kaydedilmemiş."
+        ozet={human}
+      />
 
-          <section style={{ marginTop: 24 }}>
-            <h2>Hatanın Yönü</h2>
-            <p className="muted">
-              Tek bir uyum oranı, sistemin fazla iyimser mi yoksa fazla temkinli mi olduğunu
-              söylemez. İki durum ters yönde düzeltme gerektirir.
-            </p>
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Sistemin Kararı</th>
-                    <th>Danışmanın Kararı</th>
-                    <th>Vaka</th>
-                    <th>Durum</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {summary.matrix.map((h) => (
-                    <tr key={`${h.systemVerdict}-${h.expertOpinion}`}>
-                      <td>{verdictLabels[h.systemVerdict]}</td>
-                      <td>{verdictLabels[h.expertOpinion]}</td>
-                      <td>{h.count}</td>
-                      <td>{hucreDurumu(h.systemVerdict, h.expertOpinion)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-
-          {summary.reasons.length > 0 ? (
-            <section style={{ marginTop: 24 }}>
-              <h2>Ayrışma Sebepleri</h2>
-              <p className="muted">
-                Hangi düzeltmenin en çok işe yarayacağını gösterir. "Kural yanlış
-                çıkarılmış" ile "ağırlık yanlış" ayrı işlerdir.
-              </p>
-              <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Sebep</th>
-                      <th>Vaka</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {summary.reasons.map((s) => (
-                      <tr key={s.reason}>
-                        <td>{sebepAdlari[s.reason]}</td>
-                        <td>{s.count}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-          ) : null}
-
-          <section style={{ marginTop: 24 }}>
-            <h2>Skor Ayrım Gücü</h2>
-            <p className="muted">
-              Danışmanın "uygun" dediği vakaların ortalama skoru, "uygun değil"
-              dediklerinden belirgin biçimde yüksek olmalıdır. İki ortalama birbirine
-              yakınsa skor ayrım üretmiyor demektir.
-            </p>
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Danışmanın Kararı</th>
-                    <th>Vaka</th>
-                    <th>Ortalama Skor</th>
-                    <th>En Düşük</th>
-                    <th>En Yüksek</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {summary.scoreBands.map((b) => (
-                    <tr key={b.expertOpinion}>
-                      <td>{verdictLabels[b.expertOpinion]}</td>
-                      <td>{b.count}</td>
-                      <td>{b.averageSystemScore.toFixed(1)}</td>
-                      <td>{b.minSystemScore.toFixed(1)}</td>
-                      <td>{b.maxSystemScore.toFixed(1)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        </>
-      )}
+      <Olcum
+        baslik="Yapay Zekâ Görüşüne Karşı Ölçüm"
+        aciklama={
+          'Tarama sinyalidir: nereye bakılacağını gösterir, ağırlık değişikliğine gerekçe '
+          + 'olamaz. İki taraf da aynı metni okur ve aynı yanlışı birlikte yapabilirler.'
+        }
+        bos="Henüz yapay zekâ görüşü toplanmamış. Gece turu bunu kendiliğinden yapar."
+        ozet={ai}
+      />
 
       <section style={{ marginTop: 24 }}>
         <h2>
@@ -221,17 +140,17 @@ export default function CalibrationPage() {
 
       {kayitlar.data && kayitlar.data.length > 0 ? (
         <section style={{ marginTop: 24 }}>
-          <h2>Kaydedilen Değerlendirmeler</h2>
+          <h2>Kaydedilen Görüşler</h2>
           <div className="table-wrap">
             <table>
               <thead>
                 <tr>
                   <th>Çağrı</th>
+                  <th>Görüşü Veren</th>
                   <th>Sistem</th>
                   <th>Skor</th>
-                  <th>Danışman</th>
-                  <th>Sebep</th>
-                  <th>Kaydeden</th>
+                  <th>İkinci Görüş</th>
+                  <th>Durum</th>
                   <th>Tarih</th>
                 </tr>
               </thead>
@@ -239,11 +158,14 @@ export default function CalibrationPage() {
                 {kayitlar.data.map((k) => (
                   <tr key={k.id}>
                     <td>{k.opportunityTitle}</td>
+                    <td>
+                      {k.source === 'Ai' ? 'Yapay zekâ' : 'Danışman'}
+                      {k.reviewerModel ? <><br /><small>{k.reviewerModel}</small></> : null}
+                    </td>
                     <td>{verdictLabels[k.systemVerdict]}</td>
                     <td>{k.systemScore.toFixed(1)}</td>
                     <td>{verdictLabels[k.expertOpinion]}</td>
-                    <td>{k.agrees ? '—' : sebepAdlari[k.disagreementReason]}</td>
-                    <td>{k.recordedBy}</td>
+                    <td>{k.agrees ? 'Uyumlu' : 'Ayrışma'}</td>
                     <td>{formatDate(k.recordedAt)}</td>
                   </tr>
                 ))}
@@ -256,15 +178,157 @@ export default function CalibrationPage() {
   )
 }
 
+/** Tek bir kaynağın ölçümü. İki ölçüm aynı bileşenle ama AYRI bölümlerde gösterilir. */
+function Olcum({
+  baslik,
+  aciklama,
+  bos,
+  ozet,
+}: {
+  baslik: string
+  aciklama: string
+  bos: string
+  ozet: CalibrationSummary
+}) {
+  return (
+    <section style={{ marginTop: 24 }}>
+      <h2>{baslik}</h2>
+      <p className="muted">{aciklama}</p>
+
+      {ozet.totalVerdicts === 0 ? (
+        <EmptyState>{bos}</EmptyState>
+      ) : (
+        <>
+          {/*
+            Örneklem uyarısı ölçümün ÜSTÜNDE durur. Az sayıda vakayla hesaplanan bir oran
+            istatistik değil gürültüdür; bu sayıya bakarak ağırlık değiştirmek modeli bozar.
+          */}
+          {!ozet.isSampleSufficient ? (
+            <InfoBox>
+              Ölçüm {ozet.totalVerdicts} vakaya dayanıyor. Oranları yorumlamak için bu sayı
+              henüz yeterli değil; değerler eğilim olarak okunmalı, ağırlık değişikliğine
+              gerekçe yapılmamalıdır.
+            </InfoBox>
+          ) : null}
+
+          <div className="kpi-row">
+            <Kpi
+              label="Uyum Oranı"
+              value={formatPercent(ozet.agreementRate)}
+              hint={`${ozet.agreementCount} / ${ozet.totalVerdicts} vaka`}
+            />
+            <Kpi
+              label="Yanlış Pozitif"
+              value={String(ozet.falsePositiveCount)}
+              hint={formatPercent(ozet.falsePositiveRate)}
+            />
+            <Kpi
+              label="Yanlış Negatif"
+              value={String(ozet.falseNegativeCount)}
+              hint={formatPercent(ozet.falseNegativeRate)}
+            />
+            <Kpi
+              label="Eksik Veriden Ayrışma"
+              value={String(ozet.dataGapDisagreementCount)}
+              hint="Model değil, veri sorunu"
+            />
+          </div>
+
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Sistemin Kararı</th>
+                  <th>İkinci Görüş</th>
+                  <th>Vaka</th>
+                  <th>Durum</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ozet.matrix.map((h) => (
+                  <tr key={`${h.systemVerdict}-${h.expertOpinion}`}>
+                    <td>{verdictLabels[h.systemVerdict]}</td>
+                    <td>{verdictLabels[h.expertOpinion]}</td>
+                    <td>{h.count}</td>
+                    <td>{hucreDurumu(h.systemVerdict, h.expertOpinion)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {ozet.scoreBands.length > 0 ? (
+            <>
+              <h3 style={{ marginTop: 16 }}>Skor Ayrım Gücü</h3>
+              <p className="muted">
+                İkinci görüşün "uygun" dediği vakaların ortalama skoru, "uygun değil"
+                dediklerinden belirgin biçimde yüksek olmalıdır. İki ortalama birbirine
+                yakınsa skor ayrım üretmiyor demektir.
+              </p>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>İkinci Görüş</th>
+                      <th>Vaka</th>
+                      <th>Ortalama Skor</th>
+                      <th>En Düşük</th>
+                      <th>En Yüksek</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ozet.scoreBands.map((b) => (
+                      <tr key={b.expertOpinion}>
+                        <td>{verdictLabels[b.expertOpinion]}</td>
+                        <td>{b.count}</td>
+                        <td>{b.averageSystemScore.toFixed(1)}</td>
+                        <td>{b.minSystemScore.toFixed(1)}</td>
+                        <td>{b.maxSystemScore.toFixed(1)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : null}
+
+          {ozet.reasons.length > 0 ? (
+            <>
+              <h3 style={{ marginTop: 16 }}>Ayrışma Sebepleri</h3>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Sebep</th>
+                      <th>Vaka</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ozet.reasons.map((s) => (
+                      <tr key={s.reason}>
+                        <td>{sebepAdlari[s.reason]}</td>
+                        <td>{s.count}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : null}
+        </>
+      )}
+    </section>
+  )
+}
+
 /** Hücrenin ne anlama geldiği; ham enum adı kullanıcıya gösterilmez. */
-function hucreDurumu(sistem: EligibilityVerdict, uzman: EligibilityVerdict): string {
-  if (sistem === uzman) return 'Uyumlu'
+function hucreDurumu(sistem: EligibilityVerdict, ikinci: EligibilityVerdict): string {
+  if (sistem === ikinci) return 'Uyumlu'
 
-  const pozitif = (v: EligibilityVerdict) =>
-    v === 'Eligible' || v === 'ConditionallyEligible'
+  const pozitif = (v: EligibilityVerdict) => v === 'Eligible' || v === 'ConditionallyEligible'
 
-  if (pozitif(sistem) && uzman === 'NotEligible') return 'Yanlış pozitif'
-  if (sistem === 'NotEligible' && pozitif(uzman)) return 'Yanlış negatif'
+  if (pozitif(sistem) && ikinci === 'NotEligible') return 'Yanlış pozitif'
+  if (sistem === 'NotEligible' && pozitif(ikinci)) return 'Yanlış negatif'
 
   return 'Farklı derece'
 }
@@ -275,5 +339,5 @@ const sebepAdlari: Record<VerdictDisagreementReason, string> = {
   CompanyData: 'Firma verisi yanlış veya eski',
   ScoreWeighting: 'Ağırlıklar sonucu yanlış tarafa çekiyor',
   UnwrittenPractice: 'Metinde yazmayan kurum uygulaması',
-  Other: 'Diğer',
+  Other: 'Gerekçe kayıtta yazılı',
 }

@@ -42,6 +42,7 @@ public static class DependencyInjection
         services.AddScoped<ReportingService>();
         services.AddScoped<WeeklyReportService>();
         services.AddScoped<CalibrationService>();
+        services.AddScoped<AiSecondOpinionService>();
         services.AddScoped<NotificationService>();
         services.AddScoped<AuthenticationService>();
 

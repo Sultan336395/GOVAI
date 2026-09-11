@@ -33,13 +33,33 @@ public sealed record ExpertVerdictDto(
     string? Note,
     DateTimeOffset RecordedAt,
     string RecordedBy,
+    VerdictSource Source,
+    string? ReviewerModel,
+    decimal? AiConfidence,
     bool Agrees,
     bool IsFalsePositive,
     bool IsFalseNegative);
 
-/// <summary>Kalibrasyon raporu ve kural düzeltme oranı.</summary>
+/// <summary>
+/// Kalibrasyon raporu.
+///
+/// <para>
+/// İki ölçüm <b>ayrı alanlarda</b> döner ve hiçbir yerde toplanmaz. Tek bir "uyum oranı"
+/// üretmek, yapay zekânın görüşünü insan görüşüyle eşdeğer saymak olurdu; oysa ikisi
+/// farklı sorulara cevap verir ve yalnızca biri ağırlık kalibrasyonunun ölçütüdür.
+/// </para>
+/// </summary>
 public sealed record CalibrationReportDto(
-    CalibrationSummary Summary,
+    /// <summary>
+    /// Danışman görüşüne karşı ölçüm. <b>Ağırlık kalibrasyonunun tek geçerli ölçütü budur.</b>
+    /// </summary>
+    CalibrationSummary Human,
+    /// <summary>
+    /// Yapay zekâ görüşüne karşı ölçüm. <b>Tarama sinyalidir</b>: nereye bakılacağını
+    /// gösterir, ağırlık değişikliğine gerekçe olamaz. İki taraf da aynı metni okur ve
+    /// aynı yanlışı birlikte yapabilirler.
+    /// </summary>
+    CalibrationSummary Ai,
     /// <summary>
     /// Danışmanın elle düzelttiği kural oranı — kural çıkarımının başarısının dolaylı ölçüsü.
     /// </summary>
@@ -89,7 +109,8 @@ public sealed class CalibrationService(
         var kim = currentUser.Email ?? currentUser.UserId?.ToString() ?? "bilinmiyor";
         var now = clock.UtcNow;
 
-        var mevcut = await verdicts.GetByAssessmentAsync(request.AssessmentId, cancellationToken);
+        var mevcut = await verdicts.GetByAssessmentAsync(
+            request.AssessmentId, VerdictSource.Human, cancellationToken);
 
         if (mevcut is not null)
         {
@@ -158,7 +179,12 @@ public sealed class CalibrationService(
             "Kalibrasyon raporu üretildi. TenantId={TenantId} CompanyId={CompanyId} Kayıt={Count}",
             tenantId, companyId, kayitlar.Count);
 
-        return new CalibrationReportDto(CalibrationReport.Build(kayitlar), kural);
+        // İki kaynak AYRI ölçülür. Aynı listeye koymak, modelin görüşünü danışmanın
+        // görüşüyle eşdeğer saymak olurdu.
+        return new CalibrationReportDto(
+            CalibrationReport.Build(kayitlar.Where(v => v.Source == VerdictSource.Human).ToList()),
+            CalibrationReport.Build(kayitlar.Where(v => v.Source == VerdictSource.Ai).ToList()),
+            kural);
     }
 
     private static ExpertVerdictDto ToDto(ExpertVerdict verdict, string opportunityTitle) => new(
@@ -174,6 +200,9 @@ public sealed class CalibrationService(
         verdict.Note,
         verdict.RecordedAt,
         verdict.RecordedBy,
+        verdict.Source,
+        verdict.ReviewerModel,
+        verdict.AiConfidence,
         verdict.Agrees,
         verdict.IsFalsePositive,
         verdict.IsFalseNegative);

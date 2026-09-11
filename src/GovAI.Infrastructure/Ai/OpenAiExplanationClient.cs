@@ -178,6 +178,122 @@ public sealed class OpenAiExplanationClient(
             : new AiSummaryResult(text.Trim(), _options.SummaryModel);
     }
 
+    /// <summary>Modele verilecek azami çağrı metni uzunluğu.</summary>
+    private const int MaximumOpportunityTextLength = 12000;
+
+    public async Task<AiSecondOpinionResult?> ReviewEligibilityAsync(
+        SecondOpinionRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        // Anahtar yoksa görüş UYDURULMAZ. Sahte bir ikinci görüş, ölçümü olduğundan iyi
+        // ya da kötü gösterir ve kalibrasyonu bozar; hiç görüş vermemek dürüst olandır.
+        if (!_options.IsConfigured)
+        {
+            return null;
+        }
+
+        const string systemPrompt = """
+            Sen kamu teşvik, hibe ve ihale başvurularını değerlendiren kıdemli bir danışmansın.
+            Sana bir çağrının resmî metni ve bir firmanın profili veriliyor.
+
+            Görevin: firmanın bu çağrıya uygun olup olmadığına KENDİ BAŞINA karar vermek.
+
+            Kurallar:
+            1. Kararını yalnızca çağrı metninde YAZAN koşullara dayandır. Metinde olmayan bir
+               şartı varsayma.
+            2. Bilinmeyen bir firma bilgisi "hayır" DEĞİLDİR. Bir koşul, profilde o alan
+               eksik olduğu için değerlendirilemiyorsa firmayı eleme; kararını
+               "Indeterminate" yap ve gerekçende hangi bilginin eksik olduğunu yaz.
+            3. Emin olmadığında yüksek güven bildirme. Güven değerin kararının ne kadar
+               sağlam veriye dayandığını yansıtmalı.
+            4. Gerekçen Türkçe, en fazla 3 cümle ve somut olmalı: hangi koşul, firmanın
+               hangi değeriyle karşılaştırıldı.
+
+            Karar seçenekleri:
+            - "Eligible": firma koşulların tamamını karşılıyor.
+            - "ConditionallyEligible": kapatılabilir eksikler var ama başvuru yapılabilir.
+            - "NotEligible": firma bir zorunlu koşulu karşılamıyor.
+            - "Indeterminate": eksik bilgi yüzünden karar verilemiyor.
+
+            Yanıtı yalnızca şu JSON şemasıyla ver:
+            {"verdict":"Eligible|ConditionallyEligible|NotEligible|Indeterminate",
+             "rationale":"...","confidence":0.0}
+            """;
+
+        // Modele HESAPLANMIŞ SKOR VERİLMEZ. Verilseydi model onu onaylama eğilimine girer,
+        // "bağımsız" görüş sistemin kendi cevabının yankısı olur ve ayrışma hiç görünmezdi.
+        var userPrompt = $"""
+            Çağrı: {request.OpportunityTitle}
+
+            Çağrı metni:
+            {Kirp(request.OpportunityText, MaximumOpportunityTextLength)}
+
+            Firma: {request.CompanyName}
+
+            Firma profili:
+            {request.CompanyProfileSummary}
+
+            Profilde EKSİK olan alanlar (bunlar "hayır" anlamına gelmez):
+            {(request.MissingProfileFields.Count == 0
+                ? "- yok"
+                : string.Join("\n", request.MissingProfileFields.Select(a => $"- {a}")))}
+            """;
+
+        var text = await CompleteAsync(
+            _options.ExtractionModel, systemPrompt, userPrompt, jsonMode: true, cancellationToken);
+
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return null;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(text);
+            var kok = document.RootElement;
+
+            if (!Enum.TryParse<EligibilityVerdict>(
+                    kok.GetProperty("verdict").GetString(), ignoreCase: true, out var karar))
+            {
+                // Tanınmayan karar sessizce bir değere eşlenmez: yanlış eşleme, ölçümü
+                // gerçekte olmayan bir uyum ya da ayrışmayla doldurur.
+                logger.LogWarning("İkinci görüş tanınmayan karar döndürdü; kayıt açılmadı.");
+                return null;
+            }
+
+            var guven = kok.TryGetProperty("confidence", out var g) && g.TryGetDecimal(out var d)
+                ? Math.Clamp(d, 0m, 1m)
+                : 0.5m;
+
+            var gerekce = kok.TryGetProperty("rationale", out var r) ? r.GetString() : null;
+
+            return new AiSecondOpinionResult
+            {
+                Verdict = karar,
+                Rationale = string.IsNullOrWhiteSpace(gerekce) ? "Gerekçe üretilmedi." : gerekce.Trim(),
+                Confidence = guven,
+                ModelName = _options.ExtractionModel,
+            };
+        }
+        catch (JsonException ex)
+        {
+            logger.LogError(ex, "İkinci görüş yanıtı JSON olarak ayrıştırılamadı.");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Çağrı metni uzun olabilir; modele tamamı yerine başı verilir.
+    ///
+    /// <para>
+    /// Koşullar resmî metinlerde başta toplanır; sondaki ekler çoğunlukla biçimsel
+    /// hükümlerdir. Kırpma yapılmazsa uzun bir belge istek sınırını aşar ve o vaka için
+    /// ikinci görüş HİÇ üretilmez — eksik ölçüm, kısaltılmış bağlamdan kötüdür.
+    /// </para>
+    /// </summary>
+    private static string Kirp(string metin, int azami) =>
+        metin.Length <= azami ? metin : metin[..azami] + "\n[metin kırpıldı]";
+
     private async Task<string?> CompleteAsync(
         string model,
         string systemPrompt,

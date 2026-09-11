@@ -22,6 +22,68 @@ public interface IAiExplanationClient
     Task<AiSummaryResult> GenerateExecutiveSummaryAsync(
         ExecutiveSummaryRequest request,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Çağrı metnini ve firma profilini <b>bağımsız</b> okuyup kendi kararını verir.
+    ///
+    /// <para>
+    /// Bu karar skoru DEĞİŞTİRMEZ. Amaç, kural motorunun kaçırdığı ya da yanlış okuduğu
+    /// vakaları işaret etmektir: iki taraf ayrı yollardan aynı sonuca varıyorsa kayıt
+    /// büyük olasılıkla doğrudur, ayrılıyorsa insan bakmalıdır.
+    /// </para>
+    ///
+    /// <para>
+    /// Modele <b>hesaplanmış skor verilmez</b>. Verilseydi model onu onaylama eğilimine
+    /// girer ve "bağımsız" görüş, sistemin kendi cevabının yankısı olurdu — ayrışma hiç
+    /// görünmez, ölçüm işe yaramazdı.
+    /// </para>
+    ///
+    /// <para>
+    /// Anahtar yapılandırılmamışsa <c>null</c> döner. Görüş <b>uydurulmaz</b>: sahte bir
+    /// ikinci görüş, ölçümü olduğundan iyi ya da kötü gösterir ve kalibrasyonu bozar.
+    /// </para>
+    /// </summary>
+    Task<AiSecondOpinionResult?> ReviewEligibilityAsync(
+        SecondOpinionRequest request,
+        CancellationToken cancellationToken = default);
+}
+
+/// <summary>Bağımsız ikinci görüş için modele verilen bağlam.</summary>
+public sealed record SecondOpinionRequest
+{
+    public required string OpportunityTitle { get; init; }
+
+    /// <summary>Çağrının koşullarını anlatan resmî metin.</summary>
+    public required string OpportunityText { get; init; }
+
+    public required string CompanyName { get; init; }
+
+    /// <summary>Firma profilinin okunabilir özeti: sektör, çalışan, mali veriler, belgeler.</summary>
+    public required string CompanyProfileSummary { get; init; }
+
+    /// <summary>
+    /// Profilde eksik olan alanlar.
+    ///
+    /// <para>
+    /// Modelin eksik veriyi "hayır" sayıp firmayı elememesi için açıkça bildirilir
+    /// (bkz. <c>docs/adr/0003</c>). Bilinmeyen bir alan, olumsuz bir cevap değildir.
+    /// </para>
+    /// </summary>
+    public required IReadOnlyList<string> MissingProfileFields { get; init; }
+}
+
+/// <summary>Modelin bağımsız kararı.</summary>
+public sealed record AiSecondOpinionResult
+{
+    public required EligibilityVerdict Verdict { get; init; }
+
+    /// <summary>Kararın Türkçe gerekçesi; ayrışma incelenirken okunur.</summary>
+    public required string Rationale { get; init; }
+
+    /// <summary>Modelin kendi kararına dair güveni (0..1).</summary>
+    public required decimal Confidence { get; init; }
+
+    public required string ModelName { get; init; }
 }
 
 public sealed record RuleExtractionRequest

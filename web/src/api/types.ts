@@ -1335,6 +1335,8 @@ export type VerdictDisagreementReason =
   | 'UnwrittenPractice'
   | 'Other'
 
+export type VerdictSource = 'Human' | 'Ai'
+
 export interface ExpertVerdict {
   id: string
   assessmentId: string
@@ -1349,6 +1351,11 @@ export interface ExpertVerdict {
   note: string | null
   recordedAt: string
   recordedBy: string
+  /** Görüşü danışman mı yapay zekâ mı verdi. */
+  source: VerdictSource
+  /** Yapay zekâ görüşünde kullanılan model; insan görüşünde null. */
+  reviewerModel: string | null
+  aiConfidence: number | null
   agrees: boolean
   isFalsePositive: boolean
   isFalseNegative: boolean
@@ -1397,8 +1404,21 @@ export interface RuleExtractionQuality {
 }
 
 export interface CalibrationReport {
-  summary: CalibrationSummary
+  /** Danışman görüşüne karşı ölçüm. Ağırlık kalibrasyonunun tek geçerli ölçütü. */
+  human: CalibrationSummary
+  /** Yapay zekâ görüşüne karşı ölçüm. Tarama sinyalidir; ağırlık gerekçesi olamaz. */
+  ai: CalibrationSummary
   ruleExtraction: RuleExtractionQuality
+}
+
+export interface AiSecondOpinionResult {
+  examinedCount: number
+  recordedCount: number
+  agreedCount: number
+  disagreedCount: number
+  skippedCount: number
+  /** Yapay zekâ devre dışıysa false; hiçbir görüş üretilmez. */
+  aiEnabled: boolean
 }
 
 export interface RecordExpertVerdictRequest {

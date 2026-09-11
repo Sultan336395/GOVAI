@@ -141,8 +141,22 @@ korunmaya çalışılan iki iddiayı da bozar.
 | `MinimumSampleSize = 20` altı "yorumlanamaz" işaretlenir | Üç vakayla hesaplanan "%33 hata oranı" istatistik değil gürültüdür |
 
 Kayıt **silinmez**: uyumsuz çıkanların silinebilmesi, raporu istenen sonuca göre şekillendirmeyi
-mümkün kılardı. Gerekçe: `docs/adr/0005`. Koruyan testler: `CalibrationReportTests` (14),
-`CalibrationTests` (9).
+mümkün kılardı.
+
+**İkinci görüşü yapay zekâ da verebilir** (`VerdictSource.Ai`) ve gece turu bunu kendiliğinden
+toplar — insan değerlendirmesi seyrektir, ölçüm birikmezse kalibrasyon hiç yapılamaz. Ama iki
+kaynak **eşdeğer değildir ve hiçbir yerde toplanmaz**: danışman görüşü kalibrasyon ölçütüdür,
+yapay zekâ görüşü yalnızca taramadır (nereye bakılmalı). Kural motoru da ikinci görüşü veren
+model de aynı metni okur; aynı yanlışı birlikte yapabilirler ve yüksek uyum oranı doğruluk
+değil ortak körlük olabilir. Bu yüzden rapor iki ayrı özet döner ve **ortak toplam alanı
+yoktur**.
+
+Modele **hesaplanmış skor verilmez** (yoksa onaylama eğilimine girer, görüş sistemin kendi
+cevabının yankısı olur) ve **eksik alanlar açıkça bildirilir** (yoksa bilinmeyeni "hayır" sayıp
+firmayı eler, §2.2 çiğnenir). Anahtar yoksa görüş **uydurulmaz**.
+
+Gerekçe: `docs/adr/0005`. Koruyan testler: `CalibrationReportTests` (14), `CalibrationTests` (9),
+`AiSecondOpinionTests` (7).
 
 ### 2.3 Skor ağırlıklarının toplamı 1.0'dır
 
