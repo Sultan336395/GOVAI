@@ -78,6 +78,24 @@ Proje dosyasındaki bileşen listesinin kod karşılıkları:
 | Reporting Service | `GovAI.Application.Reporting.ReportingService` |
 | Notification Service | `GovAI.Application.Notifications.NotificationService` |
 
+Proje dosyasında adı geçmeyen, sonraki fazlarda eklenen bileşenler:
+
+| Bileşen | Kod karşılığı | Ne yapar |
+|---|---|---|
+| Otonom haftalık rapor | `GovAI.Application.Reporting.WeeklyReportBuilder` | Firmaya haftalık anlık görüntü üretir; saftır, yeniden hesaplamaz |
+| Rapora soru sorma | `ReportQuestionCatalog` + `ReportAnswerBuilder` | Soruyu da cevabı da rapordan deterministik üretir; model çağrısı yok |
+| İhale başvuru takibi | `GovAI.Application.Tenders.TenderPursuitService` | Firmanın süreç beyanı; skoru **değiştirmez** |
+| Dashboard içgörüleri | `GovAI.Application.Dashboard.DashboardInsightsBuilder` | Aksiyon, profil doluluğu, huni, hareket akışı; saftır |
+| Kalibrasyon | `GovAI.Domain.Calibration.CalibrationReport` | Skoru **ölçer**, değiştirmez |
+| Yapay zekâ ikinci görüşü | `GovAI.Application.Calibration.AiSecondOpinionService` | Ayrışan vakayı insana işaret eder; anahtar yoksa görüş uydurmaz |
+| ERP veri çekme | `GovAI.Application.Integrations.ErpPullService` | Gece 02:45; bulunamayan alanı `null` bırakır, sıfır yazmaz |
+| E-posta gönderimi | `GovAI.Infrastructure.Notifications.SmtpEmailSender` | Gerçek SMTP; yapılandırma yoksa `DisabledEmailSender` devreye girer ve "gönderildi" yazılmaz |
+
+Üç tanesi bilerek **saf** (`WeeklyReportBuilder`, `DashboardInsightsBuilder`,
+`ReportAnswerBuilder`): girdileri yüklenmiş kayıtlar ile `asOf`'tur, içeride ne veri
+okunur ne tarih alınır. Böylece aynı girdi her zaman aynı çıktıyı verir ve davranış
+sahte depo kurmadan sınanabilir.
+
 ## 4. Veri akışı: bir çağrının yolculuğu
 
 ```

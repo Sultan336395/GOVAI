@@ -22,9 +22,9 @@ ERP adaptörleri gerçek kurumlara/sistemlere bağlanmayı bekliyor.
 | Application (use-case servisleri) | **Tamam** | 8 servis, MediatR yok |
 | Persistence (EF Core + PostgreSQL) | **Tamam** | 18 tablo, ilk migration üretildi |
 | Infrastructure | **Tamam** | OpenAI, Redis, RabbitMQ, JWT, PDF/Excel |
-| API (8 endpoint grubu) | **Tamam** | Swagger, 5 rol, otomatik audit log |
+| API (18 uç grubu) | **Tamam** | Swagger, rol ve firma izni iki kademeli, otomatik audit log |
 | Python worker'ları | **İskelet** | Akış uçtan uca yazıldı; kurum bazlı seçiciler yok |
-| Web paneli | **Tamam** | 8 ekran, gerçek API sözleşmesine bağlı |
+| Web paneli | **Tamam** | 27 ekran, gerçek API sözleşmesine bağlı |
 | docker-compose + CI | **Doğrulandı** | 19.08.2026'da sekiz servis birlikte ayağa kalktı (§2.1) |
 
 ---

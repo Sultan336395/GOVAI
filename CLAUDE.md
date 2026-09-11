@@ -432,9 +432,9 @@ src/GovAI.Domain/Calibration/    ← uzman görüşüyle karşılaştırma; skor
 src/GovAI.Application/           ← use-case servisleri (her modül kendi klasöründe)
 src/GovAI.Persistence/           ← EF Core yapılandırmaları, repository'ler, seed
 src/GovAI.Infrastructure/        ← OpenAI, Redis, RabbitMQ, JWT, PDF/Excel
-src/GovAI.Api/Controllers/       ← 8 endpoint grubu
+src/GovAI.Api/Controllers/       ← 18 uç grubu (26 denetleyici)
 workers/govai_workers/           ← collector, parser, rule_extractor, scheduler
-web/src/pages/                   ← 8 ekran
+web/src/pages/                   ← 27 ekran (28 rota); menü tanımı app/navigation.ts
 docs/                            ← mimari, veri modeli, API, skorlama, ADR'ler, yol haritası
 scripts/                         ← sözleşme senkron denetimi
 ```
@@ -510,7 +510,7 @@ Bunlar hata değil, bilinçli ertelemedir. Tamamı gerekçesi ve hedef ayıyla
 | Webhook gönderimi | Bildirim kuyruğa bırakılıyor, gerçek adaptör yok (e-posta adaptörü Faz 4'te eklendi) |
 | ERP adaptörleri | Çekme yolu kuruldu (`/api/erp`); ürün varsayılan eşlemeleri **gerçek kurulumda doğrulanmadı** — "Şimdi Dene ve Çek" bunun için var |
 | Ağırlık kalibrasyonu | Ölçüm altyapısı hazır (`/api/calibration`); ağırlıklar henüz gerçek vaka verisiyle kalibre edilmedi — örneklem birikiyor |
-| Kod bölme | Bundle ~714 KB, tek parça |
+| Kod bölme | Bundle ~862 KB, tek parça |
 
 `docker compose up` ile servislerin **birlikte** ayağa kalkması 19.08.2026'da denendi ve
 geçti; ayrıntı `docs/handover.md` §2.1'de. Bu artık açık uç değildir.

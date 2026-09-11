@@ -15,7 +15,7 @@ hazır olduğu ve neyin yapılacağı ile birlikte gösterir.
 | 6 | Kural motorunun ilk sürümü, metinlerden koşul çıkarımı | `RuleEvaluator` (13 operatör), deterministik kalıplar, alan beyaz listesi | Kalıp kütüphanesinin gerçek metinlerle genişletilmesi |
 | Ağırlık kalibrasyonu | Ölçüm altyapısı kuruldu: `ExpertVerdict` kaydı ve `CalibrationReport` (uyum oranı, yanlış pozitif/negatif, karışıklık matrisi, skor ayrım gücü). Ağırlıkların gerçek vaka verisiyle yeniden kalibre edilmesi örneklem 20 vakayı geçtiğinde yapılacak. | Ölçülebilir |
 | 8 | AI açıklama servisi, anlam eşleştirme, yönetici özetleri | OpenAI istemcisi, JSON şemalı kural çıkarımı, kural tabanlı yedek | Prompt iyileştirme, çıktı kalitesi ölçümü, maliyet takibi |
-| 9 | Dashboard, raporlama, PDF/Excel çıktıları, bildirim servisleri | React paneli (8 ekran), QuestPDF + ClosedXML, bildirim tekilleştirme | E-posta/webhook gönderim entegrasyonu, rapor şablonları |
+| 9 | Dashboard, raporlama, PDF/Excel çıktıları, bildirim servisleri | React paneli, QuestPDF + ClosedXML, bildirim tekilleştirme, SMTP gönderimi, otonom haftalık rapor, ihale takibi | Webhook gönderimi, rapor şablonları |
 | 10 | Pilot müşteri kurulumu, senaryo testleri, performans ve güvenlik | docker-compose, CI, sağlık kontrolleri, root olmayan kapsayıcılar | Sızma testi, yük testi, pilot firma verisiyle doğrulama |
 | 11 | Kullanıcı geri bildirimi, revizyonlar, kural kütüphanesi zenginleştirme | Danışman onay akışı, kural elle düzeltme | Sektörel kural setleri, istisna yönetimi ekranları |
 | 12 | Canlıya geçiş, dokümantasyon, demo ortamı, ticarileştirme paketleri | Mimari/API/veri modeli dokümanları, seed verisi | Üretim dağıtım hattı, yedekleme/geri yükleme provası, paket tanımları |
@@ -28,10 +28,10 @@ Altyapı kurulurken bilinçli olarak sonraya bırakılanlar:
 |---|---|---|
 | **OCR** | Taranmış PDF'ler kaynakların azınlığı; Tesseract bağımlılığı imaj boyutunu ciddi büyütüyor | Ay 4 |
 | **Refresh token akışı** | `CreateRefreshToken()` üretiliyor ama sunucuda saklanmıyor; şu an jeton süresi dolunca yeniden giriş gerekiyor | Ay 3 |
-| **E-posta/webhook gönderimi** | Bildirimler üretiliyor ve kuyruğa bırakılıyor; gerçek gönderim adaptörü yok | Ay 9 |
+| **Webhook gönderimi** | Bildirim kuyruğa bırakılıyor, tüketici yok. E-posta adaptörü Faz 4'te yazıldı (MailKit, `/api/notifications/dispatch`); webhook için hedef URL doğrulaması ve imzalama tasarlanmadı | Ay 10 |
 | **Kural ağırlığı kalibrasyonu** | Gerçek başvuru sonucu verisi olmadan istatistiksel kalibrasyon mümkün değil | Ay 10–11 |
-| **Web paneli birim testleri** | Ekranlar API sözleşmesine bağlı; sözleşme oturmadan test yazmak erken | Ay 9 |
-| **Kod bölme (code splitting)** | Bundle 714 KB; tek kullanıcılı kurumsal panelde kabul edilebilir | Ay 9 |
+| **Web paneli ekran testleri** | `lib/` altındaki saf fonksiyonlar kapsandı (166 vitest); ekran testleri hâlâ yok — render testi kurulumu (jsdom + React Testing Library) ayrı bir iş | Ay 9 |
+| **Kod bölme (code splitting)** | Bundle ~862 KB (tek parça); tek kullanıcılı kurumsal panelde kabul edilebilir | Ay 9 |
 | **Postgres tam metin arama** | `pg_trgm` ve `unaccent` eklentileri kuruldu, henüz kullanılmıyor | Ay 6 |
 
 ## Ticarileşme bileşenleri
@@ -41,4 +41,4 @@ Altyapıda karşılığı olan noktalar:
 - **SaaS abonelik** — `Tenant.Plan` ve `MaxCompanies` kotası hazır; ödeme entegrasyonu yok.
 - **Beyaz etiket** — çok kiracılı model ve `Consultant` rolünün firma kapsamı hazır.
 - **API lisanslama** — REST API dokümante ve rol bazlı korumalı; API anahtarı/kota katmanı yok.
-- **ERP modülü** — `/erp-sync` sözleşmesi hazır; ERP tarafı adaptörleri yazılacak.
+- **ERP modülü** — çekme yolu kuruldu (`/api/erp`, gece 02:45) ve alan eşlemesi panelden düzenlenebiliyor; ürün varsayılan eşlemeleri **gerçek bir Logo/Netsis/SAP kurulumunda doğrulanmadı**.
