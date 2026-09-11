@@ -23,6 +23,17 @@ public sealed class ReportInquiryRepository(GovAiDbContext context) : IReportInq
             .OrderBy(i => i.AskedAt)
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<ReportInquiry>> ListRecentForCompanyAsync(
+        Guid companyId,
+        int limit,
+        CancellationToken cancellationToken = default) =>
+        await context.ReportInquiries
+            .AsNoTracking()
+            .Where(i => i.CompanyId == companyId)
+            .OrderByDescending(i => i.AskedAt)
+            .Take(limit)
+            .ToListAsync(cancellationToken);
+
     public async Task AddAsync(ReportInquiry inquiry, CancellationToken cancellationToken = default) =>
         await context.ReportInquiries.AddAsync(inquiry, cancellationToken);
 }

@@ -1,5 +1,6 @@
 using GovAI.Application.Common;
 using GovAI.Application.Companies;
+using GovAI.Application.Dashboard;
 using GovAI.Application.Eligibility;
 using GovAI.Application.Identity;
 using GovAI.Application.Notifications;
@@ -45,6 +46,7 @@ public static class DependencyInjection
         services.AddScoped<WeeklyReportService>();
         services.AddScoped<ReportInquiryService>();
         services.AddScoped<TenderPursuitService>();
+        services.AddScoped<DashboardInsightsService>();
         services.AddScoped<CalibrationService>();
         services.AddScoped<AiSecondOpinionService>();
         services.AddScoped<ErpConnectionService>();

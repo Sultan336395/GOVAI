@@ -1075,3 +1075,146 @@ tbody tr:hover {
   font-size: 13px;
   line-height: 1.6;
 }
+
+/* ---- dashboard ek bölümleri ---- */
+
+.aksiyon-listesi,
+.hareket-listesi {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.aksiyon {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+
+.aksiyon:first-child {
+  border-top: 0;
+}
+
+.aksiyon-etiket {
+  flex: 0 0 64px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding-top: 2px;
+}
+
+.aksiyon-urgent .aksiyon-etiket {
+  color: var(--danger);
+}
+
+.aksiyon-high .aksiyon-etiket {
+  color: var(--warning);
+}
+
+.aksiyon-normal .aksiyon-etiket {
+  color: var(--text-muted);
+}
+
+.aksiyon-govde {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+}
+
+.aksiyon-tarih {
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.profil-oran strong {
+  font-size: 28px;
+}
+
+.profil-cubuk {
+  height: 8px;
+  margin-top: 6px;
+  border-radius: 4px;
+  background: var(--neutral-soft);
+  overflow: hidden;
+}
+
+.profil-cubuk span {
+  display: block;
+  height: 100%;
+  background: var(--primary);
+}
+
+.huni {
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+}
+
+.huni li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 3px 0;
+  font-size: 13px;
+}
+
+.huni-ad {
+  flex: 0 0 120px;
+}
+
+.huni-cubuk {
+  flex: 1;
+  height: 10px;
+  border-radius: 5px;
+  background: var(--neutral-soft);
+  overflow: hidden;
+}
+
+.huni-cubuk span {
+  display: block;
+  height: 100%;
+  background: var(--primary);
+}
+
+.huni-sayi {
+  flex: 0 0 40px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.hareket-listesi li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.hareket-listesi li:first-child {
+  border-top: 0;
+}
+
+.hareket-zaman {
+  flex: 0 0 84px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.hareket-govde {
+  flex: 1;
+  min-width: 0;
+}
+
+.hareket-kisi {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}

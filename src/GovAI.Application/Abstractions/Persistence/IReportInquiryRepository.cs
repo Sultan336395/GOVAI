@@ -17,5 +17,11 @@ public interface IReportInquiryRepository
         Guid reportId,
         CancellationToken cancellationToken = default);
 
+    /// <summary>Firmanın son soruları, en yenisi başta. Hareket akışı için.</summary>
+    Task<IReadOnlyList<ReportInquiry>> ListRecentForCompanyAsync(
+        Guid companyId,
+        int limit,
+        CancellationToken cancellationToken = default);
+
     Task AddAsync(ReportInquiry inquiry, CancellationToken cancellationToken = default);
 }

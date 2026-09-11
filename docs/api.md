@@ -218,6 +218,18 @@ Simülasyon firma kaydına **dokunmaz**.
 
 Dışa aktarım uçları dosya döner (`Content-Disposition: attachment`).
 
+`/api/reports/companies/{companyId}/dashboard/insights` (Read) dört ek bölüm döner:
+`actions`, `profile`, `funnel`, `trend`, `activity` ve boş bölümlerin sebebini yazan
+`notes`. Ayrı bir uçtur: ana dashboard sayıları bu bölümler hesaplanamasa da görünür.
+
+Profil doluluğu form alanlarını değil **kural motorunun okuduğu** alanları sayar;
+her eksik alan o alana bakan kuralda `Unknown` demektir. Sertifika listesi ölçüye
+girmez — boş küme "belgemiz yok" anlamına gelen geçerli bir cevaptır.
+
+Huni basamakları daralan bir dizi **değildir**: üst iki basamak sistemin kararı,
+alt üçü firmanın beyanıdır; firma sistemin uygun görmediği bir ihaleyi de takibe
+alabilir.
+
 ## `/api/reports/weekly` — otonom haftalık rapor
 
 | Metot | Yol | Yetki |

@@ -16,6 +16,7 @@ import {
 import { api } from '@/api/client'
 import { useCompanies } from '@/app/contexts'
 import { EmptyState, ErrorBox, Kpi, Loading, ScoreCell, SectorFitBadge, VerdictBadge } from '@/components/Common'
+import DashboardInsights from '@/components/DashboardInsights'
 import { formatCurrency, formatDeadline, formatPercent } from '@/lib/format'
 
 const VERDICT_COLORS = ['#15803d', '#b45309', '#b91c1c', '#64748b']
@@ -109,6 +110,12 @@ export default function DashboardPage() {
           hint="Profil eksikliği nedeniyle karar verilemeyen koşul"
         />
       </div>
+
+      {/*
+        Aksiyonlar ve profil göstergesi grafiklerin ÜSTÜNDE durur: ekranın işi önce
+        "bugün ne yapmalıyım" sorusuna cevap vermek, sonra genel resmi göstermektir.
+      */}
+      <DashboardInsights companyId={selectedCompanyId} />
 
       <div className="grid two" style={{ marginBottom: 16 }}>
         <div className="card">

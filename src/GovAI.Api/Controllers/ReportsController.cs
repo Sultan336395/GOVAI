@@ -1,4 +1,5 @@
 using GovAI.Api.Infrastructure;
+using GovAI.Application.Dashboard;
 using GovAI.Application.Reporting;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -11,13 +12,30 @@ namespace GovAI.Api.Controllers;
 [ApiController]
 [Route("api/reports")]
 [Authorize(Policy = Policies.CompanyData)]
-public sealed class ReportsController(ReportingService service) : ControllerBase
+public sealed class ReportsController(
+    ReportingService service,
+    DashboardInsightsService insights) : ControllerBase
 {
     /// <summary>Yönetici dashboard verisi: KPI'lar, kategori kırılımı, boyut ortalamaları, öncelikli fırsatlar.</summary>
     [HttpGet("companies/{companyId:guid}/dashboard")]
     [Produces("application/json")]
     public async Task<ActionResult<DashboardDto>> GetDashboard(Guid companyId, CancellationToken cancellationToken) =>
         Ok(await service.GetDashboardAsync(companyId, cancellationToken));
+
+    /// <summary>
+    /// Dashboard'un dört ek bölümü: aksiyonlar, profil doluluğu, huni ve eğilim,
+    /// son hareketler.
+    ///
+    /// <para>
+    /// Ayrı bir uçtur: ana dashboard sayıları bu bölümler hesaplanamasa da görünmelidir.
+    /// </para>
+    /// </summary>
+    [HttpGet("companies/{companyId:guid}/dashboard/insights")]
+    [Produces("application/json")]
+    public async Task<ActionResult<DashboardInsightsDto>> GetInsights(
+        Guid companyId,
+        CancellationToken cancellationToken) =>
+        Ok(await insights.GetAsync(companyId, cancellationToken));
 
     /// <summary>Önceliklendirilmiş fırsat listesini Excel olarak indirir.</summary>
     [HttpGet("companies/{companyId:guid}/export/excel")]

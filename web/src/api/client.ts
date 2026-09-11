@@ -43,6 +43,7 @@ import type {
   WeeklyReportDetail,
   ReportInquiryState,
   AnswerQuestionResult,
+  DashboardInsights,
   TenderBoard,
   TenderPursuit,
   TenderPursuitStatus,
@@ -294,6 +295,10 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ questionKey, parentInquiryId: parentInquiryId ?? null }),
     }),
+
+  /** Dashboard'un dört ek bölümü. Ana dashboard sayılarından ayrı bir uçtur. */
+  getDashboardInsights: (companyId: string) =>
+    request<DashboardInsights>(`/api/reports/companies/${companyId}/dashboard/insights`),
 
   // ---- ihale başvuru takibi ----
 

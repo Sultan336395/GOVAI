@@ -1619,3 +1619,63 @@ export interface TenderBoard {
   pursuits: TenderPursuit[]
   counts: TenderBoardCounts
 }
+
+// ---- dashboard ek bölümleri ----
+
+export type DashboardActionPriority = 'Urgent' | 'High' | 'Normal'
+
+export interface DashboardAction {
+  priority: DashboardActionPriority
+  priorityLabel: string
+  title: string
+  reason: string
+  /** Aksiyonun götürdüğü ekran. Götürmeyen uyarı gösterilmez. */
+  target: string
+  dueAt?: string | null
+  daysRemaining?: number | null
+}
+
+export interface ProfileCompletenessInfo {
+  percentage: number
+  knownCount: number
+  totalCount: number
+  missingLabels: string[]
+  dataGapCount: number
+}
+
+/** Basamaklar daralan bir dizi DEĞİLDİR; alt basamak üstten büyük çıkabilir. */
+export interface OpportunityFunnel {
+  evaluated: number
+  eligible: number
+  conditionallyEligible: number
+  tracked: number
+  submitted: number
+  won: number
+}
+
+export interface TrendPoint {
+  periodStart: string
+  opportunityCount: number
+  tenderCount: number
+  riskCount: number
+  urgentDeadlineCount: number
+}
+
+export interface ActivityItem {
+  at: string
+  kind: string
+  title: string
+  detail?: string | null
+  target?: string | null
+  actor?: string | null
+}
+
+export interface DashboardInsights {
+  companyId: string
+  actions: DashboardAction[]
+  profile: ProfileCompletenessInfo
+  funnel: OpportunityFunnel
+  trend: TrendPoint[]
+  activity: ActivityItem[]
+  notes: string[]
+}
