@@ -118,6 +118,32 @@ kalıyordu.
 Koruyan testler: `ActivityCatalogTests` (29), `ActivityReferenceTests` (13),
 `SectorConsistencyTests` (11), `turkce.test.ts` (8).
 
+### 2.2.3 Uzman görüşü skoru değiştirmez, skoru ölçer
+
+Danışmanın bir değerlendirmeye verdiği kendi kararı (`ExpertVerdict`) karar mekanizmasının
+**girdisi değil denetçisidir**. Skoru, kararı veya ağırlıkları değiştirmez.
+
+Sebebi ürünün ilk iki iddiasıdır. Uzman görüşü skoru etkileseydi aynı firma–çağrı çifti
+geçmişte kimin baktığına göre farklı puan alırdı (determinizm gider) ve kayan puanın dayanağı
+çağrı metninde bulunmazdı (açıklanabilirlik gider).
+
+`CalibrationReport` bu kayıtlardan uyum oranını, yanlış pozitif/negatif sayılarını, karışıklık
+matrisini ve skorun ayrım gücünü hesaplar. Rapor **öneri üretmez**; hangi ağırlığın nasıl
+değişeceği insan kararıdır. Sayılara bakıp otomatik ağırlık değiştiren bir mekanizma eklemek,
+korunmaya çalışılan iki iddiayı da bozar.
+
+Üç ayrım bilinçlidir ve kaldırılmamalıdır:
+
+| Ayrım | Neden |
+|---|---|
+| Sistem kararı **kopyalanarak** saklanır | Değerlendirme yeniden hesaplanırsa bugünün skoruyla dünün uzman görüşü kıyaslanmış olurdu |
+| Eksik veriden doğan ayrışma ayrı sayılır | Veri toplama sorununu ağırlık sorunu sanıp ağırlıkları bozmamak için |
+| `MinimumSampleSize = 20` altı "yorumlanamaz" işaretlenir | Üç vakayla hesaplanan "%33 hata oranı" istatistik değil gürültüdür |
+
+Kayıt **silinmez**: uyumsuz çıkanların silinebilmesi, raporu istenen sonuca göre şekillendirmeyi
+mümkün kılardı. Gerekçe: `docs/adr/0005`. Koruyan testler: `CalibrationReportTests` (14),
+`CalibrationTests` (9).
+
 ### 2.3 Skor ağırlıklarının toplamı 1.0'dır
 
 `ScoreWeights` yapıcısı bunu doğrular ve ihlalde `DomainException` atar.
@@ -283,6 +309,7 @@ Demo verisi için `SEED_ENABLED=true` + `SEED_ADMIN_PASSWORD=...`.
 ```
 src/GovAI.Domain/Eligibility/    ← ürünün kalbi: kural motoru
 src/GovAI.Domain/Scoring/        ← ağırlıklar, boyut puanları, zamanlama skoru
+src/GovAI.Domain/Calibration/    ← uzman görüşüyle karşılaştırma; skoru ÖLÇER, değiştirmez
 src/GovAI.Application/           ← use-case servisleri (her modül kendi klasöründe)
 src/GovAI.Persistence/           ← EF Core yapılandırmaları, repository'ler, seed
 src/GovAI.Infrastructure/        ← OpenAI, Redis, RabbitMQ, JWT, PDF/Excel
@@ -363,7 +390,7 @@ Bunlar hata değil, bilinçli ertelemedir. Tamamı gerekçesi ve hedef ayıyla
 | Refresh token | Üretiliyor ama sunucuda saklanmıyor; süre dolunca yeniden giriş |
 | E-posta / webhook gönderimi | Bildirim üretiliyor ve kuyruğa bırakılıyor, gerçek adaptör yok |
 | ERP adaptörleri | `/erp-sync` sözleşmesi hazır, Logo/Netsis/SAP tarafı yok |
-| Ağırlık kalibrasyonu | Uzman görüşüne dayalı; gerçek başvuru sonucu verisiyle kalibre edilmedi |
+| Ağırlık kalibrasyonu | Ölçüm altyapısı hazır (`/api/calibration`); ağırlıklar henüz gerçek vaka verisiyle kalibre edilmedi — örneklem birikiyor |
 | Kod bölme | Bundle ~714 KB, tek parça |
 
 `docker compose up` ile servislerin **birlikte** ayağa kalkması 19.08.2026'da denendi ve

@@ -4,6 +4,7 @@ using GovAI.Application.Eligibility;
 using GovAI.Application.Identity;
 using GovAI.Application.Notifications;
 using GovAI.Application.Opportunities;
+using GovAI.Application.Calibration;
 using GovAI.Application.Reporting;
 using GovAI.Application.Simulation;
 using GovAI.Application.Sources;
@@ -40,6 +41,7 @@ public static class DependencyInjection
         services.AddScoped<ScenarioSimulationService>();
         services.AddScoped<ReportingService>();
         services.AddScoped<WeeklyReportService>();
+        services.AddScoped<CalibrationService>();
         services.AddScoped<NotificationService>();
         services.AddScoped<AuthenticationService>();
 

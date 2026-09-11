@@ -120,6 +120,13 @@ export const fieldHelp = {
   acilSonBasvuru: 'İki hafta içinde kapanan çağrı sayısı.',
   gecmisDonemEksigi:
     'Başvuru süresi geçmiş çağrılardan kalan eksikler; şimdi yapılacak bir iş yoktur.',
+
+  // ── Karar doğruluğu ──
+  uyumOrani: 'Sistemin kararıyla danışmanın kararının aynı çıktığı vaka oranı.',
+  yanlisPozitif: 'Sistem uygun dedi, danışman uygun değil dedi.',
+  yanlisNegatif: 'Sistem uygun değil dedi, danışman uygun dedi.',
+  ornekYeterliligi: 'Oranların yorumlanabilmesi için gereken en az vaka sayısına ulaşıldı mı.',
+  kuralDuzeltmeOrani: 'Danışmanın elle düzelttiği kuralların tüm kurallara oranı.',
 } as const satisfies Record<string, string>
 
 export type FieldHelpKey = keyof typeof fieldHelp

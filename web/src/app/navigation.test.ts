@@ -109,6 +109,7 @@ describe('kiracı kullanıcıları', () => {
     ])
     expect(etiketler(ctx)).toContain('Mevzuat Değişiklikleri')
     expect(etiketler(ctx)).toContain('Haftalık Raporlar')
+    expect(etiketler(ctx)).toContain('Karar Doğruluğu')
     expect(etiketler(ctx)).not.toContain('Veri Kaynakları')
     expect(etiketler(ctx)).not.toContain('Karantina İnceleme')
   })

@@ -129,6 +129,7 @@ export function buildNavigation({
       title: 'Raporlar',
       items: [
         { to: '/weekly-reports', label: 'Haftalık Raporlar', icon: 'report' },
+        { to: '/calibration', label: 'Karar Doğruluğu', icon: 'scenario' },
       ],
     },
   ]

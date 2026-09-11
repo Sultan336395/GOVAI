@@ -1,6 +1,7 @@
 using GovAI.Domain.Analysis;
 using GovAI.Application.Abstractions.Services;
 using GovAI.Domain.Assessments;
+using GovAI.Domain.Calibration;
 using GovAI.Domain.Auditing;
 using GovAI.Domain.Common;
 using GovAI.Domain.Companies;
@@ -65,6 +66,7 @@ public class GovAiDbContext(
     public DbSet<MaintenanceRun> MaintenanceRuns => Set<MaintenanceRun>();
     public DbSet<ScenarioSimulation> ScenarioSimulations => Set<ScenarioSimulation>();
     public DbSet<WeeklyReport> WeeklyReports => Set<WeeklyReport>();
+    public DbSet<ExpertVerdict> ExpertVerdicts => Set<ExpertVerdict>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<AuditLogEntry> AuditLog => Set<AuditLogEntry>();
 
@@ -150,6 +152,9 @@ public class GovAiDbContext(
 
         modelBuilder.Entity<WeeklyReport>()
             .HasQueryFilter(r => r.TenantId == _tenantId);
+
+        modelBuilder.Entity<ExpertVerdict>()
+            .HasQueryFilter(v => v.TenantId == _tenantId);
 
         modelBuilder.Entity<AnalysisRun>()
             .HasQueryFilter(r => r.TenantId == _tenantId);

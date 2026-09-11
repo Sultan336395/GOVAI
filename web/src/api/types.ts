@@ -1324,3 +1324,86 @@ export interface WeeklyReportDetail {
   trigger: ReportTrigger
   content: WeeklyReportContent
 }
+
+// ---- uzman değerlendirmesi ve kalibrasyon ----
+
+export type VerdictDisagreementReason =
+  | 'None'
+  | 'RuleExtraction'
+  | 'CompanyData'
+  | 'ScoreWeighting'
+  | 'UnwrittenPractice'
+  | 'Other'
+
+export interface ExpertVerdict {
+  id: string
+  assessmentId: string
+  opportunityId: string
+  opportunityTitle: string
+  /** Sistemin O AN verdiği karar; sonradan yeniden hesaplanmaz. */
+  systemVerdict: EligibilityVerdict
+  systemScore: number
+  systemHadDataGap: boolean
+  expertOpinion: EligibilityVerdict
+  disagreementReason: VerdictDisagreementReason
+  note: string | null
+  recordedAt: string
+  recordedBy: string
+  agrees: boolean
+  isFalsePositive: boolean
+  isFalseNegative: boolean
+}
+
+export interface CalibrationMatrixCell {
+  systemVerdict: EligibilityVerdict
+  expertOpinion: EligibilityVerdict
+  count: number
+}
+
+export interface CalibrationReasonCount {
+  reason: VerdictDisagreementReason
+  count: number
+}
+
+export interface CalibrationScoreBand {
+  expertOpinion: EligibilityVerdict
+  count: number
+  averageSystemScore: number
+  minSystemScore: number
+  maxSystemScore: number
+}
+
+export interface CalibrationSummary {
+  totalVerdicts: number
+  agreementCount: number
+  agreementRate: number
+  falsePositiveCount: number
+  falsePositiveRate: number
+  falseNegativeCount: number
+  falseNegativeRate: number
+  /** Eksik veriyle verilmiş karardan doğan ayrışma sayısı. */
+  dataGapDisagreementCount: number
+  /** Örneklem yorum yapmaya yetiyor mu? */
+  isSampleSufficient: boolean
+  matrix: CalibrationMatrixCell[]
+  reasons: CalibrationReasonCount[]
+  scoreBands: CalibrationScoreBand[]
+}
+
+export interface RuleExtractionQuality {
+  totalRules: number
+  manuallyOverriddenRules: number
+  overrideRate: number
+}
+
+export interface CalibrationReport {
+  summary: CalibrationSummary
+  ruleExtraction: RuleExtractionQuality
+}
+
+export interface RecordExpertVerdictRequest {
+  assessmentId: string
+  expertOpinion: EligibilityVerdict
+  disagreementReason: VerdictDisagreementReason
+  note?: string | null
+}

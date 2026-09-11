@@ -41,6 +41,9 @@ import type {
   VerificationRequest,
   WeeklyReportSummary,
   WeeklyReportDetail,
+  ExpertVerdict,
+  CalibrationReport,
+  RecordExpertVerdictRequest,
 } from './types'
 
 const TOKEN_STORAGE_KEY = 'govai.token'
@@ -263,6 +266,22 @@ export const api = {
 
   weeklyReportExportUrl: (reportId: string, format: 'excel' | 'pdf') =>
     `${BASE_URL}/api/reports/weekly/${reportId}/${format}`,
+
+  // ---- uzman değerlendirmesi ve kalibrasyon ----
+
+  /** Uzman görüşü skoru DEĞİŞTİRMEZ; yalnızca ölçüm için saklanır. */
+  recordExpertVerdict: (body: RecordExpertVerdictRequest) =>
+    request<ExpertVerdict>('/api/calibration/verdicts', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  listExpertVerdicts: (companyId: string) =>
+    request<ExpertVerdict[]>(`/api/calibration/companies/${companyId}/verdicts`),
+
+  /** Firma verilmezse kiracının tamamı ölçülür. */
+  getCalibrationReport: (companyId?: string) =>
+    request<CalibrationReport>(`/api/calibration/report${query({ companyId })}`),
 
   // ---- bildirimler ----
   listNotifications: (params: { companyId?: string; onlyUnread?: boolean; pageSize?: number }) =>
