@@ -94,6 +94,13 @@ describe('platform rolleri', () => {
   it('veri toplama servisi hesabı hiçbir menü görmez', () => {
     expect(buildNavigation(baglam({ userRole: 'SystemIngest' }))).toEqual([])
   })
+
+  it('platform rolleri ihale takibini görmez', () => {
+    // Takip müşteri verisidir; Policies.CompanyData platform rollerini dışarıda bırakır.
+    for (const rol of ['PlatformCatalogManager', 'PlatformReviewer'] as UserRole[]) {
+      expect(etiketler(baglam({ userRole: rol }))).not.toContain('İhale Takibi')
+    }
+  })
 })
 
 describe('kiracı kullanıcıları', () => {
@@ -136,6 +143,15 @@ describe('kiracı kullanıcıları', () => {
       expect(etiketler(ctx)).toContain('Mevzuat Değişiklikleri')
     },
   )
+
+  it('ihale takibi katalogdan SONRA gelir', () => {
+    // Takibe alınacak ihale önce katalogda bulunur; menü sırası o yolu izler.
+    const sira = etiketler(baglam())
+
+    expect(sira).toContain('İhale Takibi')
+    expect(sira.indexOf('İhale Takibi'))
+      .toBeGreaterThan(sira.indexOf('Fon, Hibe ve İhale Kataloğu'))
+  })
 
   it('aktif şirket henüz çözülmediyse yedek şirkete düşülür', () => {
     const ctx = baglam({ activeRole: null, activeCompanyId: null })

@@ -1542,3 +1542,80 @@ export interface ErpPullResult {
   missingFields: string[]
   message: string
 }
+
+// ---- ihale başvuru takibi ----
+
+export type TenderPursuitStatus =
+  | 'Inceleniyor'
+  | 'Hazirlaniyor'
+  | 'TeklifVerildi'
+  | 'Sonuclandi'
+  | 'Vazgecildi'
+
+export type TenderOutcome = 'Kazanildi' | 'Kaybedildi' | 'Iptal'
+
+/** Takip edilen ihalenin sistem değerlendirmesi. Takipten ETKİLENMEZ. */
+export interface TenderAssessment {
+  score: number
+  verdict: EligibilityVerdict
+  verdictLabel: string
+  sectorFit: SectorFit
+  sectorFitLabel: string
+  missingConditionCount: number
+  missingMandatoryDocumentCount: number
+  evaluatedAt: string
+}
+
+export interface TenderPursuitEvent {
+  fromStatus?: TenderPursuitStatus | null
+  fromStatusLabel?: string | null
+  toStatus: TenderPursuitStatus
+  toStatusLabel: string
+  outcome?: TenderOutcome | null
+  outcomeLabel?: string | null
+  note?: string | null
+  at: string
+  by: string
+}
+
+export interface TenderPursuit {
+  id: string
+  opportunityId: string
+  title: string
+  publisher: string
+  category: SupportCategory
+  categoryLabel: string
+  sourceUrl?: string | null
+  deadline?: string | null
+  daysToDeadline?: number | null
+  status: TenderPursuitStatus
+  statusLabel: string
+  outcome?: TenderOutcome | null
+  outcomeLabel?: string | null
+  note?: string | null
+  owner?: string | null
+  startedAt: string
+  statusChangedAt: string
+  isClosed: boolean
+  /** Süre doldu ama takip hâlâ açık. */
+  isOverdue: boolean
+  assessment?: TenderAssessment | null
+  history: TenderPursuitEvent[]
+}
+
+export interface TenderBoardCounts {
+  inceleniyor: number
+  hazirlaniyor: number
+  teklifVerildi: number
+  kazanildi: number
+  kaybedildi: number
+  iptal: number
+  vazgecildi: number
+  suresiGecen: number
+}
+
+export interface TenderBoard {
+  companyId: string
+  pursuits: TenderPursuit[]
+  counts: TenderBoardCounts
+}

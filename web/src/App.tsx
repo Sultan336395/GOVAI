@@ -22,6 +22,7 @@ import MatchesPage from '@/pages/MatchesPage'
 import CalibrationPage from '@/pages/CalibrationPage'
 import ErpConnectionPage from '@/pages/ErpConnectionPage'
 import WeeklyReportPage from '@/pages/WeeklyReportPage'
+import TenderBoardPage from '@/pages/TenderBoardPage'
 import WeeklyReportsPage from '@/pages/WeeklyReportsPage'
 import MyCompaniesPage from '@/pages/MyCompaniesPage'
 import NewCompanyPage from '@/pages/NewCompanyPage'
@@ -93,6 +94,7 @@ export default function App() {
         <Route path="/company" element={<CompanyPage />} />
         <Route path="/company/erp" element={<ErpConnectionPage />} />
         <Route path="/simulation" element={<SimulationPage />} />
+        <Route path="/tenders" element={<TenderBoardPage />} />
         <Route path="/weekly-reports" element={<WeeklyReportsPage />} />
         <Route path="/calibration" element={<CalibrationPage />} />
         <Route path="/weekly-reports/:reportId" element={<WeeklyReportPage />} />

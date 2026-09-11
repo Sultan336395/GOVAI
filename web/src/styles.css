@@ -1045,3 +1045,33 @@ tbody tr:hover {
 .cevap-bosluk {
   height: 10px;
 }
+
+/* ---- ihale takibi ---- */
+
+.asama-paneli {
+  padding: 12px 4px;
+}
+
+.asama-alanlar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.asama-alanlar label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.asama-gecmis {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.6;
+}

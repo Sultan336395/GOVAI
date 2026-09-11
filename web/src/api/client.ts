@@ -43,6 +43,10 @@ import type {
   WeeklyReportDetail,
   ReportInquiryState,
   AnswerQuestionResult,
+  TenderBoard,
+  TenderPursuit,
+  TenderPursuitStatus,
+  TenderOutcome,
   ExpertVerdict,
   CalibrationReport,
   RecordExpertVerdictRequest,
@@ -289,6 +293,30 @@ export const api = {
     request<AnswerQuestionResult>(`/api/reports/weekly/${reportId}/questions`, {
       method: 'POST',
       body: JSON.stringify({ questionKey, parentInquiryId: parentInquiryId ?? null }),
+    }),
+
+  // ---- ihale başvuru takibi ----
+
+  getTenderBoard: (companyId: string) =>
+    request<TenderBoard>(`/api/tenders/companies/${companyId}`),
+
+  /** Zaten takipteyse ikinci kayıt açılmaz; mevcut kayıt döner. */
+  startTenderPursuit: (companyId: string, opportunityId: string, note?: string | null) =>
+    request<TenderPursuit>(`/api/tenders/companies/${companyId}`, {
+      method: 'POST',
+      body: JSON.stringify({ opportunityId, note: note ?? null }),
+    }),
+
+  /** Sonuçlanan ihalede `outcome` zorunludur; sunucu aksini 422 ile reddeder. */
+  changeTenderStatus: (
+    pursuitId: string,
+    status: TenderPursuitStatus,
+    outcome?: TenderOutcome | null,
+    note?: string | null,
+  ) =>
+    request<TenderPursuit>(`/api/tenders/${pursuitId}/status`, {
+      method: 'POST',
+      body: JSON.stringify({ status, outcome: outcome ?? null, note: note ?? null }),
     }),
 
   // ---- uzman değerlendirmesi ve kalibrasyon ----

@@ -13,6 +13,7 @@ using GovAI.Domain.Opportunities;
 using GovAI.Domain.Regulatory;
 using GovAI.Domain.Reporting;
 using GovAI.Domain.Sources;
+using GovAI.Domain.Tenders;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore;
 
@@ -70,6 +71,8 @@ public class GovAiDbContext(
     public DbSet<ExpertVerdict> ExpertVerdicts => Set<ExpertVerdict>();
     public DbSet<ErpConnection> ErpConnections => Set<ErpConnection>();
     public DbSet<ReportInquiry> ReportInquiries => Set<ReportInquiry>();
+    public DbSet<TenderPursuit> TenderPursuits => Set<TenderPursuit>();
+    public DbSet<TenderPursuitEvent> TenderPursuitEvents => Set<TenderPursuitEvent>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<AuditLogEntry> AuditLog => Set<AuditLogEntry>();
 
@@ -164,6 +167,12 @@ public class GovAiDbContext(
 
         modelBuilder.Entity<ReportInquiry>()
             .HasQueryFilter(i => i.TenantId == _tenantId);
+
+        modelBuilder.Entity<TenderPursuit>()
+            .HasQueryFilter(p => p.TenantId == _tenantId);
+
+        modelBuilder.Entity<TenderPursuitEvent>()
+            .HasQueryFilter(e => e.TenantId == _tenantId);
 
         modelBuilder.Entity<AnalysisRun>()
             .HasQueryFilter(r => r.TenantId == _tenantId);

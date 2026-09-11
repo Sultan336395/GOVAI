@@ -168,6 +168,8 @@ export function buildNavigation({
       items: [
         { to: '/matches', label: 'Fırsat Eşleşmelerim', icon: 'matches' },
         { to: '/opportunities', label: 'Fon, Hibe ve İhale Kataloğu', icon: 'catalog' },
+        // İhale takibi katalogdan SONRA gelir: takibe alınacak ihale önce orada bulunur.
+        { to: '/tenders', label: 'İhale Takibi', icon: 'catalog' },
         { to: '/simulation', label: 'Senaryo Analizi', icon: 'scenario' },
       ],
     },

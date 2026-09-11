@@ -212,6 +212,27 @@ sıfırlanabilirdi.
 Koruyan testler: `ReportQuestionTests` (14), `ReportInquiryTests` (9),
 `cevapMetni.test.ts` (8).
 
+### 2.2.6 İhale takibi skoru değiştirmez
+
+`TenderPursuit` firmanın başvuru sürecine dair **kendi beyanıdır**: skoru, kararı ve
+sıralamayı etkilemez. Etkileseydi firma bir ihaleyi işaretleyerek kendi puanını
+yükseltebilirdi — §2.1'in iki iddiası da düşerdi.
+
+Takip ekranında sistemin değerlendirmesi ayrıca gösterilir; amaç tersidir: hazırlığa
+alınan bir ihalede "sektör uyumu doğrulanamadı" uyarısının zamanında görülmesi.
+Değerlendirilmemiş ihalede alan `null` kalır, uydurma puan yazılmaz.
+
+İki karar bilinçlidir:
+
+| Karar | Neden |
+|---|---|
+| Aşama geçişleri **serbesttir** | Katı boru hattı sahayla çatışır: teklif verdikten sonra sisteme girme, hazırlıktan incelemeye dönme, iptal edilip yenilenen ihaleyi yeniden açma olağandır. Doğruluk, geçişi kısıtlamakla değil her değişikliği geçmişe yazmakla korunur |
+| `Sonuclandi` **sonuç zorunlu** kılar | "Sonuçlandı" tek başına kazanılan ile kaybedilen ihaleyi aynı satırda gösterirdi |
+
+Kayıt **silinmez**; bırakılan takip `Vazgecildi` olur.
+
+Koruyan testler: `TenderPursuitTests` alan modeli (13) ve API (10).
+
 ### 2.3 Skor ağırlıklarının toplamı 1.0'dır
 
 `ScoreWeights` yapıcısı bunu doğrular ve ihlalde `DomainException` atar.
@@ -281,7 +302,7 @@ Solution dosyası **`GovAI.slnx`**'tir (yeni XML formatı), `.sln` değil.
 
 ```bash
 dotnet build -c Release          # tüm .NET projeleri
-dotnet test                      # 995 test (238 domain + 399 application + 358 API)
+dotnet test                      # 1018 test (251 domain + 399 application + 368 API)
 ```
 
 ```bash
@@ -300,7 +321,7 @@ cd web && npm ci && npm run lint && npm run typecheck && npm run test && npm run
 ```
 
 `npm run lint` **`--max-warnings 0`** ile çalışır; uyarı da hatadır.
-`npm run test` vitest'i tek seferlik koşturur (164 test); şu an yalnızca `lib/`
+`npm run test` vitest'i tek seferlik koşturur (166 test); şu an yalnızca `lib/`
 altındaki saf fonksiyonlar kapsanır (menü görünürlüğü, parola kuralı, etiket
 haritaları) — ekran testleri hâlâ yok.
 

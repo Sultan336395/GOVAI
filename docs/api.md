@@ -253,6 +253,31 @@ cevap döner ve hak harcanmaz. Hak bittiğinde yeni soru 400 ile reddedilir.
 Cevap sunucuda **rapordan hesaplanır**; model çağrısı yoktur, bu yüzden uç OpenAI
 anahtarı tanımlı olmadan da çalışır.
 
+## `/api/tenders` — ihale başvuru takibi
+
+| Metot | Yol | Yetki |
+|---|---|---|
+| GET | `/api/tenders/companies/{companyId}` | Read |
+| POST | `/api/tenders/companies/{companyId}` | Operate |
+| POST | `/api/tenders/{pursuitId}/status` | Operate |
+
+Takip firmanın **kendi beyanıdır**; skoru, kararı ve sıralamayı etkilemez. Tahta
+satırlarında sistemin kendi değerlendirmesi (`assessment`) ayrıca döner — hiç
+değerlendirilmemiş bir ihalede `null`'dır, uydurma bir puan yazılmaz.
+
+Aşamalar: `Inceleniyor`, `Hazirlaniyor`, `TeklifVerildi`, `Sonuclandi`, `Vazgecildi`.
+Geçişler serbesttir (geriye dönüş ve yeniden açma dâhil); her değişiklik `history`
+altına kim ve ne zaman bilgisiyle yazılır.
+
+`Sonuclandi` aşamasında `outcome` (`Kazanildi` / `Kaybedildi` / `Iptal`) **zorunludur**;
+verilmezse 422 döner. Başka aşamada sonuç yazmak da 422 ile reddedilir.
+
+Aynı firma aynı ihaleyi iki kez takibe alamaz: ikinci istek yeni kayıt açmaz, mevcut
+kaydı döner. Karantinadaki bir çağrı takibe alınamaz.
+
+Takip **silinmez**; bırakılan süreç `Vazgecildi` olur, böylece "bu ihaleye neden
+girmedik" sorusunun cevabı geçmişiyle kalır.
+
 ## `/api/notifications`
 
 | Metot | Yol | Yetki |

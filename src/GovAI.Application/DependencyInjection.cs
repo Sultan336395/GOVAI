@@ -7,6 +7,7 @@ using GovAI.Application.Opportunities;
 using GovAI.Application.Calibration;
 using GovAI.Application.Integrations;
 using GovAI.Application.Reporting;
+using GovAI.Application.Tenders;
 using GovAI.Application.Simulation;
 using GovAI.Application.Sources;
 using Microsoft.Extensions.DependencyInjection;
@@ -43,6 +44,7 @@ public static class DependencyInjection
         services.AddScoped<ReportingService>();
         services.AddScoped<WeeklyReportService>();
         services.AddScoped<ReportInquiryService>();
+        services.AddScoped<TenderPursuitService>();
         services.AddScoped<CalibrationService>();
         services.AddScoped<AiSecondOpinionService>();
         services.AddScoped<ErpConnectionService>();
