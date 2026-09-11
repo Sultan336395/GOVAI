@@ -205,6 +205,25 @@ describe('ErpConnectionPage', () => {
       .getAttribute('aria-invalid')).toBe('false')
   })
 
+  it('EW8. Bağlantı YOKKEN hata gösterilmez, boş form açılır', async () => {
+    // Sunucu bağlantı yoksa 204 döner ve istemci null görür. "Bağlantı yok" bir hata
+    // değil, kurulumun başlangıç durumudur; ekranda "data is undefined" yazamaz.
+    getErpConnection.mockResolvedValue(null)
+
+    const { container } = ekranaBas()
+
+    await waitFor(() => expect(screen.getByText('Bağlantı Ayarları')).toBeTruthy())
+
+    expect(screen.queryByText(/undefined/)).toBeNull()
+
+    // Alanlar boş ve düzenlenebilir gelir; kullanıcı kuruluma başlayabilir.
+    expect((container.querySelector('#baseUrl') as HTMLInputElement).value).toBe('')
+    expect((screen.getByLabelText('Kadın çalışan') as HTMLInputElement).value).toBe('')
+
+    // Bağlantı kurulmadan deneme çekimi yapılamaz.
+    expect((screen.getByText('Şimdi Dene ve Çek') as HTMLButtonElement).disabled).toBe(true)
+  })
+
   it('EW7. Durdurulmuş bağlantının sebebi yazılır', async () => {
     getErpConnection.mockResolvedValue({
       ...baglanti,

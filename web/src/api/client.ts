@@ -297,9 +297,15 @@ export const api = {
 
   // ---- ERP bağlantısı ----
 
-  /** Bağlantı kurulmamışsa sunucu 204 döner; istemci null görür. */
-  getErpConnection: (companyId: string) =>
-    request<ErpConnection | null>(`/api/erp/companies/${companyId}/connection`),
+  /**
+   * Bağlantı kurulmamışsa sunucu 204 döner.
+   *
+   * `request` gövdesiz yanıtta `undefined` üretir; React Query ise `undefined` veriyi
+   * HATA sayar ve ekranda "data is undefined" yazar. "Bağlantı yok" bir hata değil,
+   * geçerli bir durumdur — bu yüzden açıkça `null`a çevrilir.
+   */
+  getErpConnection: async (companyId: string) =>
+    (await request<ErpConnection | null>(`/api/erp/companies/${companyId}/connection`)) ?? null,
 
   upsertErpConnection: (companyId: string, body: UpsertErpConnectionRequest) =>
     request<ErpConnection>(`/api/erp/companies/${companyId}/connection`, {

@@ -148,13 +148,7 @@ export function buildNavigation({
   }
 
   const groups: NavGroup[] = [
-    // Şirket Yönetimi EN ÜSTTE durur.
-    //
-    // Ürünün her çıktısı firma profiline dayanır: profil eksikse skorlar belirsiz çıkar,
-    // haftalık rapor "değerlendirme yapılamadı" der ve ERP bağlantısı kurulmadan veri
-    // elle girilmeyi bekler. Kullanıcının önce göreceği yer, diğer ekranların beslendiği
-    // yer olmalıdır.
-    { title: 'Şirket Yönetimi', items: companyItems },
+    // Genel en üstte: menünün ilk satırı, kullanıcının her girişte döndüğü yer olmalı.
     {
       title: 'Genel',
       items: [
@@ -162,6 +156,13 @@ export function buildNavigation({
         { to: '/notifications', label: 'Bildirimler', icon: 'notifications' },
       ],
     },
+
+    // Şirket Yönetimi hemen ardından gelir.
+    //
+    // Ürünün her çıktısı firma profiline dayanır: profil eksikse skorlar belirsiz çıkar,
+    // haftalık rapor "değerlendirme yapılamadı" der ve ERP bağlantısı kurulmadan veri
+    // elle girilmeyi bekler. Diğer ekranların beslendiği yer, onlardan önce durmalıdır.
+    { title: 'Şirket Yönetimi', items: companyItems },
     {
       title: 'Fırsat ve Analiz',
       items: [
