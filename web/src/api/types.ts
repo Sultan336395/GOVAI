@@ -1436,21 +1436,26 @@ export type ErpAuthMode = 'ApiKeyHeader' | 'BearerToken' | 'BasicAuth'
 
 export type ErpSyncStatus = 'NeverRun' | 'Succeeded' | 'NoChange' | 'Failed'
 
-/** ERP yanıtındaki alanların GOVAI alanlarına eşlemesi. Nokta yolu kullanır. */
+/**
+ * ERP yanıtındaki alanların GOVAI alanlarına eşlemesi. Nokta yolu kullanır.
+ *
+ * Alanlar isteğe bağlıdır: sunucu boş değerleri yanıttan çıkarır, bu yüzden tanımlı
+ * olmayan bir eşleme satırı `undefined` gelir.
+ */
 export interface ErpFieldMap {
-  annualRevenue: string | null
-  balanceSize: string | null
-  equity: string | null
-  exportRevenue: string | null
-  employeeCount: string | null
-  womenEmployeeCount: string | null
-  youngEmployeeCount: string | null
-  rAndDEmployeeCount: string | null
-  disabledEmployeeCount: string | null
-  youngEmployeeMaxAge: string | null
-  certificates: string | null
-  certificateCodeField: string | null
-  certificateValidUntilField: string | null
+  annualRevenue?: string | null
+  balanceSize?: string | null
+  equity?: string | null
+  exportRevenue?: string | null
+  employeeCount?: string | null
+  womenEmployeeCount?: string | null
+  youngEmployeeCount?: string | null
+  rAndDEmployeeCount?: string | null
+  disabledEmployeeCount?: string | null
+  youngEmployeeMaxAge?: string | null
+  certificates?: string | null
+  certificateCodeField?: string | null
+  certificateValidUntilField?: string | null
 }
 
 export interface ErpConnection {

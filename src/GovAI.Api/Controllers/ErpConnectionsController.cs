@@ -1,5 +1,6 @@
 using GovAI.Api.Infrastructure;
 using GovAI.Application.Integrations;
+using GovAI.Domain.Integrations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -26,6 +27,20 @@ public sealed class ErpConnectionsController(
     ErpConnectionService connections,
     ErpPullService pull) : ControllerBase
 {
+    /// <summary>
+    /// Bir ürünün varsayılan alan eşlemesi.
+    ///
+    /// <para>
+    /// Arayüz "ürün varsayılanına dön" derken bu ucu çağırır. Varsayılanların istemciye
+    /// kopyalanması, iki tarafın zamanla ayrışması demek olurdu; alan adlarının tek
+    /// kaynağı sunucudur (bkz. CLAUDE.md §3).
+    /// </para>
+    /// </summary>
+    [HttpGet("field-map-defaults/{vendor}")]
+    [Produces("application/json")]
+    public ActionResult<ErpFieldMap> FieldMapDefaults(ErpVendor vendor) =>
+        Ok(ErpFieldMap.Default(vendor));
+
     /// <summary>Firmanın ERP bağlantısı. Kurulmamışsa <c>204</c> döner.</summary>
     [HttpGet("companies/{companyId:guid}/connection")]
     [Produces("application/json")]

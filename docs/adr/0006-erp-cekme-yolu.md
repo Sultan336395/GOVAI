@@ -93,6 +93,15 @@ açılmaz; kullanıcı sorunu görüp ayarları kaydettiğinde açılır.
 **"Değişiklik yok" hata sayılmaz.** ERP'ye ulaşıldı ve veri okundu, yalnızca profil zaten
 güncel. Bunu hata saymak sağlıklı bir bağlantıyı beş gecede kapatırdı.
 
+**Eşleme panelden düzenlenir.** Her satır bir metin alanıdır ve boş bırakılması "bu alanı
+ERP'den okuma" demektir — profildeki mevcut değer korunur. "Ürün varsayılanını yükle"
+düğmesi varsayılanları **sunucudan** ister; istemciye kopyalamak, iki tarafın zamanla
+ayrışması ve ekranda geçerli görünen bir eşlemenin sunucuda tutmaması demek olurdu
+(CLAUDE.md §3 ile aynı gerekçe).
+
+**Deneme çekiminde bulunamayan alanlar tabloda işaretlenir.** Kullanıcı hangi satırı
+düzelteceğini prozadan çıkarmak zorunda kalmaz.
+
 **Kimlik hiçbir yanıtta dönmez.** Ekran yalnızca "kayıtlı" bilgisini görür; boş bırakılan
 alan mevcut kimliği korur. Gösterilen bir sır, ekran görüntüsüne ve tarayıcı geçmişine düşer.
 
@@ -117,7 +126,13 @@ yazmaktan çok daha küçüktür ve bir kez yapılır.
 `ErpFieldMapTests` (4) ve `ErpConnectionTests` — alan modeli (5): varsayılan eşlemeler,
 bilinmeyen üründe ad uydurulmaması, hata sayacı ve kendiliğinden durma.
 
-`ErpConnectionTests` — API (12): kimliğin yanıtta dönmemesi, veritabanında açık
+`ErpConnectionTests` — API (14): kimliğin yanıtta dönmemesi, veritabanında açık
 saklanmaması, boş gönderimin mevcudu silmemesi, firma başına tek bağlantı, kurum içi
-adresin beyansız reddi, **metadata adresine beyanla dahi gidilmemesi**, kiracı yalıtımı ve
-platform rollerinin girememesi.
+adresin beyansız reddi, **metadata adresine beyanla dahi gidilmemesi**, kiracı yalıtımı,
+platform rollerinin girememesi, düzenlenen eşlemenin kalıcı olması ve ürün
+varsayılanlarının sunucudan gelmesi.
+
+`ErpConnectionPage.test.tsx` (7): kayıtlı kimliğin ekranda gösterilmemesi, eşlemenin
+kayıtlı değerlerle dolu gelmesi, düzenlenen değerin kaydetme isteğine girmesi, boşaltılan
+satırın `null` gitmesi, varsayılanın sunucudan istenmesi ve bulunamayan alanların
+işaretlenmesi.

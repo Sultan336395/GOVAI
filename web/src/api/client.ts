@@ -48,6 +48,8 @@ import type {
   ErpConnection,
   UpsertErpConnectionRequest,
   ErpPullResult,
+  ErpFieldMap,
+  ErpVendor,
 } from './types'
 
 const TOKEN_STORAGE_KEY = 'govai.token'
@@ -307,6 +309,10 @@ export const api = {
 
   pullErpProfile: (companyId: string) =>
     request<ErpPullResult>(`/api/erp/companies/${companyId}/pull`, { method: 'POST' }),
+
+  /** Ürün varsayılan eşlemesi. Alan adlarının tek kaynağı sunucudur. */
+  getErpFieldMapDefaults: (vendor: ErpVendor) =>
+    request<ErpFieldMap>(`/api/erp/field-map-defaults/${vendor}`),
 
   deleteErpConnection: (companyId: string) =>
     request<void>(`/api/erp/companies/${companyId}/connection`, { method: 'DELETE' }),

@@ -157,6 +157,58 @@ public sealed class ErpConnectionTests(GovAiApiFactory factory)
         Assert.Equal("mali.yillikCiro", esleme.GetProperty("annualRevenue").GetString());
     }
 
+    [Fact(DisplayName = "EA13. Panelden düzenlenen eşleme SAKLANIR ve geri okunur")]
+    public async Task Duzenlenen_esleme_saklanir()
+    {
+        // Varsayılan eşleme her kurulumda tutmaz; kullanıcının yazdığı alan adı kalıcı
+        // olmalı, aksi hâlde her kaydetmede varsayılana dönerdi.
+        var kur = await _tenantAdmin.PutAsJsonAsync($"/api/erp/companies/{_companyId}/connection", new
+        {
+            vendor = "Logo",
+            baseUrl = "https://erp.ornek.com/api/govai",
+            authMode = "ApiKeyHeader",
+            secret = Gizli,
+            isOnPremise = false,
+            fieldMap = new
+            {
+                annualRevenue = "muhasebe.ciro2026",
+                womenEmployeeCount = "ik.kadinSayisi",
+                employeeCount = "ik.toplam",
+            },
+        });
+
+        kur.EnsureSuccessStatusCode();
+
+        var oku = await _tenantAdmin.GetFromJsonAsync<JsonElement>(
+            $"/api/erp/companies/{_companyId}/connection");
+
+        var esleme = oku.GetProperty("fieldMap");
+
+        Assert.Equal("muhasebe.ciro2026", esleme.GetProperty("annualRevenue").GetString());
+        Assert.Equal("ik.kadinSayisi", esleme.GetProperty("womenEmployeeCount").GetString());
+
+        // Verilmeyen alan UYDURULMAZ: varsayılana geri düşmez. API boş alanları
+        // yanıttan çıkardığı için alan ya hiç yoktur ya da null'dır.
+        var varMi = esleme.TryGetProperty("equity", out var ozkaynak);
+
+        Assert.True(!varMi || ozkaynak.ValueKind == JsonValueKind.Null);
+    }
+
+    [Fact(DisplayName = "EA14. Ürün varsayılan eşlemesi sunucudan alınabilir")]
+    public async Task Varsayilan_esleme_sunucudan_alinir()
+    {
+        // Varsayılanları istemciye kopyalamak, iki tarafın zamanla ayrışması demek
+        // olurdu; alan adlarının tek kaynağı sunucudur.
+        var logo = await _tenantAdmin.GetFromJsonAsync<JsonElement>(
+            "/api/erp/field-map-defaults/Logo");
+
+        var sap = await _tenantAdmin.GetFromJsonAsync<JsonElement>(
+            "/api/erp/field-map-defaults/Sap");
+
+        Assert.Equal("personel.kadin", logo.GetProperty("womenEmployeeCount").GetString());
+        Assert.Equal("workforce.femaleHeadcount", sap.GetProperty("womenEmployeeCount").GetString());
+    }
+
     [Fact(DisplayName = "EA7. Kurum içi adres BEYAN OLMADAN reddedilir")]
     public async Task Kurum_ici_adres_beyansiz_reddedilir()
     {
