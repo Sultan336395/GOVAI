@@ -5,6 +5,7 @@ using GovAI.Infrastructure.Caching;
 using GovAI.Infrastructure.Identity;
 using GovAI.Infrastructure.Messaging;
 using GovAI.Infrastructure.Integrations;
+using GovAI.Infrastructure.Notifications;
 using GovAI.Infrastructure.Options;
 using GovAI.Infrastructure.Reporting;
 using GovAI.Infrastructure.Sources;
@@ -41,6 +42,7 @@ public static class DependencyInjection
         services.Configure<OpenAiOptions>(configuration.GetSection(OpenAiOptions.SectionName));
         services.Configure<RedisOptions>(configuration.GetSection(RedisOptions.SectionName));
         services.Configure<RabbitMqOptions>(configuration.GetSection(RabbitMqOptions.SectionName));
+        services.Configure<EmailOptions>(configuration.GetSection(EmailOptions.SectionName));
 
         services.AddHttpContextAccessor();
         services.AddSingleton<IDateTimeProvider, SystemDateTimeProvider>();
@@ -75,6 +77,7 @@ public static class DependencyInjection
         AddCache(services, configuration);
         AddMessaging(services, configuration);
 
+        AddEmail(services, configuration);
         return services;
     }
 
@@ -167,6 +170,31 @@ public static class DependencyInjection
                 return new NullCacheService();
             }
         });
+    }
+
+    /// <summary>
+    /// E-posta adaptörü.
+    ///
+    /// <para>
+    /// Yapılandırma eksikse <see cref="DisabledEmailSender"/> kaydedilir ve bu adaptör
+    /// gönderilmiş <b>gibi davranmaz</b>: bildirim hattı onu görüp gönderimi hiç
+    /// denemez, kaydı "gönderildi" işaretlemez. Sistem e-postasız çalışmaya devam
+    /// eder; bildirimler panelde görünür.
+    /// </para>
+    /// </summary>
+    private static void AddEmail(IServiceCollection services, IConfiguration configuration)
+    {
+        var options = configuration.GetSection(EmailOptions.SectionName).Get<EmailOptions>()
+                      ?? new EmailOptions();
+
+        if (options.IsConfigured)
+        {
+            services.AddSingleton<IEmailSender, SmtpEmailSender>();
+        }
+        else
+        {
+            services.AddSingleton<IEmailSender, DisabledEmailSender>();
+        }
     }
 
     private static void AddMessaging(IServiceCollection services, IConfiguration configuration)

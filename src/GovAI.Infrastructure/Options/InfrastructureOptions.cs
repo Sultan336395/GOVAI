@@ -68,3 +68,53 @@ public sealed class RabbitMqOptions
 
     public bool Enabled { get; set; } = true;
 }
+
+/// <summary>
+/// SMTP ayarları.
+///
+/// <para>
+/// Parola <b>bu sınıfta varsayılan almaz</b> ve hiçbir yerde loglanmaz. Eksik
+/// yapılandırmada sistem çalışmaya devam eder: bildirim panelde görünür, yalnızca
+/// e-posta gitmez (<see cref="IsConfigured"/>).
+/// </para>
+/// </summary>
+public sealed class EmailOptions
+{
+    public const string SectionName = "Email";
+
+    /// <summary>Kapalıyken gönderim hiç denenmez; bildirimler panelde kalır.</summary>
+    public bool Enabled { get; set; }
+
+    public string Host { get; set; } = string.Empty;
+
+    public int Port { get; set; } = 587;
+
+    /// <summary>
+    /// 587 için STARTTLS, 465 için baştan TLS. Şifresiz bağlantı desteklenmez:
+    /// kimlik bilgisi ve personel verisi açık ağdan geçerdi.
+    /// </summary>
+    public bool UseStartTls { get; set; } = true;
+
+    public string UserName { get; set; } = string.Empty;
+
+    public string Password { get; set; } = string.Empty;
+
+    public string FromAddress { get; set; } = string.Empty;
+
+    public string FromName { get; set; } = "GOVAI";
+
+    public int TimeoutSeconds { get; set; } = 30;
+
+    /// <summary>Tek bir e-postadaki azami alıcı; kalabalık liste sunucuda reddedilir.</summary>
+    public int MaxRecipients { get; set; } = 50;
+
+    /// <summary>
+    /// Dördü birden verilmezse gönderim yapılmaz. Kullanıcı adı bilerek zorunlu
+    /// değildir: kurum içi röle sunucuları kimlik istemeyebilir.
+    /// </summary>
+    public bool IsConfigured =>
+        Enabled
+        && !string.IsNullOrWhiteSpace(Host)
+        && Port > 0
+        && !string.IsNullOrWhiteSpace(FromAddress);
+}

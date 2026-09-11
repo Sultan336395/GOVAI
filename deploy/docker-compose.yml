@@ -117,6 +117,21 @@ services:
       GOVAI_AI_MAX_RETRIES: ${GOVAI_AI_MAX_RETRIES:-2}
       Redis__Enabled: "true"
       Redis__ConnectionString: "redis:6379"
+      # E-posta bildirimi. KAPALI varsayılandır ve kapalıyken sistem çalışmaya devam
+      # eder: bildirimler panelde görünür, yalnızca e-posta gitmez.
+      #
+      # Parola BU DOSYAYA YAZILMAZ; yalnızca sunucudaki .env dosyasından gelir.
+      # Şifresiz SMTP desteklenmez: bildirim gövdesi firmanın hangi çağrıya hangi
+      # eksikle baktığını taşır.
+      Email__Enabled: ${EMAIL_ENABLED:-false}
+      Email__Host: ${EMAIL_HOST:-}
+      Email__Port: ${EMAIL_PORT:-587}
+      Email__UseStartTls: ${EMAIL_USE_STARTTLS:-true}
+      Email__UserName: ${EMAIL_USERNAME:-}
+      Email__Password: ${EMAIL_PASSWORD:-}
+      Email__FromAddress: ${EMAIL_FROM_ADDRESS:-}
+      Email__FromName: ${EMAIL_FROM_NAME:-GOVAI}
+
       RabbitMq__Enabled: "true"
       RabbitMq__HostName: rabbitmq
       RabbitMq__UserName: ${RABBITMQ_USER:-govai}

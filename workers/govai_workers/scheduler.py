@@ -41,11 +41,29 @@ def _trigger_due_crawls(client: GovAiClient) -> None:
 
 
 def _dispatch_notifications(client: GovAiClient) -> None:
+    """Bekleyen bildirimleri kanallarına aktarır.
+
+    Log "işlendi" değil **ne olduğunu** yazar: kaçı gerçekten gönderildi, kaçı
+    başarısız oldu, kaçı kanalı yapılandırılmadığı için beklemede kaldı. Tek bir
+    "işlendi" sayısı, hiç ulaşmayan bildirimleri başarı gibi gösteriyordu.
+    """
     try:
-        result = client.dispatch_notifications(batch_size=200)
-        count = (result or {}).get("processedCount", 0)
-        if count:
-            log.info("notifications_dispatched", count=count)
+        result = client.dispatch_notifications(batch_size=200) or {}
+        processed = result.get("processedCount", 0)
+        failed = result.get("failedCount", 0)
+        skipped = result.get("skippedCount", 0)
+
+        if processed:
+            log.info(
+                "notifications_dispatched",
+                processed=processed,
+                sent=result.get("sentCount", 0),
+                failed=failed,
+                skipped=skipped,
+            )
+
+        if failed:
+            log.warning("notification_delivery_failed", count=failed)
     except ApiError:
         log.exception("notification_dispatch_failed")
 

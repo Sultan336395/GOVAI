@@ -233,6 +233,36 @@ Kayıt **silinmez**; bırakılan takip `Vazgecildi` olur.
 
 Koruyan testler: `TenderPursuitTests` alan modeli (13) ve API (10).
 
+### 2.2.7 "Gönderildi" damgası gerçekten gönderilince basılır
+
+Bildirim kaydı, kanalına **ulaştığı** an gönderilmiş sayılır. Eskiden e-posta kuyruğa
+bırakılır bırakılmaz `MarkSent` çağrılıyordu; kuyruğun ucunda tüketici olmadığı için
+hiç ulaşmayan hatırlatmalar panelde "gönderildi" görünüyordu — kullanıcının almadığı
+bir uyarıyı almış sanması demekti.
+
+| Durum | Ne olur |
+|---|---|
+| Gönderildi | `MarkSent`; hata alanı temizlenir |
+| Denendi, başarısız | `MarkFailed(sebep)`; `SentAt` boş kalır, en fazla üç kez denenir |
+| SMTP yapılandırılmamış | Hiç denenmez; **deneme hakkı harcanmaz**, bildirim bekler |
+| Alıcı yok | Başarısız sayılır; "gönderildi" yazılmaz |
+
+Son satır önemlidir: hak harcansaydı, SMTP sonradan tanımlandığında birikmiş
+hatırlatmalar üç denemeyi çoktan doldurmuş olur ve hiç gitmezdi.
+
+Alıcılar bildirimde **saklanmaz**, gönderim anında çözülür. Saklansaydı liste kayıt
+oluşturulduğu andaki ekiple donardı: ayrılan kişiye posta gider, yeni gelen hiçbir
+hatırlatma almazdı. Görüntüleyici rolü listede yoktur; tanım gereği pasif izleyicidir.
+
+Şifresiz SMTP desteklenmez ve SMTP sunucusunun hata gövdesi kullanıcıya
+yansıtılmaz — gövde kullanıcı adı ve iç sunucu adları taşıyabilir.
+
+**Bilinen sınır:** gönderim turu çağıran oturumun kiracısıyla sınırlıdır (EF kiracı
+süzgeci). Tek kiracılı kurulumda sorun değildir; çok kiracılıya geçildiğinde tur
+kiracı başına çalıştırılmalıdır.
+
+Koruyan testler: `NotificationDispatchTests` (7).
+
 ### 2.3 Skor ağırlıklarının toplamı 1.0'dır
 
 `ScoreWeights` yapıcısı bunu doğrular ve ihlalde `DomainException` atar.
@@ -302,7 +332,7 @@ Solution dosyası **`GovAI.slnx`**'tir (yeni XML formatı), `.sln` değil.
 
 ```bash
 dotnet build -c Release          # tüm .NET projeleri
-dotnet test                      # 1047 test (251 domain + 420 application + 376 API)
+dotnet test                      # 1054 test (251 domain + 427 application + 376 API)
 ```
 
 ```bash
@@ -477,7 +507,7 @@ Bunlar hata değil, bilinçli ertelemedir. Tamamı gerekçesi ve hedef ayıyla
 |---|---|
 | OCR | Taranmış PDF'lerde metin çıkmaz; parser bunu loglar |
 | Refresh token | Üretiliyor ama sunucuda saklanmıyor; süre dolunca yeniden giriş |
-| E-posta / webhook gönderimi | Bildirim üretiliyor ve kuyruğa bırakılıyor, gerçek adaptör yok |
+| Webhook gönderimi | Bildirim kuyruğa bırakılıyor, gerçek adaptör yok (e-posta adaptörü Faz 4'te eklendi) |
 | ERP adaptörleri | Çekme yolu kuruldu (`/api/erp`); ürün varsayılan eşlemeleri **gerçek kurulumda doğrulanmadı** — "Şimdi Dene ve Çek" bunun için var |
 | Ağırlık kalibrasyonu | Ölçüm altyapısı hazır (`/api/calibration`); ağırlıklar henüz gerçek vaka verisiyle kalibre edilmedi — örneklem birikiyor |
 | Kod bölme | Bundle ~714 KB, tek parça |

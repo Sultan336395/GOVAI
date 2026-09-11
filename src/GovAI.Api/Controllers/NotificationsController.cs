@@ -46,8 +46,13 @@ public sealed class NotificationsController(NotificationService service, ICurren
         Ok(await service.MarkReadAsync(id, cancellationToken));
 
     /// <summary>
-    /// Gönderilmemiş bildirimleri dış kanallara aktarılmak üzere kuyruğa bırakır.
-    /// Zamanlanmış worker tarafından çağrılır.
+    /// Gönderilmemiş bildirimleri kanallarına aktarır. Zamanlanmış worker çağırır.
+    ///
+    /// <para>
+    /// Cevap işlenen sayıyı değil <b>ne olduğunu</b> döner: kaçı gerçekten gönderildi,
+    /// kaçı başarısız oldu, kaçı kanal yapılandırılmadığı için beklemede kaldı. Tek bir
+    /// "işlendi" sayısı, hiç ulaşmayan bildirimleri başarı gibi gösteriyordu.
+    /// </para>
     /// </summary>
     [HttpPost("dispatch")]
     [Authorize(Policy = Policies.SystemIngest)]
@@ -56,9 +61,14 @@ public sealed class NotificationsController(NotificationService service, ICurren
         [FromQuery] int batchSize = 100,
         CancellationToken cancellationToken = default)
     {
-        var count = await service.DispatchPendingAsync(batchSize, cancellationToken);
-        return Ok(new DispatchResponse(count));
+        var sonuc = await service.DispatchPendingAsync(batchSize, cancellationToken);
+
+        return Ok(new DispatchResponse(sonuc.Processed, sonuc.Sent, sonuc.Failed, sonuc.Skipped));
     }
 
-    public sealed record DispatchResponse(int ProcessedCount);
+    public sealed record DispatchResponse(
+        int ProcessedCount,
+        int SentCount,
+        int FailedCount,
+        int SkippedCount);
 }

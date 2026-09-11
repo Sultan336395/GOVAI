@@ -298,6 +298,18 @@ girmedik" sorusunun cevabı geçmişiyle kalır.
 | POST | `/api/notifications/{id}/read` | Read |
 | POST | `/api/notifications/dispatch` | SuperAdmin |
 
+`dispatch` cevabı işlenen sayıyı değil **ne olduğunu** döner: `processedCount`,
+`sentCount`, `failedCount`, `skippedCount`.
+
+"Gönderildi" damgası yalnızca **gerçekten gönderilince** basılır. SMTP
+yapılandırılmamışsa e-posta bildirimi `skipped` sayılır ve deneme hakkı harcanmaz;
+yapılandırma tamamlandığında birikmiş bildirimler gider. Başarısız gönderim sebebiyle
+birlikte kayda yazılır ve en fazla üç kez denenir.
+
+Alıcılar bildirimde saklanmaz, gönderim anında çözülür: firmanın **etkin** üyeleri,
+görüntüleyici rolü hariç. Firma bağlantısı olmayan sistem uyarıları kiracı
+yöneticilerine gider.
+
 ## `/api/admin` — kullanıcı yönetimi, audit log
 
 | Metot | Yol | Yetki |
