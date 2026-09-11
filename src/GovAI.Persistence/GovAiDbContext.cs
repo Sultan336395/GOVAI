@@ -74,6 +74,7 @@ public class GovAiDbContext(
     public DbSet<TenderPursuit> TenderPursuits => Set<TenderPursuit>();
     public DbSet<TenderPursuitEvent> TenderPursuitEvents => Set<TenderPursuitEvent>();
     public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<NotificationRecipient> NotificationRecipients => Set<NotificationRecipient>();
     public DbSet<AuditLogEntry> AuditLog => Set<AuditLogEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -179,6 +180,9 @@ public class GovAiDbContext(
 
         modelBuilder.Entity<Notification>()
             .HasQueryFilter(n => n.TenantId == _tenantId);
+
+        modelBuilder.Entity<NotificationRecipient>()
+            .HasQueryFilter(r => r.TenantId == _tenantId);
 
         // AuditLogEntry.TenantId nullable'dır (kiracı belirlenemeden oluşan kayıtlar için).
         // Kiracısı olmayan kayıtlar hiçbir kiracıya gösterilmez.

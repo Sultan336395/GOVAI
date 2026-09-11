@@ -23,7 +23,24 @@ public sealed record NotificationDto(
 /// <param name="Sent">Gerçekten gönderilen.</param>
 /// <param name="Failed">Denendi ve başarısız oldu; sebebi kayda yazıldı.</param>
 /// <param name="Skipped">Kanalı yapılandırılmadığı için hiç denenmedi; deneme hakkı harcanmadı.</param>
-public sealed record NotificationDispatchResult(int Processed, int Sent, int Failed, int Skipped);
+/// <summary>
+/// Bir gönderim turunun sonucu.
+///
+/// <para>
+/// Dört sonuç ayrı sayılır. Tek bir "işlendi" sayısı, hiç ulaşmayan bildirimleri
+/// başarı gibi gösteriyordu; <see cref="RecipientMissing"/> ise bir arıza değil
+/// <b>eksik kurulum</b> işaretidir ve başarısızlıkla aynı kefeye konursa gerçek SMTP
+/// hataları görünmez olur.
+/// </para>
+/// </summary>
+public sealed record NotificationDispatchResult(
+    int Processed,
+    int Sent,
+    int Failed,
+    /// <summary>Kanalı yapılandırılmadığı için bekleyenler. Deneme hakkı harcanmadı.</summary>
+    int Skipped,
+    /// <summary>Şirkette tanımlı alıcı olmadığı için gönderilemeyenler.</summary>
+    int RecipientMissing);
 
 /// <summary>
 /// Bildirim ve Hatırlatma Modülü (Modül 10) use-case servisi.
@@ -104,6 +121,7 @@ public sealed class NotificationService(
         var gonderilen = 0;
         var basarisiz = 0;
         var atlanan = 0;
+        var alicisiz = 0;
 
         foreach (var notification in pending)
         {
@@ -122,19 +140,29 @@ public sealed class NotificationService(
                     break;
 
                 case NotificationChannel.Email:
-                    if (await EpostaGonderAsync(notification, cancellationToken))
+                    switch (await EpostaGonderAsync(notification, cancellationToken))
                     {
-                        gonderilen++;
-                    }
-                    else
-                    {
-                        basarisiz++;
+                        case EmailDispatchOutcome.Sent:
+                            gonderilen++;
+                            break;
+
+                        case EmailDispatchOutcome.RecipientMissing:
+                            alicisiz++;
+                            break;
+
+                        default:
+                            basarisiz++;
+                            break;
                     }
 
                     break;
 
                 default:
-                    // Webhook ve sonraki kanallar hâlâ kuyruk üzerinden yürür.
+                    // Webhook ve sonraki kanallar hâlâ kuyruk üzerinden yürür ve
+                    // kuyruğun ucunda HENÜZ TÜKETİCİ YOK. Bu yüzden "gönderildi"
+                    // damgalanmaz: damgalansaydı hiç ulaşmayan bir bildirim panelde
+                    // gönderilmiş görünürdü — §2.2.7'nin düzelttiği hatanın ta kendisi.
+                    // Kayıt bekler; tüketici yazıldığında kaldığı yerden alınır.
                     await events.PublishAsync(
                         QueueNames.NotificationDispatchRequested,
                         new
@@ -147,8 +175,7 @@ public sealed class NotificationService(
                         },
                         cancellationToken);
 
-                    notification.MarkSent(clock.UtcNow);
-                    gonderilen++;
+                    atlanan++;
                     break;
             }
         }
@@ -158,15 +185,29 @@ public sealed class NotificationService(
         if (pending.Count > 0)
         {
             logger.LogInformation(
-                "Bildirim gönderimi: {Sent} gönderildi, {Failed} başarısız, {Skipped} beklemede.",
-                gonderilen, basarisiz, atlanan);
+                "Bildirim gönderimi: {Sent} gönderildi, {Failed} başarısız, "
+                + "{RecipientMissing} alıcısız, {Skipped} beklemede.",
+                gonderilen, basarisiz, alicisiz, atlanan);
         }
 
-        return new NotificationDispatchResult(pending.Count, gonderilen, basarisiz, atlanan);
+        return new NotificationDispatchResult(
+            pending.Count, gonderilen, basarisiz, atlanan, alicisiz);
+    }
+
+    /// <summary>Tek bir e-posta gönderiminin sonucu.</summary>
+    private enum EmailDispatchOutcome
+    {
+        Sent,
+
+        /// <summary>Denendi, gönderilemedi. Deneme hakkı harcandı.</summary>
+        Failed,
+
+        /// <summary>Şirkette tanımlı alıcı yok. Deneme hakkı harcanmadı.</summary>
+        RecipientMissing
     }
 
     /// <summary>Tek bir bildirimi e-posta ile gönderir; sonucu kayda yazar.</summary>
-    private async Task<bool> EpostaGonderAsync(
+    private async Task<EmailDispatchOutcome> EpostaGonderAsync(
         Domain.Notifications.Notification notification,
         CancellationToken cancellationToken)
     {
@@ -175,10 +216,14 @@ public sealed class NotificationService(
 
         if (alicilar.Count == 0)
         {
-            // Alıcısı olmayan bildirim "gönderildi" sayılamaz; sebep kayda yazılır ve
-            // ekip tanımlandığında sonraki turda gider.
-            notification.MarkFailed("Bildirimi alacak etkin kullanıcı bulunamadı.");
-            return false;
+            // Alıcı tanımlı değil: bu bir gönderim HATASI DEĞİLDİR, eksik bir kurulumdur.
+            // Ayrı durum olarak kaydedilir ve deneme hakkı HARCANMAZ — sorumlusu bir
+            // hafta sonra ERP'de tanımlanan firmanın birikmiş uyarıları yoksa üç
+            // denemeyi çoktan doldurmuş olur ve hiç gitmezdi.
+            //
+            // Bildirim kaybolmaz: ERP modülünde görünmeye devam eder.
+            notification.MarkRecipientMissing();
+            return EmailDispatchOutcome.RecipientMissing;
         }
 
         var sonuc = await email.SendAsync(
@@ -193,11 +238,11 @@ public sealed class NotificationService(
         if (sonuc.Sent)
         {
             notification.MarkSent(clock.UtcNow);
-            return true;
+            return EmailDispatchOutcome.Sent;
         }
 
         notification.MarkFailed(sonuc.Error ?? "E-posta gönderilemedi.");
-        return false;
+        return EmailDispatchOutcome.Failed;
     }
 
     private static NotificationDto ToDto(Domain.Notifications.Notification notification) => new(

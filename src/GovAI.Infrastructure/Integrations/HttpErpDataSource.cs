@@ -266,6 +266,7 @@ public sealed class HttpErpDataSource(
                 DisabledEmployeeCount = Adet(esleme.DisabledEmployeeCount, "Engelli çalışan"),
                 YoungEmployeeMaxAge = Adet(esleme.YoungEmployeeMaxAge, "Genç çalışan üst yaşı"),
                 Certificates = Belgeler(kok, esleme, bulunamayan),
+                NotificationRecipients = Aliciar(kok, esleme, bulunamayan),
                 MissingFields = bulunamayan,
             };
         }
@@ -329,6 +330,99 @@ public sealed class HttpErpDataSource(
 
             _ => null,
         };
+    }
+
+    /// <summary>
+    /// ERP'de tanımlı bildirim sorumlularını çıkarır.
+    ///
+    /// <para>
+    /// Bölüm eşlemede yoksa <c>null</c> döner — "sorumlu yok" değil "bu ERP'de bu
+    /// bölüm tanımlı değil" demektir ve mevcut tanımlara dokunulmaz. Bölüm eşlemede
+    /// var ama yanıtta yoksa eksik alan olarak bildirilir ve yine <c>null</c> döner:
+    /// geçici bir ERP arızası yüzünden bütün sorumluları pasifleştirmek, firmayı
+    /// sessizce bildirimsiz bırakırdı.
+    /// </para>
+    /// </summary>
+    private static IReadOnlyList<ErpRecipient>? Aliciar(
+        JsonElement kok,
+        ErpFieldMap esleme,
+        List<string> bulunamayan)
+    {
+        if (string.IsNullOrWhiteSpace(esleme.NotificationRecipients))
+        {
+            return null;
+        }
+
+        if (!Bul(kok, esleme.NotificationRecipients, out var deger))
+        {
+            bulunamayan.Add("Bildirim sorumluları");
+            return null;
+        }
+
+        // Virgülle ayrılmış adres listesi: "ayse@firma.com, mehmet@firma.com"
+        if (deger.ValueKind == JsonValueKind.String)
+        {
+            return (deger.GetString() ?? string.Empty)
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(a => new ErpRecipient(a, null, null, null))
+                .ToList();
+        }
+
+        if (deger.ValueKind != JsonValueKind.Array)
+        {
+            return null;
+        }
+
+        var liste = new List<ErpRecipient>();
+
+        foreach (var oge in deger.EnumerateArray())
+        {
+            if (oge.ValueKind == JsonValueKind.String)
+            {
+                if (oge.GetString() is { Length: > 0 } adres)
+                {
+                    liste.Add(new ErpRecipient(adres.Trim(), null, null, null));
+                }
+
+                continue;
+            }
+
+            if (oge.ValueKind != JsonValueKind.Object)
+            {
+                continue;
+            }
+
+            var epostaAlani = esleme.RecipientEmailField ?? "email";
+
+            if (!oge.TryGetProperty(epostaAlani, out var epostaDeger)
+                || epostaDeger.GetString() is not { Length: > 0 } eposta)
+            {
+                continue;
+            }
+
+            liste.Add(new ErpRecipient(
+                eposta.Trim(),
+                Metin(oge, esleme.RecipientNameField),
+                Metin(oge, esleme.RecipientRoleField),
+                Metin(oge, esleme.RecipientExternalIdField)));
+        }
+
+        return liste;
+    }
+
+    /// <summary>Nesne içindeki isteğe bağlı metin alanı; yoksa <c>null</c>.</summary>
+    private static string? Metin(JsonElement oge, string? alan)
+    {
+        if (string.IsNullOrWhiteSpace(alan)
+            || !oge.TryGetProperty(alan, out var deger)
+            || deger.ValueKind != JsonValueKind.String)
+        {
+            return null;
+        }
+
+        var metin = deger.GetString();
+
+        return string.IsNullOrWhiteSpace(metin) ? null : metin.Trim();
     }
 
     private static IReadOnlyList<ErpCertificate> Belgeler(

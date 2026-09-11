@@ -1,6 +1,7 @@
 using GovAI.Application.Abstractions.Persistence;
 using GovAI.Application.Abstractions.Services;
 using GovAI.Application.Common;
+using GovAI.Application.Notifications;
 using GovAI.Application.Companies;
 using GovAI.Domain.Common;
 using GovAI.Domain.Integrations;
@@ -42,6 +43,7 @@ public sealed record ErpPullBatchResultDto(
 public sealed class ErpPullService(
     IErpConnectionRepository connections,
     ICompanyRepository companies,
+    INotificationRecipientRepository recipients,
     CompanyProfileService profiles,
     IErpDataSource dataSource,
     IUnitOfWork unitOfWork,
@@ -119,6 +121,53 @@ public sealed class ErpPullService(
         return new ErpPullBatchResultDto(hepsi.Count, basarili, degismeyen, hatali);
     }
 
+    /// <summary>
+    /// ERP'de tanımlı bildirim sorumlularını mevcut kayıtlarla uzlaştırır.
+    ///
+    /// <para>
+    /// Alıcılar profil hattından (<c>SyncFromErpAsync</c>) geçmez: profil kural
+    /// motorunun okuduğu veridir ve sürümlenir, alıcı listesi ise skoru hiç
+    /// etkilemeyen bir iletişim ayarıdır. Birleştirilseydi sorumlu değişikliği
+    /// profil sürümünü artırır ve gereksiz yere bütün çağrıları yeniden skorlatırdı.
+    /// </para>
+    /// </summary>
+    private async Task<RecipientSyncResult> AliciarıUzlastirAsync(
+        ErpConnection connection,
+        ErpSnapshot goruntu,
+        CancellationToken cancellationToken)
+    {
+        if (goruntu.NotificationRecipients is null)
+        {
+            return RecipientSyncResult.None;
+        }
+
+        var mevcut = await recipients.ListForCompanyAsync(connection.CompanyId, cancellationToken);
+
+        var sonuc = NotificationRecipientSync.Reconcile(
+            connection.TenantId,
+            connection.CompanyId,
+            mevcut,
+            goruntu.NotificationRecipients
+                .Select(a => new IncomingRecipient(a.Email, a.FullName, a.Role, a.ExternalId))
+                .ToList());
+
+        foreach (var yeni in sonuc.Added)
+        {
+            await recipients.AddAsync(yeni, cancellationToken);
+        }
+
+        if (sonuc.Changed || sonuc.Invalid.Count > 0)
+        {
+            logger.LogInformation(
+                "ERP bildirim sorumluları uzlaştırıldı. CompanyId={CompanyId} Eklenen={Added} "
+                + "YenidenEtkin={Reactivated} Pasifleşen={Deactivated} Geçersiz={Invalid}",
+                connection.CompanyId, sonuc.Added.Count, sonuc.Reactivated, sonuc.Deactivated,
+                sonuc.Invalid.Count);
+        }
+
+        return sonuc;
+    }
+
     private async Task<ErpPullResultDto> PullAsync(
         ErpConnection connection,
         CancellationToken cancellationToken)
@@ -143,6 +192,11 @@ public sealed class ErpPullService(
             return new ErpPullResultDto(
                 connection.CompanyId, ErpSyncStatus.Failed, [], [], exception.Message);
         }
+
+        // Bildirim sorumluları profilden AYRI uzlaştırılır ve profil verisi boş olsa
+        // da işlenir: ERP'sinde yalnızca sorumlu listesi tanımlı bir firmada, profil
+        // alanları bulunamadı diye sorumlular da atlanırsa firma bildirimsiz kalırdı.
+        var aliciSonucu = await AliciarıUzlastirAsync(connection, goruntu, cancellationToken);
 
         if (goruntu.IsEmpty)
         {

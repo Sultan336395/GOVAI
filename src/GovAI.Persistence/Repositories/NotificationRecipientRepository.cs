@@ -1,5 +1,5 @@
 using GovAI.Application.Abstractions.Persistence;
-using GovAI.Domain.Common;
+using GovAI.Domain.Notifications;
 using Microsoft.EntityFrameworkCore;
 
 namespace GovAI.Persistence.Repositories;
@@ -8,44 +8,46 @@ namespace GovAI.Persistence.Repositories;
 /// Bildirim alıcılarının veri erişimi.
 ///
 /// <para>
-/// Sorgular kiracı süzgecini <b>aşar</b> (<c>IgnoreQueryFilters</c>) ve kiracıyı
-/// kendisi yazar: gönderimi bir kullanıcı değil zamanlayıcı tetikler ve o oturumun
-/// kiracısı, bildirimin kiracısı olmak zorunda değildir. Kiracı sınırı burada
-/// gevşetilmez, yalnızca oturumdan değil <b>bildirimin kendisinden</b> alınır.
+/// Sorgular kiracı süzgecini <b>aşar</b> (<c>IgnoreQueryFilters</c>) ve kiracıyı kendisi
+/// yazar: gönderimi bir kullanıcı değil zamanlayıcı tetikler ve o oturumun kiracısı
+/// bildirimin kiracısı olmak zorunda değildir. Sınır gevşetilmez — yalnızca oturumdan
+/// değil <b>bildirimin kendisinden</b> alınır ve her sorguda açıkça yazılır.
 /// </para>
 /// </summary>
 public sealed class NotificationRecipientRepository(GovAiDbContext context)
     : INotificationRecipientRepository
 {
-    public async Task<IReadOnlyList<NotificationRecipient>> ListForNotificationAsync(
+    public async Task<IReadOnlyList<RecipientAddress>> ListForNotificationAsync(
         Guid tenantId,
         Guid? companyId,
         CancellationToken cancellationToken = default)
     {
-        var kullanicilar = context.Users.IgnoreQueryFilters()
-            .Where(u => u.TenantId == tenantId && u.IsActive && !u.IsDeleted);
-
+        // Firması olmayan bildirim (kiracı düzeyindeki sistem uyarısı) e-postayla
+        // gönderilmez: alıcı listesi şirkete bağlıdır ve kiracının tamamına yazmak,
+        // bir firmanın sorumlusuna başka firmanın uyarısını göndermek olurdu.
         if (companyId is null)
         {
-            // Kiracı düzeyindeki sistem uyarıları yalnızca kiracı yöneticilerine gider.
-            return await kullanicilar
-                .Where(u => u.Role == UserRole.SuperAdmin)
-                .Select(u => new NotificationRecipient(u.Id, u.Email, u.FullName))
-                .ToListAsync(cancellationToken);
+            return [];
         }
 
-        var uyelikler = context.UserCompanies.IgnoreQueryFilters()
-            .Where(uc => uc.TenantId == tenantId
-                         && uc.CompanyId == companyId
-                         && uc.IsActive
-                         && !uc.IsDeleted
-                         // Görüntüleyici tanım gereği pasif bir izleyicidir.
-                         && uc.CompanyRole != CompanyRole.CompanyViewer);
-
-        return await uyelikler
-            .Join(kullanicilar, uc => uc.UserId, u => u.Id, (_, u) => u)
-            .Distinct()
-            .Select(u => new NotificationRecipient(u.Id, u.Email, u.FullName))
+        return await context.NotificationRecipients.IgnoreQueryFilters()
+            .Where(r => r.TenantId == tenantId && r.CompanyId == companyId && r.IsActive)
+            .OrderBy(r => r.Email)
+            .Select(r => new RecipientAddress(r.Email, r.FullName, r.Role))
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyList<NotificationRecipient>> ListForCompanyAsync(
+        Guid companyId,
+        CancellationToken cancellationToken = default) =>
+        await context.NotificationRecipients
+            .Where(r => r.CompanyId == companyId)
+            .OrderByDescending(r => r.IsActive)
+            .ThenBy(r => r.Email)
+            .ToListAsync(cancellationToken);
+
+    public async Task AddAsync(
+        NotificationRecipient recipient,
+        CancellationToken cancellationToken = default) =>
+        await context.NotificationRecipients.AddAsync(recipient, cancellationToken);
 }

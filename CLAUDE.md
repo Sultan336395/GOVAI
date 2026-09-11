@@ -245,14 +245,69 @@ bir uyarıyı almış sanması demekti.
 | Gönderildi | `MarkSent`; hata alanı temizlenir |
 | Denendi, başarısız | `MarkFailed(sebep)`; `SentAt` boş kalır, en fazla üç kez denenir |
 | SMTP yapılandırılmamış | Hiç denenmez; **deneme hakkı harcanmaz**, bildirim bekler |
-| Alıcı yok | Başarısız sayılır; "gönderildi" yazılmaz |
+| Şirkette alıcı tanımlı değil | `RecipientMissing`; **deneme hakkı harcanmaz** (bkz. §2.2.9) |
+| Webhook | Kuyruğa bırakılır; tüketici olmadığı için **gönderildi sayılmaz** |
 
-Son satır önemlidir: hak harcansaydı, SMTP sonradan tanımlandığında birikmiş
-hatırlatmalar üç denemeyi çoktan doldurmuş olur ve hiç gitmezdi.
+Son üç satır aynı sebebe dayanır: hak harcansaydı, eksik kurulum sonradan
+tamamlandığında birikmiş hatırlatmalar üç denemeyi çoktan doldurmuş olur ve hiç
+gitmezdi.
+
+### 2.2.8 Alıcılar GOVAI kullanıcısı değildir
+
+Müşteri çalışanlarının **GOVAI hesabı ve parolası yoktur**; kendi ERP'lerindeki GOVAI
+modülünü kullanırlar. Bu yüzden alıcı listesi kullanıcı tablosundan **türetilemez** —
+türetilseydi e-posta almak için herkese GOVAI hesabı açmak gerekirdi.
+
+Alıcılar ayrı bir tablodadır (`NotificationRecipient`), **şirkete** bağlıdır
+(`TenantId` + `CompanyId`) ve asıl kaynağı şirketin **ERP'sidir**: liste gece turunda
+ciro ve personel gibi çekilir (`ErpFieldMap.NotificationRecipients`). Kişiye değil
+şirkete bağlı olması bilinçlidir: sorumlu değiştiğinde hat kopmaz, ERP'deki tanım
+güncellenir.
+
+Uzlaştırma kuralları (`NotificationRecipientSync`, saf ve test edilebilir):
+
+| Gelen | Ne olur |
+|---|---|
+| `null` (bölüm eşlemede yok / yanıtta yok) | **Hiçbir şey**; mevcut tanımlar korunur |
+| Boş liste | ERP kaynaklı kayıtlar pasifleşir ("artık sorumlu yok") |
+| Yeni adres | Eklenir, `ErpPull` işaretlenir |
+| Listeden düşen | Pasifleşir, **silinmez** |
+| Elle tanımlı, ERP'de yok | **Pasifleşmez** — ERP'sinde bu modül olmayan firma için bilinçli girilmiştir |
+| Elle tanımlı, ERP'de de var | ERP'ye devredilir; tek doğruluk kaynağı kalır |
+| Geçersiz adres | Atlanır ve bildirilir; **tur düşmez** |
+
+İlk satır kritiktir: `null` ile boş listeyi karıştırmak, geçici bir ERP arızasında
+bütün sorumluları silmek olurdu.
+
+Panelden elle tanımlama (`PUT /api/erp/companies/{id}/notification-recipients`)
+yalnızca ERP'sinde bu modül olmayan firmalar içindir ve **ERP kaynaklı kayıtlara
+dokunmaz**.
+
+Koruyan testler: `NotificationRecipientSyncTests` (25), `NotificationRecipientTests` (10).
+
+### 2.2.9 Alıcısı olmayan bildirim kaybolmaz
+
+Şirkette tanımlı alıcı yoksa bildirim `RecipientMissing` durumuyla kaydedilir ve
+**deneme hakkı harcanmaz**. Harcansaydı, sorumlusu bir hafta sonra ERP'de tanımlanan
+firmanın birikmiş uyarıları üç denemeyi çoktan doldurmuş olur ve hiç gitmezdi.
+
+Durum **görünürlüğü etkilemez**: bildirim ERP modülünde/panelde durmaya devam eder.
+`DeliveryStatus` yalnızca "dışarı çıktı mı, çıkmadıysa neden" sorusunu cevaplar —
+`SentAt` tek başına "henüz denenmedi", "denendi ve başarısız oldu" ve "alıcısı yok"
+üçünü aynı gösteriyordu.
+
+Webhook da **gönderildi sayılmaz**: kuyruğun ucunda henüz tüketici yoktur.
+
+**SMTP parolası** secret dosyasından okunur (`Email__PasswordFile`, ör.
+`/run/secrets/...`) ve bu, ortam değişkeninin önüne geçer: ortam değişkenindeki parola
+`docker inspect` ve `/proc/<pid>/environ` ile okunabilir. Dosya okunamazsa başlangıçta
+çökülmez — e-posta yüzünden bütün API'yi indirmek daha pahalıdır.
+
+Koruyan testler: `NotificationDispatchTests` (13), `EmailSecretResolverTests` (8).
 
 Alıcılar bildirimde **saklanmaz**, gönderim anında çözülür. Saklansaydı liste kayıt
 oluşturulduğu andaki ekiple donardı: ayrılan kişiye posta gider, yeni gelen hiçbir
-hatırlatma almazdı. Görüntüleyici rolü listede yoktur; tanım gereği pasif izleyicidir.
+hatırlatma almazdı.
 
 Şifresiz SMTP desteklenmez ve SMTP sunucusunun hata gövdesi kullanıcıya
 yansıtılmaz — gövde kullanıcı adı ve iç sunucu adları taşıyabilir.
@@ -271,8 +326,7 @@ bildirim panelde de durur, yalnızca ayrıca posta olarak da gider.
 süzgeci). Tek kiracılı kurulumda sorun değildir; çok kiracılıya geçildiğinde tur
 kiracı başına çalıştırılmalıdır.
 
-Koruyan testler: `NotificationDispatchTests` (7), `NotificationChannelPolicyTests` (8),
-`DocumentMissingNotificationTests` (6).
+Koruyan testler: `NotificationChannelPolicyTests` (8), `DocumentMissingNotificationTests` (6).
 
 ### 2.3 Skor ağırlıklarının toplamı 1.0'dır
 
@@ -343,7 +397,7 @@ Solution dosyası **`GovAI.slnx`**'tir (yeni XML formatı), `.sln` değil.
 
 ```bash
 dotnet build -c Release          # tüm .NET projeleri
-dotnet test                      # 1068 test (251 domain + 435 application + 382 API)
+dotnet test                      # 1117 test (251 domain + 474 application + 392 API)
 ```
 
 ```bash

@@ -187,6 +187,13 @@ public static class DependencyInjection
         var options = configuration.GetSection(EmailOptions.SectionName).Get<EmailOptions>()
                       ?? new EmailOptions();
 
+        // Parola secret dosyasından okunur; ortam değişkeni yalnızca yedektir.
+        EmailSecretResolver.Apply(options, EmailSecretResolver.ReadFromDisk);
+
+        // Çözülen parola IOptions üzerinden de görünmeli; adaptör onu okur.
+        services.PostConfigure<EmailOptions>(o =>
+            EmailSecretResolver.Apply(o, EmailSecretResolver.ReadFromDisk));
+
         if (options.IsConfigured)
         {
             services.AddSingleton<IEmailSender, SmtpEmailSender>();

@@ -40,7 +40,7 @@ public class NotificationDispatchTests
 
     private static (NotificationService Servis, FakeNotificationRepository Depo) Kur(
         IEmailSender eposta,
-        IReadOnlyList<NotificationRecipient>? alicilar = null,
+        IReadOnlyList<RecipientAddress>? alicilar = null,
         params Notification[] bildirimler)
     {
         var depo = new FakeNotificationRepository(bildirimler);
@@ -51,7 +51,7 @@ public class NotificationDispatchTests
 
         var servis = new NotificationService(
             depo,
-            new FakeRecipientRepository(alicilar ?? [new NotificationRecipient(Guid.NewGuid(), "u@firma.test", "Ad Soyad")]),
+            new FakeRecipientRepository(alicilar ?? [new RecipientAddress("u@firma.test", "Ad Soyad", null)]),
             eposta,
             new FakeUnitOfWork(),
             new CompanyAccessGuard(new FakeCompanyRepository(), uyelikler, kullanici),
@@ -114,9 +114,12 @@ public class NotificationDispatchTests
         Assert.Empty(eposta.Gonderilenler);
     }
 
-    [Fact(DisplayName = "BG4. Alıcısı olmayan bildirim gönderilmiş SAYILMAZ")]
-    public async Task Alicisi_yoksa_gonderilmis_sayilmaz()
+    [Fact(DisplayName = "BG4. Alıcı tanımlı değilse RecipientMissing yazılır ve HAK HARCANMAZ")]
+    public async Task Alicisi_yoksa_recipient_missing()
     {
+        // Alıcı eksikliği bir gönderim hatası değil, eksik kurulumdur. Hak harcansaydı
+        // sorumlusu bir hafta sonra ERP'de tanımlanan firmanın birikmiş uyarıları üç
+        // denemeyi çoktan doldurmuş olur ve hiç gitmezdi.
         var bildirim = Bildirim(NotificationChannel.Email);
         var eposta = new FakeEmailSender(configured: true, basarili: true);
 
@@ -124,10 +127,36 @@ public class NotificationDispatchTests
 
         var sonuc = await servis.DispatchPendingAsync();
 
-        Assert.Equal(1, sonuc.Failed);
+        Assert.Equal(1, sonuc.RecipientMissing);
+        Assert.Equal(0, sonuc.Failed);
+        Assert.Equal(NotificationDeliveryStatus.RecipientMissing, bildirim.DeliveryStatus);
         Assert.Null(bildirim.SentAt);
-        Assert.Contains("kullanıcı", bildirim.DeliveryError);
+        Assert.Equal(0, bildirim.DeliveryAttemptCount);
         Assert.Empty(eposta.Gonderilenler);
+    }
+
+    [Fact(DisplayName = "BG4b. Alıcısız bildirim KAYBOLMAZ; alıcı tanımlanınca gider")]
+    public async Task Alici_tanimlaninca_gider()
+    {
+        var bildirim = Bildirim(NotificationChannel.Email);
+        var eposta = new FakeEmailSender(configured: true, basarili: true);
+
+        // Önce alıcısız tur.
+        var (alicisiz, _) = Kur(eposta, alicilar: [], bildirimler: bildirim);
+        await alicisiz.DispatchPendingAsync();
+
+        Assert.Null(bildirim.SentAt);
+
+        // Sonra alıcı tanımlanmış tur: aynı kayıt gönderilir.
+        var (tanimli, _) = Kur(
+            eposta,
+            alicilar: [new RecipientAddress("sorumlu@firma.test", "Sorumlu", "Mali İşler")],
+            bildirimler: bildirim);
+
+        var sonuc = await tanimli.DispatchPendingAsync();
+
+        Assert.Equal(1, sonuc.Sent);
+        Assert.Equal(NotificationDeliveryStatus.Sent, bildirim.DeliveryStatus);
     }
 
     [Fact(DisplayName = "BG5. Panel bildirimi e-postaya BAĞLI DEĞİLDİR")]
@@ -163,6 +192,120 @@ public class NotificationDispatchTests
         Assert.NotNull(panel.SentAt);
     }
 
+    [Fact(DisplayName = "BG8. Başarısız gönderim SONRAKİ turda yeniden denenir")]
+    public async Task Basarisiz_gonderim_yeniden_denenir()
+    {
+        var bildirim = Bildirim(NotificationChannel.Email);
+
+        // İlk tur: SMTP ulaşılamıyor.
+        var (basarisizServis, _) = Kur(
+            new FakeEmailSender(configured: true, basarili: false), bildirimler: bildirim);
+
+        await basarisizServis.DispatchPendingAsync();
+
+        Assert.Equal(1, bildirim.DeliveryAttemptCount);
+        Assert.Equal(NotificationDeliveryStatus.Failed, bildirim.DeliveryStatus);
+
+        // İkinci tur: sunucu geri geldi. Geçici arıza kalıcı kayba dönüşmemeli.
+        var iyilesen = new FakeEmailSender(configured: true, basarili: true);
+        var (iyilesenServis, _) = Kur(iyilesen, bildirimler: bildirim);
+
+        var sonuc = await iyilesenServis.DispatchPendingAsync();
+
+        Assert.Equal(1, sonuc.Sent);
+        Assert.Equal(NotificationDeliveryStatus.Sent, bildirim.DeliveryStatus);
+        Assert.Null(bildirim.DeliveryError);
+        Assert.Single(iyilesen.Gonderilenler);
+    }
+
+    [Fact(DisplayName = "BG9. Gönderilmiş bildirim İKİNCİ KEZ gönderilmez")]
+    public async Task Mukerrer_gonderim_engellenir()
+    {
+        // Zamanlayıcı her beş dakikada bir çalışır; gönderilmiş kaydı yeniden
+        // göndermek aynı uyarıyı gün içinde onlarca kez postalardı.
+        var bildirim = Bildirim(NotificationChannel.Email);
+        var eposta = new FakeEmailSender(configured: true, basarili: true);
+
+        var (servis, _) = Kur(eposta, bildirimler: bildirim);
+
+        await servis.DispatchPendingAsync();
+        var ikinciTur = await servis.DispatchPendingAsync();
+
+        Assert.Single(eposta.Gonderilenler);
+        Assert.Equal(0, ikinciTur.Processed);
+        Assert.Equal(1, bildirim.DeliveryAttemptCount);
+    }
+
+    [Fact(DisplayName = "BG10. Üç başarısız denemeden sonra kayıt turdan DÜŞER")]
+    public async Task Uc_denemeden_sonra_durur()
+    {
+        // Sonsuz yeniden deneme, kalıcı olarak geçersiz bir adres yüzünden her turu
+        // aynı kayda harcardı.
+        var bildirim = Bildirim(NotificationChannel.Email);
+        var eposta = new FakeEmailSender(configured: true, basarili: false);
+
+        var (servis, _) = Kur(eposta, bildirimler: bildirim);
+
+        for (var i = 0; i < 4; i++)
+        {
+            await servis.DispatchPendingAsync();
+        }
+
+        Assert.Equal(3, bildirim.DeliveryAttemptCount);
+    }
+
+    [Fact(DisplayName = "BG11. Webhook kuyruğa bırakılır ama GÖNDERİLDİ yazılmaz")]
+    public async Task Webhook_gonderildi_yazilmaz()
+    {
+        // Kuyruğun ucunda henüz tüketici yok. "Gönderildi" damgalansaydı hiç ulaşmayan
+        // bildirim panelde gönderilmiş görünürdü.
+        var bildirim = Bildirim(NotificationChannel.Webhook);
+        var eposta = new FakeEmailSender(configured: true, basarili: true);
+
+        var (servis, _) = Kur(eposta, bildirimler: bildirim);
+
+        var sonuc = await servis.DispatchPendingAsync();
+
+        Assert.Equal(0, sonuc.Sent);
+        Assert.Equal(1, sonuc.Skipped);
+        Assert.Null(bildirim.SentAt);
+        Assert.Equal(NotificationDeliveryStatus.Pending, bildirim.DeliveryStatus);
+    }
+
+    [Fact(DisplayName = "BG12. Alıcılar bildirimin KENDİ kiracısı ve firmasıyla sorulur")]
+    public async Task Alicilar_bildirimin_kiracisiyla_sorulur()
+    {
+        // Kiracı oturumdan alınsaydı, zamanlayıcının kiracısı bildirimin kiracısından
+        // farklı olduğunda bir firmanın uyarısı başka kiracının sorumlusuna giderdi.
+        var bildirim = Bildirim(NotificationChannel.Email);
+
+        var depo = new FakeNotificationRepository([bildirim]);
+        var sahteAlicilar = new FakeRecipientRepository(
+            [new RecipientAddress("u@firma.test", "Ad", null)]);
+
+        // Oturumun kiracısı BİLEREK farklı.
+        var kullanici = new FakeCurrentUser { TenantId = Guid.NewGuid() };
+        var uyelikler = new FakeUserCompanyRepository();
+
+        var servis = new NotificationService(
+            depo,
+            sahteAlicilar,
+            new FakeEmailSender(configured: true, basarili: true),
+            new FakeUnitOfWork(),
+            new CompanyAccessGuard(new FakeCompanyRepository(), uyelikler, kullanici),
+            new FixedClock(AsOf),
+            new FakeEventPublisher(),
+            NullLogger<NotificationService>.Instance);
+
+        await servis.DispatchPendingAsync();
+
+        var sorgu = Assert.Single(sahteAlicilar.Sorgular);
+
+        Assert.Equal(TenantId, sorgu.TenantId);
+        Assert.Equal(CompanyId, sorgu.CompanyId);
+        Assert.NotEqual(kullanici.TenantId, sorgu.TenantId);
+    }
+
     [Fact(DisplayName = "BG7. Alıcı adresleri gönderime taşınır")]
     public async Task Adresler_tasinir()
     {
@@ -173,8 +316,8 @@ public class NotificationDispatchTests
             eposta,
             alicilar:
             [
-                new NotificationRecipient(Guid.NewGuid(), "bir@firma.test", "Bir"),
-                new NotificationRecipient(Guid.NewGuid(), "iki@firma.test", "İki"),
+                new RecipientAddress("bir@firma.test", "Bir", null),
+                new RecipientAddress("iki@firma.test", "İki", null),
             ],
             bildirimler: bildirim);
 
@@ -211,14 +354,29 @@ internal sealed class FakeEmailSender(bool configured, bool basarili) : IEmailSe
     }
 }
 
-internal sealed class FakeRecipientRepository(IReadOnlyList<NotificationRecipient> alicilar)
+internal sealed class FakeRecipientRepository(IReadOnlyList<RecipientAddress> alicilar)
     : INotificationRecipientRepository
 {
-    public Task<IReadOnlyList<NotificationRecipient>> ListForNotificationAsync(
+    /// <summary>Hangi kiracı ve firma için sorulduğu; sınır testleri bunu okur.</summary>
+    public List<(Guid TenantId, Guid? CompanyId)> Sorgular { get; } = [];
+
+    public Task<IReadOnlyList<RecipientAddress>> ListForNotificationAsync(
         Guid tenantId,
         Guid? companyId,
+        CancellationToken cancellationToken = default)
+    {
+        Sorgular.Add((tenantId, companyId));
+
+        return Task.FromResult(alicilar);
+    }
+
+    public Task<IReadOnlyList<NotificationRecipient>> ListForCompanyAsync(
+        Guid companyId,
         CancellationToken cancellationToken = default) =>
-        Task.FromResult(alicilar);
+        Task.FromResult<IReadOnlyList<NotificationRecipient>>([]);
+
+    public Task AddAsync(NotificationRecipient recipient, CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
 }
 
 internal sealed class FakeNotificationRepository(IReadOnlyList<Notification> bildirimler)

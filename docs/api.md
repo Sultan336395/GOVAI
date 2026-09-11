@@ -358,6 +358,8 @@ Ayrıntı: `docs/adr/0005`.
 | DELETE | `/api/erp/companies/{companyId}/connection` | ManageProfile |
 | POST | `/api/erp/companies/{companyId}/pull` | ManageProfile |
 | POST | `/api/erp/pull-batch` | SystemIngest |
+| GET | `/api/erp/companies/{companyId}/notification-recipients` | Read |
+| PUT | `/api/erp/companies/{companyId}/notification-recipients` | ManageProfile |
 
 Bağlantı kurulmamışsa `GET .../connection` **204** döner; bu bir hata değildir.
 
@@ -377,6 +379,12 @@ adresi (169.254.169.254) **beyanla dahi** açılmaz.
 
 Ardışık beş başarısızlıkta bağlantı kendiliğinden devre dışı kalır.
 
+**Bildirim sorumluları** da ERP'den çekilir (`NotificationRecipients` eşlemesi). Bunlar
+GOVAI kullanıcısı **değildir**: hesapları ve parolaları yoktur. Bölüm eşlemede tanımlı
+değilse ya da yanıtta yoksa mevcut tanımlara **dokunulmaz** — boş listeyle karıştırmak,
+geçici bir ERP arızasında bütün sorumluları silmek olurdu. `PUT` ucu yalnızca **elle**
+tanımlananları yönetir; ERP kaynaklı kayıtlara dokunmaz.
+
 Ayrıntı: `docs/adr/0006`.
 
 ## `/api/notifications`
@@ -392,16 +400,25 @@ yetkisi `SystemIngest`'tir. Kiracı yöneticisine açmak, bir kullanıcının b�
 kiracının bildirim gönderimini tetikleyebilmesi demek olurdu.
 
 `dispatch` cevabı işlenen sayıyı değil **ne olduğunu** döner: `processedCount`,
-`sentCount`, `failedCount`, `skippedCount`.
+`sentCount`, `failedCount`, `skippedCount`, `recipientMissingCount`.
 
 "Gönderildi" damgası yalnızca **gerçekten gönderilince** basılır. SMTP
 yapılandırılmamışsa e-posta bildirimi `skipped` sayılır ve deneme hakkı harcanmaz;
 yapılandırma tamamlandığında birikmiş bildirimler gider. Başarısız gönderim sebebiyle
 birlikte kayda yazılır ve en fazla üç kez denenir.
 
-Alıcılar bildirimde saklanmaz, gönderim anında çözülür: firmanın **etkin** üyeleri,
-görüntüleyici rolü hariç. Firma bağlantısı olmayan sistem uyarıları kiracı
-yöneticilerine gider.
+Alıcılar bildirimde saklanmaz, gönderim anında çözülür ve **GOVAI kullanıcı
+tablosundan alınmaz**: müşteri çalışanlarının GOVAI hesabı yoktur. Liste şirkete ait
+ayrı bir tablodadır ve asıl kaynağı şirketin ERP'sidir
+(`GET/PUT /api/erp/companies/{id}/notification-recipients`).
+
+Şirkette tanımlı alıcı yoksa bildirim **kaybolmaz**: `RecipientMissing` durumuyla
+kaydedilir, panelde/ERP modülünde görünmeye devam eder ve deneme hakkı harcanmaz.
+Alıcı tanımlandığında sonraki turda gider.
+
+Firma bağlantısı olmayan kiracı düzeyindeki sistem uyarıları e-postayla gönderilmez:
+alıcı listesi şirkete bağlıdır ve kiracının tamamına yazmak, bir firmanın sorumlusuna
+başka firmanın uyarısını göndermek olurdu.
 
 E-postayla **da** iletilen türler: `DeadlineApproaching` ve `DocumentMissing`. İkisi de
 zamana bağlıdır ve kaçırılırsa fırsat kapanır; diğer türler yalnızca panelde kalır.

@@ -63,12 +63,15 @@ public sealed class NotificationsController(NotificationService service, ICurren
     {
         var sonuc = await service.DispatchPendingAsync(batchSize, cancellationToken);
 
-        return Ok(new DispatchResponse(sonuc.Processed, sonuc.Sent, sonuc.Failed, sonuc.Skipped));
+        return Ok(new DispatchResponse(
+            sonuc.Processed, sonuc.Sent, sonuc.Failed, sonuc.Skipped, sonuc.RecipientMissing));
     }
 
     public sealed record DispatchResponse(
         int ProcessedCount,
         int SentCount,
         int FailedCount,
-        int SkippedCount);
+        int SkippedCount,
+        /// <summary>Şirkette tanımlı bildirim alıcısı olmadığı için gönderilemeyenler.</summary>
+        int RecipientMissingCount);
 }

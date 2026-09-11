@@ -36,6 +36,17 @@ public sealed record ErpSnapshot
     /// <summary>ERP'de kayıtlı belge/sertifikalar.</summary>
     public IReadOnlyList<ErpCertificate> Certificates { get; init; } = [];
 
+    /// <summary>
+    /// ERP'de tanımlı bildirim sorumluları.
+    ///
+    /// <para>
+    /// <c>null</c> ile boş liste <b>farklıdır</b>: bölüm eşlemede tanımlı değilse ya da
+    /// ERP yanıtında hiç yoksa <c>null</c> gelir ve mevcut tanımlara dokunulmaz. Boş
+    /// liste ise "bu firmada artık sorumlu yok" demektir ve tanımlar pasifleşir.
+    /// </para>
+    /// </summary>
+    public IReadOnlyList<ErpRecipient>? NotificationRecipients { get; init; }
+
     /// <summary>Eşlemede aranıp ERP yanıtında <b>bulunamayan</b> alanlar; kullanıcıya gösterilir.</summary>
     public IReadOnlyList<string> MissingFields { get; init; } = [];
 
@@ -46,6 +57,9 @@ public sealed record ErpSnapshot
 }
 
 public sealed record ErpCertificate(string Code, DateOnly? ValidUntil);
+
+/// <summary>ERP'den gelen bir bildirim sorumlusu. GOVAI hesabı yoktur.</summary>
+public sealed record ErpRecipient(string Email, string? FullName, string? Role, string? ExternalId);
 
 /// <summary>
 /// ERP'den veri okuyan liman.

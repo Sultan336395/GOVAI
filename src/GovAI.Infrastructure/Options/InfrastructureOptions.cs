@@ -97,7 +97,23 @@ public sealed class EmailOptions
 
     public string UserName { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Parola. <see cref="PasswordFile"/> verilmişse <b>oradan</b> okunur ve bu alan
+    /// boş bırakılır; tercih edilen yol odur.
+    /// </summary>
     public string Password { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Parolanın okunacağı dosya yolu (Docker/Kubernetes secret bağlama noktası,
+    /// ör. <c>/run/secrets/govai_smtp_password</c>).
+    ///
+    /// <para>
+    /// Dosya yolu tercih edilir: ortam değişkenindeki parola <c>docker inspect</c>,
+    /// <c>/proc/&lt;pid&gt;/environ</c> ve çoğu süreç listeleyicisiyle okunabilir;
+    /// secret dosyası yalnızca kapsayıcının içinde ve dosya izinleriyle durur.
+    /// </para>
+    /// </summary>
+    public string PasswordFile { get; set; } = string.Empty;
 
     public string FromAddress { get; set; } = string.Empty;
 

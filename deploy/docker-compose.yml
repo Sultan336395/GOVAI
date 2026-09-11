@@ -129,6 +129,10 @@ services:
       Email__UseStartTls: ${EMAIL_USE_STARTTLS:-true}
       Email__UserName: ${EMAIL_USERNAME:-}
       Email__Password: ${EMAIL_PASSWORD:-}
+      # Tercih edilen yol: parola dosyadan okunur. Dolu olduğunda Email__Password
+      # yok sayılır; ortam değişkeni docker inspect ile okunabilirken secret dosyası
+      # yalnızca kapsayıcının içinde durur.
+      Email__PasswordFile: ${EMAIL_PASSWORD_FILE:-}
       Email__FromAddress: ${EMAIL_FROM_ADDRESS:-}
       Email__FromName: ${EMAIL_FROM_NAME:-GOVAI}
 

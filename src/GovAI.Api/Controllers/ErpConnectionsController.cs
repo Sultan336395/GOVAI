@@ -1,5 +1,6 @@
 using GovAI.Api.Infrastructure;
 using GovAI.Application.Integrations;
+using GovAI.Application.Notifications;
 using GovAI.Domain.Integrations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -25,8 +26,36 @@ namespace GovAI.Api.Controllers;
 [Authorize(Policy = Policies.CompanyData)]
 public sealed class ErpConnectionsController(
     ErpConnectionService connections,
-    ErpPullService pull) : ControllerBase
+    ErpPullService pull,
+    NotificationRecipientService recipients) : ControllerBase
 {
+    /// <summary>
+    /// Şirketin bildirim sorumluları.
+    ///
+    /// <para>
+    /// Bunlar <b>GOVAI kullanıcısı değildir</b>: hesapları ve parolaları yoktur.
+    /// Asıl kaynak şirketin ERP'sidir; liste gece turunda oradan çekilir. Panelden
+    /// tanımlananlar, ERP'sinde bu modül olmayan firmalar içindir.
+    /// </para>
+    /// </summary>
+    [HttpGet("companies/{companyId:guid}/notification-recipients")]
+    [Produces("application/json")]
+    public async Task<ActionResult<IReadOnlyList<NotificationRecipientDto>>> Recipients(
+        Guid companyId,
+        CancellationToken cancellationToken) =>
+        Ok(await recipients.ListAsync(companyId, cancellationToken));
+
+    /// <summary>
+    /// Elle tanımlı sorumluları değiştirir. ERP'den gelenlere <b>dokunmaz</b>.
+    /// </summary>
+    [HttpPut("companies/{companyId:guid}/notification-recipients")]
+    [Audited("NotificationRecipients.Replaced", "Company", RouteKey = "companyId")]
+    public async Task<ActionResult<IReadOnlyList<NotificationRecipientDto>>> ReplaceRecipients(
+        Guid companyId,
+        [FromBody] ReplaceRecipientsRequest request,
+        CancellationToken cancellationToken) =>
+        Ok(await recipients.ReplaceManualAsync(companyId, request, cancellationToken));
+
     /// <summary>
     /// Bir ürünün varsayılan alan eşlemesi.
     ///

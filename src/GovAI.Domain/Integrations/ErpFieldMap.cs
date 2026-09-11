@@ -51,6 +51,30 @@ public sealed record ErpFieldMap
     public string? CertificateValidUntilField { get; init; }
 
     /// <summary>
+    /// Mevzuat/hibe bildirimlerini alacak kişilerin listesi.
+    ///
+    /// <para>
+    /// Şirket bu listeyi <b>kendi ERP'sinde</b> tanımlar; GOVAI'de hesap açılmaz.
+    /// Bölüm eşlemede tanımlı değilse alıcılar çekilmez ve mevcut tanımlar olduğu gibi
+    /// kalır — ERP'sinde bu modül olmayan bir firmada elle girilmiş doğru liste
+    /// silinmemelidir (§2.2.4 ile aynı gerekçe).
+    /// </para>
+    /// </summary>
+    public string? NotificationRecipients { get; init; }
+
+    /// <summary>Alıcı listesindeki e-posta alanı. Alıcının tek zorunlu alanıdır.</summary>
+    public string? RecipientEmailField { get; init; }
+
+    /// <summary>Alıcı adı alanı. Yoksa yalnızca adres kullanılır.</summary>
+    public string? RecipientNameField { get; init; }
+
+    /// <summary>Alıcı görevi alanı (ör. "Mali İşler Müdürü"). Yalnızca gösterim içindir.</summary>
+    public string? RecipientRoleField { get; init; }
+
+    /// <summary>ERP'deki personel/kişi kimliği; kişi yeniden adlandırılsa da eşleşme korunur.</summary>
+    public string? RecipientExternalIdField { get; init; }
+
+    /// <summary>
     /// Üreticinin varsayılan eşlemesi.
     ///
     /// <para>
@@ -78,6 +102,11 @@ public sealed record ErpFieldMap
             Certificates = "belgeler",
             CertificateCodeField = "kod",
             CertificateValidUntilField = "gecerlilikTarihi",
+            NotificationRecipients = "bildirimSorumlulari",
+            RecipientEmailField = "eposta",
+            RecipientNameField = "adSoyad",
+            RecipientRoleField = "gorev",
+            RecipientExternalIdField = "personelKodu",
         },
 
         // SAP ve Nebim İngilizce alan adlarıyla yayımlıyor.
@@ -96,6 +125,11 @@ public sealed record ErpFieldMap
             Certificates = "certificates",
             CertificateCodeField = "code",
             CertificateValidUntilField = "validUntil",
+            NotificationRecipients = "notificationContacts",
+            RecipientEmailField = "email",
+            RecipientNameField = "fullName",
+            RecipientRoleField = "title",
+            RecipientExternalIdField = "employeeCode",
         },
 
         // Ürün bilinmiyorsa varsayım yapılmaz: eşleme bağlantıda tanımlanır.
