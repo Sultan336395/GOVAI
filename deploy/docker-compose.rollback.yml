@@ -15,11 +15,11 @@
 # Yeniden derleme `latest`i üzerine yazar ve eski imaj isimsiz kalır — geri dönüş
 # imkânsızlaşır.
 #
-# ── 11.09.2026 · Menü sırası yayını öncesi çalışan sürüm ───────────────────
+# ── 11.09.2026 · Menü düzeni ve ERP ekran düzeltmesi öncesi çalışan sürüm ──
 #
-#   govai-api:d517aa2
-#   govai-web:d517aa2
-#   govai-worker:d517aa2
+#   govai-api:69b8e31
+#   govai-web:69b8e31
+#   govai-worker:69b8e31
 #
 # DÖRT WORKER AYNI İMAJI PAYLAŞIR. Bu dosya eskiden her worker'ı ayrı bir imaj
 # adına (`govai-collector:…`, `govai-parser:…`) sabitliyordu; o adlar artık
@@ -27,7 +27,7 @@
 # bölümüne düşerek SUNUCUDA DERLEME başlatırdı. Geri dönüşün kendisi arıza
 # üretmemelidir.
 #
-# ÖNCEKİ SÜRÜMLER (artık hedef değil): 023f6b2, eda245c, f28ca80, 14953a2, cc49454, 398f84e, cff2322, 2a5382d, 492b40c, 0d42f3f, c8bf41d, bc6a53a, 5cb1a7f, c202352, cffc2b5, 9c35582, c202352, b13f0c2, 3e9b9ab. O etiketli imajlar
+# ÖNCEKİ SÜRÜMLER (artık hedef değil): d517aa2, 023f6b2, eda245c, f28ca80, 14953a2, cc49454, 398f84e, cff2322, 2a5382d, 492b40c, 0d42f3f, c8bf41d, bc6a53a, 5cb1a7f, c202352, cffc2b5, 9c35582, c202352, b13f0c2, 3e9b9ab. O etiketli imajlar
 # silinmedi; gerekirse bu dosyanın bir kopyasıyla hedeflenebilirler.
 #
 # VERİTABANI: Bu dosya veritabanına DOKUNMAZ. Geri dönüş otomatik restore İÇERMEZ —
@@ -37,25 +37,25 @@
 
 services:
   api:
-    image: govai-api:d517aa2
+    image: govai-api:69b8e31
     pull_policy: never
 
   web:
-    image: govai-web:d517aa2
+    image: govai-web:69b8e31
     pull_policy: never
 
   collector:
-    image: govai-worker:d517aa2
+    image: govai-worker:69b8e31
     pull_policy: never
 
   parser:
-    image: govai-worker:d517aa2
+    image: govai-worker:69b8e31
     pull_policy: never
 
   scoring:
-    image: govai-worker:d517aa2
+    image: govai-worker:69b8e31
     pull_policy: never
 
   scheduler:
-    image: govai-worker:d517aa2
+    image: govai-worker:69b8e31
     pull_policy: never
