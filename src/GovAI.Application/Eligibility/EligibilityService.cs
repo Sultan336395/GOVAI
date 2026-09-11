@@ -4,6 +4,7 @@ using GovAI.Application.Abstractions.Persistence;
 using GovAI.Application.Abstractions.Services;
 using GovAI.Application.Analysis;
 using GovAI.Application.Common;
+using GovAI.Application.Notifications;
 using GovAI.Domain.Assessments;
 using GovAI.Domain.Common;
 using GovAI.Domain.Companies;
@@ -279,8 +280,8 @@ public sealed class EligibilityService(
     }
 
     /// <summary>
-    /// Yeni eşleşme, skor değişimi ve yaklaşan son tarih bildirimlerini üretir (Modül 10).
-    /// Tekilleştirme anahtarı sayesinde aynı uyarı tekrar gönderilmez.
+    /// Yeni eşleşme, skor değişimi, yaklaşan son tarih ve eksik belge bildirimlerini
+    /// üretir (Modül 10). Tekilleştirme anahtarı sayesinde aynı uyarı tekrar gönderilmez.
     /// </summary>
     private async Task RaiseNotificationsAsync(
         Company company,
@@ -334,6 +335,31 @@ public sealed class EligibilityService(
                 now,
                 cancellationToken);
         }
+
+        // Eksik belge uyarısı son tarih penceresini BEKLEMEZ. Belge temini kurumdan
+        // kuruma haftalar alır; 15 güne inince haber vermek çoğu belge için geç
+        // kalmaktır. Süresi geçmiş çağrıda ise belge toplamanın bir anlamı yoktur.
+        if (current.MissingMandatoryDocumentCount > 0
+            && current.Verdict != EligibilityVerdict.NotEligible
+            && daysLeft is null or > 0)
+        {
+            // Anahtar sayıyı TAŞIMAZ: eksik belge sayısı her yeniden skorlamada
+            // değişebilir ve sayıyı anahtara koymak aynı çağrı için art arda uyarı
+            // üretirdi. Yapılacak iş her hâlükârda aynıdır — belgeleri tamamlamak.
+            await AddNotificationAsync(
+                company,
+                opportunity,
+                NotificationKind.DocumentMissing,
+                $"{current.MissingMandatoryDocumentCount} zorunlu belge eksik: {opportunity.Title}",
+                daysLeft is { } kalan
+                    ? $"{company.LegalName} bu çağrıya başvurabilir; son başvuruya {kalan} gün var. "
+                      + "Eksik belgeler tamamlanmadan başvuru kabul edilmez."
+                    : $"{company.LegalName} bu çağrıya başvurabilir. "
+                      + "Eksik belgeler tamamlanmadan başvuru kabul edilmez.",
+                $"document:{opportunity.Id}:{company.Id}",
+                now,
+                cancellationToken);
+        }
     }
 
     private async Task AddNotificationAsync(
@@ -352,6 +378,10 @@ public sealed class EligibilityService(
         }
 
         var notification = new Notification(company.TenantId, company.Id, kind, title, body, now, deduplicationKey, opportunity.Id);
+
+        // Hangi türün ayrıca e-postayla da gideceği tek yerde tanımlıdır.
+        notification.SetChannel(NotificationChannelPolicy.For(kind));
+
         await notifications.AddAsync(notification, cancellationToken);
     }
 

@@ -257,11 +257,22 @@ hatırlatma almazdı. Görüntüleyici rolü listede yoktur; tanım gereği pasi
 Şifresiz SMTP desteklenmez ve SMTP sunucusunun hata gövdesi kullanıcıya
 yansıtılmaz — gövde kullanıcı adı ve iç sunucu adları taşıyabilir.
 
+**Hangi tür e-postaya gider:** `NotificationChannelPolicy` tek karar yeridir.
+Listede yalnızca `DeadlineApproaching` ve `DocumentMissing` vardır; ikisi de zamana
+bağlıdır ve kaçırılırsa fırsat kapanır. `NewMatch` ve `ScoreChanged` her yeniden
+skorlamada üretilebilir — e-postaya çevrilseydi kutu dolar, insanlar kuralla filtreler
+ve asıl iki uyarı da onlarla birlikte görünmez olurdu. Varsayılan `InApp`'tir: yeni bir
+tür eklemek kendiliğinden posta göndermeye başlamaz.
+
+Kanal **görünürlüğü belirlemez**; panel listesi kanala bakmaz. E-posta kanalındaki
+bildirim panelde de durur, yalnızca ayrıca posta olarak da gider.
+
 **Bilinen sınır:** gönderim turu çağıran oturumun kiracısıyla sınırlıdır (EF kiracı
 süzgeci). Tek kiracılı kurulumda sorun değildir; çok kiracılıya geçildiğinde tur
 kiracı başına çalıştırılmalıdır.
 
-Koruyan testler: `NotificationDispatchTests` (7).
+Koruyan testler: `NotificationDispatchTests` (7), `NotificationChannelPolicyTests` (8),
+`DocumentMissingNotificationTests` (6).
 
 ### 2.3 Skor ağırlıklarının toplamı 1.0'dır
 
@@ -332,7 +343,7 @@ Solution dosyası **`GovAI.slnx`**'tir (yeni XML formatı), `.sln` değil.
 
 ```bash
 dotnet build -c Release          # tüm .NET projeleri
-dotnet test                      # 1054 test (251 domain + 427 application + 376 API)
+dotnet test                      # 1068 test (251 domain + 435 application + 382 API)
 ```
 
 ```bash

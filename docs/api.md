@@ -403,6 +403,10 @@ Alıcılar bildirimde saklanmaz, gönderim anında çözülür: firmanın **etki
 görüntüleyici rolü hariç. Firma bağlantısı olmayan sistem uyarıları kiracı
 yöneticilerine gider.
 
+E-postayla **da** iletilen türler: `DeadlineApproaching` ve `DocumentMissing`. İkisi de
+zamana bağlıdır ve kaçırılırsa fırsat kapanır; diğer türler yalnızca panelde kalır.
+Kanal görünürlüğü belirlemez — e-posta kanalındaki bildirim panel listesinde de durur.
+
 ## `/api/admin` — kullanıcı yönetimi, audit log
 
 | Metot | Yol | Yetki |
