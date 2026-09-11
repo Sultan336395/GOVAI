@@ -158,6 +158,36 @@ firmayı eler, §2.2 çiğnenir). Anahtar yoksa görüş **uydurulmaz**.
 Gerekçe: `docs/adr/0005`. Koruyan testler: `CalibrationReportTests` (14), `CalibrationTests` (9),
 `AiSecondOpinionTests` (7).
 
+### 2.2.4 ERP'de bulunamayan alan sıfır yazılmaz
+
+ERP bağlantısı firmanın ciro, personel kırılımı ve belgelerini kendi sisteminden **çeker**
+(`ErpPullService`, gece 02:45). Çekilen veri doğrudan kaydedilmez; mevcut
+`SyncFromErpAsync` hattından geçer — ikinci bir yazma yolu, doğrulama ya da yeniden
+skorlama tetiklemesinden birinin ERP yolunda atlanması demek olurdu.
+
+**Eşlemede aranıp ERP yanıtında bulunamayan alan `null` kalır, `0` yazılmaz.** Bu, §2.2'nin
+ERP yolundaki karşılığıdır: sıfır yazmak firmayı "hiç kadın çalışanı yok" diye kaydeder ve
+o firma kadın istihdamı şartı arayan her çağrıdan elenir. Aynı sebeple bir bölümün tamamı
+boşsa o bölüm hiç gönderilmez; ERP bordro modülü kullanmayan bir firmada elle girilmiş
+doğru veri silinemez.
+
+İki güvenlik kararı kaldırılmamalıdır:
+
+| Karar | Neden |
+|---|---|
+| Özel IP'lere **yalnızca** "kurum içi" beyanıyla gidilir | Kurum içi ERP özel IP'dedir; engeli topyekûn uygulamak entegrasyonu imkânsız kılar, topyekûn kaldırmak SSRF açar |
+| Bulut metadata adresi (169.254.169.254) **beyanla dahi** açılmaz | Orası ERP değil, sunucunun kendi bulut kimliğinin durduğu yer |
+
+Kimlik bilgisi AES-GCM ile **şifrelenir** (özetlenemez — ERP'ye gönderilmesi gerekir),
+hiçbir yanıtta dönmez ve ERP'nin hata gövdesi kullanıcıya yansıtılmaz (gövde kimlik ya da
+personel verisi taşıyabilir).
+
+Gece sırası: **ERP çekme (02:45) → skorlama (03:30) → ikinci görüş (04:15).** Profil önce
+tazelenir; ters sırada firma dün düzelttiği eksiğin sonucunu bir gün sonra görür.
+
+Gerekçe: `docs/adr/0006`. Koruyan testler: `ErpFieldMapTests` (4), `ErpConnectionTests`
+alan modeli (5) ve API (12).
+
 ### 2.3 Skor ağırlıklarının toplamı 1.0'dır
 
 `ScoreWeights` yapıcısı bunu doğrular ve ihlalde `DomainException` atar.
@@ -403,7 +433,7 @@ Bunlar hata değil, bilinçli ertelemedir. Tamamı gerekçesi ve hedef ayıyla
 | OCR | Taranmış PDF'lerde metin çıkmaz; parser bunu loglar |
 | Refresh token | Üretiliyor ama sunucuda saklanmıyor; süre dolunca yeniden giriş |
 | E-posta / webhook gönderimi | Bildirim üretiliyor ve kuyruğa bırakılıyor, gerçek adaptör yok |
-| ERP adaptörleri | `/erp-sync` sözleşmesi hazır, Logo/Netsis/SAP tarafı yok |
+| ERP adaptörleri | Çekme yolu kuruldu (`/api/erp`); ürün varsayılan eşlemeleri **gerçek kurulumda doğrulanmadı** — "Şimdi Dene ve Çek" bunun için var |
 | Ağırlık kalibrasyonu | Ölçüm altyapısı hazır (`/api/calibration`); ağırlıklar henüz gerçek vaka verisiyle kalibre edilmedi — örneklem birikiyor |
 | Kod bölme | Bundle ~714 KB, tek parça |
 

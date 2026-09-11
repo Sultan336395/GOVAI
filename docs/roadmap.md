@@ -11,7 +11,7 @@ hazır olduğu ve neyin yapılacağı ile birlikte gösterir.
 | 2 | Kurumsal ve fırsat veri modeli, yetki ve güvenlik tasarımı | 18 tablo, ilk migration, 5 rol, JWT, audit log | KVKK veri envanteri, saklama süreleri, SSO kararı |
 | 3 | .NET çekirdek altyapı, kullanıcı yönetimi, firma kartı, temel API iskeleti | Onion katmanları, 8 endpoint grubu, Swagger, sağlık kontrolü | Kullanıcı davet akışı, parola sıfırlama, e-posta altyapısı |
 | 4 | Kaynak tarama servisleri, parser yapısı, veri toplama iş akışları | Collector (robots.txt uyumlu), PDF/HTML çıkarıcı, hash tabanlı tekilleştirme | Taranmış PDF'ler için OCR, kurum bazlı seçici kütüphanesi |
-| 5 | ERP / API entegrasyon katmanı ve veri standardizasyonu | `/erp-sync` kısmi eşitleme sözleşmesi, profil sürümleme | Logo / Netsis / SAP adaptörleri, alan eşleme tabloları |
+| ERP adaptörleri | Çekme yolu kuruldu: bağlantı kaydı, alan eşlemesi, gece turu ve deneme çekimi. Logo/Netsis/SAP varsayılan eşlemeleri gerçek bir kurulumda doğrulanmadı; pilot müşteride teyit edilecek. | Kısmen tamam |
 | 6 | Kural motorunun ilk sürümü, metinlerden koşul çıkarımı | `RuleEvaluator` (13 operatör), deterministik kalıplar, alan beyaz listesi | Kalıp kütüphanesinin gerçek metinlerle genişletilmesi |
 | Ağırlık kalibrasyonu | Ölçüm altyapısı kuruldu: `ExpertVerdict` kaydı ve `CalibrationReport` (uyum oranı, yanlış pozitif/negatif, karışıklık matrisi, skor ayrım gücü). Ağırlıkların gerçek vaka verisiyle yeniden kalibre edilmesi örneklem 20 vakayı geçtiğinde yapılacak. | Ölçülebilir |
 | 8 | AI açıklama servisi, anlam eşleştirme, yönetici özetleri | OpenAI istemcisi, JSON şemalı kural çıkarımı, kural tabanlı yedek | Prompt iyileştirme, çıktı kalitesi ölçümü, maliyet takibi |

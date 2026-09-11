@@ -143,6 +143,7 @@ export function buildNavigation({
   const companyItems: NavItem[] = [
     { to: '/companies', label: 'Şirketlerim', icon: 'companies', end: true },
     { to: '/company', label: 'Şirket Profili', icon: 'companyProfile' },
+    { to: '/company/erp', label: 'ERP Bağlantısı', icon: 'sources' },
   ]
 
   // Grup ve hiyerarşi kurmak sahip/yönetici işidir; uzman ve görüntüleyici için

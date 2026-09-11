@@ -45,6 +45,9 @@ import type {
   CalibrationReport,
   RecordExpertVerdictRequest,
   AiSecondOpinionResult,
+  ErpConnection,
+  UpsertErpConnectionRequest,
+  ErpPullResult,
 } from './types'
 
 const TOKEN_STORAGE_KEY = 'govai.token'
@@ -289,6 +292,24 @@ export const api = {
     request<AiSecondOpinionResult>(`/api/calibration/companies/${companyId}/ai-review`, {
       method: 'POST',
     }),
+
+  // ---- ERP bağlantısı ----
+
+  /** Bağlantı kurulmamışsa sunucu 204 döner; istemci null görür. */
+  getErpConnection: (companyId: string) =>
+    request<ErpConnection | null>(`/api/erp/companies/${companyId}/connection`),
+
+  upsertErpConnection: (companyId: string, body: UpsertErpConnectionRequest) =>
+    request<ErpConnection>(`/api/erp/companies/${companyId}/connection`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  pullErpProfile: (companyId: string) =>
+    request<ErpPullResult>(`/api/erp/companies/${companyId}/pull`, { method: 'POST' }),
+
+  deleteErpConnection: (companyId: string) =>
+    request<void>(`/api/erp/companies/${companyId}/connection`, { method: 'DELETE' }),
 
   // ---- bildirimler ----
   listNotifications: (params: { companyId?: string; onlyUnread?: boolean; pageSize?: number }) =>

@@ -5,6 +5,7 @@ using GovAI.Application.Identity;
 using GovAI.Application.Notifications;
 using GovAI.Application.Opportunities;
 using GovAI.Application.Calibration;
+using GovAI.Application.Integrations;
 using GovAI.Application.Reporting;
 using GovAI.Application.Simulation;
 using GovAI.Application.Sources;
@@ -43,6 +44,8 @@ public static class DependencyInjection
         services.AddScoped<WeeklyReportService>();
         services.AddScoped<CalibrationService>();
         services.AddScoped<AiSecondOpinionService>();
+        services.AddScoped<ErpConnectionService>();
+        services.AddScoped<ErpPullService>();
         services.AddScoped<NotificationService>();
         services.AddScoped<AuthenticationService>();
 

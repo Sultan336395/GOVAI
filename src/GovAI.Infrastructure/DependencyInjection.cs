@@ -1,8 +1,10 @@
 using GovAI.Application.Abstractions.Services;
+using GovAI.Application.Integrations;
 using GovAI.Infrastructure.Ai;
 using GovAI.Infrastructure.Caching;
 using GovAI.Infrastructure.Identity;
 using GovAI.Infrastructure.Messaging;
+using GovAI.Infrastructure.Integrations;
 using GovAI.Infrastructure.Options;
 using GovAI.Infrastructure.Reporting;
 using GovAI.Infrastructure.Sources;
@@ -58,6 +60,12 @@ public static class DependencyInjection
             });
 
         services.AddScoped<IDocumentDownloader, SafeDocumentDownloader>();
+
+        // ERP kimlikleri geri çevrilebilir biçimde şifrelenir; özetlenemez, çünkü
+        // ERP'ye gönderilmeleri gerekir.
+        services.AddSingleton<ISecretProtector, AesGcmSecretProtector>();
+        services.AddHttpClient("erp");
+        services.AddScoped<IErpDataSource, HttpErpDataSource>();
         services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
         services.AddSingleton<ITokenService, JwtTokenService>();
         services.AddSingleton<IReportRenderer, ReportRenderer>();

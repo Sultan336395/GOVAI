@@ -127,6 +127,12 @@ export const fieldHelp = {
   yanlisNegatif: 'Sistem uygun değil dedi, danışman uygun dedi.',
   ornekYeterliligi: 'Oranların yorumlanabilmesi için gereken en az vaka sayısına ulaşıldı mı.',
   kuralDuzeltmeOrani: 'Danışmanın elle düzelttiği kuralların tüm kurallara oranı.',
+
+  // ── ERP bağlantısı ──
+  erpUrun: 'Firmanın kullandığı ERP ürünü; varsayılan alan eşlemesini belirler.',
+  erpAdres: 'ERP sisteminizin veri sunduğu ve yalnızca okunacak olan adres.',
+  erpKimlikBicimi: 'ERP sisteminin kimlik doğrulama biçimi.',
+  erpKimlik: 'Şifrelenerek saklanır; hiçbir ekranda geri gösterilmez.',
 } as const satisfies Record<string, string>
 
 export type FieldHelpKey = keyof typeof fieldHelp

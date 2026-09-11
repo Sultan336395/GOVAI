@@ -10,6 +10,7 @@ Amaç, altı ay sonra "bu neden böyle yapılmış" sorusunun kod arkeolojisi ge
 | [0003](0003-eksik-veri-elemez.md) | Eksik veri firmayı elemez | Kabul | `0` ile "girilmedi" ayrı şeydir; eksik profil `Indeterminate` üretir, eleme yapmaz |
 | [0004](0004-net10-hedefi.md) | .NET 8 yerine .NET 10 | Kabul | .NET 8 desteği projenin 6. ayında bitiyor; .NET 10 LTS |
 | [0005](0005-uzman-gorusu-skoru-degistirmez.md) | Uzman görüşü skoru değiştirmez | Kabul | Danışman kararı karar mekanizmasının girdisi değil denetçisidir; skor deterministik kalır |
+| [0006](0006-erp-cekme-yolu.md) | ERP verisi çekilir, itilmeyi beklemez | Kabul | İtme ucu sahada hiç kullanılmadı; GOVAI veriyi kendisi okur, bulunamayan alan sıfır yazılmaz |
 
 ## Yeni ADR yazarken
 

@@ -191,6 +191,15 @@ class GovAiClient:
         """
         return self._request("POST", "/api/eligibility/rescore-batch")
 
+    def pull_erp_profiles(self) -> dict[str, Any]:
+        """Firmaların ERP'lerinden profil verisini çeker.
+
+        Ciro, personel kırılımı ve belgeler firmanın kendi ERP'sinden okunur; profil
+        böylece elle güncellenmeyi beklemeden güncel kalır. ERP'de BULUNAMAYAN alan
+        eksik sayılır, sıfır yazılmaz.
+        """
+        return self._request("POST", "/api/erp/pull-batch")
+
     def collect_ai_second_opinions(self) -> dict[str, Any]:
         """Kural motorunun kararlarına yapay zekâdan bağımsız ikinci görüş toplar.
 

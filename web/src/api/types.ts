@@ -1427,3 +1427,64 @@ export interface RecordExpertVerdictRequest {
   disagreementReason: VerdictDisagreementReason
   note?: string | null
 }
+
+// ---- ERP bağlantısı ----
+
+export type ErpVendor = 'GenericRest' | 'Logo' | 'Netsis' | 'Sap' | 'Mikro' | 'Nebim'
+
+export type ErpAuthMode = 'ApiKeyHeader' | 'BearerToken' | 'BasicAuth'
+
+export type ErpSyncStatus = 'NeverRun' | 'Succeeded' | 'NoChange' | 'Failed'
+
+/** ERP yanıtındaki alanların GOVAI alanlarına eşlemesi. Nokta yolu kullanır. */
+export interface ErpFieldMap {
+  annualRevenue: string | null
+  balanceSize: string | null
+  equity: string | null
+  exportRevenue: string | null
+  employeeCount: string | null
+  womenEmployeeCount: string | null
+  youngEmployeeCount: string | null
+  rAndDEmployeeCount: string | null
+  disabledEmployeeCount: string | null
+  youngEmployeeMaxAge: string | null
+  certificates: string | null
+  certificateCodeField: string | null
+  certificateValidUntilField: string | null
+}
+
+export interface ErpConnection {
+  id: string
+  companyId: string
+  vendor: ErpVendor
+  baseUrl: string
+  authMode: ErpAuthMode
+  /** Kimliğin kendisi DEĞİL, varlığı. Sunucu sırrı hiçbir zaman döndürmez. */
+  hasSecret: boolean
+  isOnPremise: boolean
+  isEnabled: boolean
+  fieldMap: ErpFieldMap
+  lastRunAt: string | null
+  lastRunStatus: ErpSyncStatus
+  lastRunMessage: string | null
+  consecutiveFailureCount: number
+}
+
+export interface UpsertErpConnectionRequest {
+  vendor: ErpVendor
+  baseUrl: string
+  authMode: ErpAuthMode
+  /** Boş bırakılırsa mevcut kimlik korunur. */
+  secret?: string | null
+  isOnPremise: boolean
+  fieldMap?: ErpFieldMap | null
+}
+
+export interface ErpPullResult {
+  companyId: string
+  status: ErpSyncStatus
+  updatedSections: string[]
+  /** Eşlemede aranıp ERP yanıtında bulunamayan alanlar. */
+  missingFields: string[]
+  message: string
+}

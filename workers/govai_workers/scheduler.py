@@ -73,6 +73,30 @@ def _nightly_rescore(client: GovAiClient) -> None:
         log.exception("nightly_rescore_failed")
 
 
+def _erp_pull(client: GovAiClient) -> None:
+    """Firmaların ERP'lerinden profil verisini çeker.
+
+    Skorlama turundan ÖNCE çalışır: profil önce tazelenir, skorlar sonra o güncel
+    veriyle hesaplanır. Ters sırada çalışsa skorlar bir gün eski profille üretilir.
+
+    ERP'de bulunamayan alan eksik sayılır, sıfır yazılmaz; ERP bordro modülü
+    kullanmayan bir firmada elle girilmiş doğru personel verisi silinmez.
+    """
+    log.info("erp_pull_started")
+
+    try:
+        result = client.pull_erp_profiles() or {}
+        log.info(
+            "erp_pull_finished",
+            connections=result.get("connectionCount"),
+            succeeded=result.get("succeededCount"),
+            no_change=result.get("noChangeCount"),
+            failed=result.get("failedCount"),
+        )
+    except ApiError:
+        log.exception("erp_pull_failed")
+
+
 def _ai_second_opinions(client: GovAiClient) -> None:
     """Kural motorunun kararlarına bağımsız ikinci görüş toplar.
 
@@ -162,6 +186,20 @@ def main() -> int:
         CronTrigger(hour=3, minute=30),
         args=[client],
         id="nightly-rescore",
+        max_instances=1,
+        coalesce=True,
+    )
+
+    # ERP çekme: her gece 02:45, skorlama turundan (03:30) ÖNCE.
+    #
+    # Sıra önemli: profil önce tazelenir, skorlar sonra o güncel veriyle hesaplanır.
+    # Ters sırada skorlar bir gün eski profille üretilir ve firma dün düzelttiği
+    # eksiğin sonucunu bir gün sonra görür.
+    scheduler.add_job(
+        _erp_pull,
+        CronTrigger(hour=2, minute=45),
+        args=[client],
+        id="erp-pull",
         max_instances=1,
         coalesce=True,
     )

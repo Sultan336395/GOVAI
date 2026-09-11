@@ -20,6 +20,7 @@ import ActivatePage from '@/pages/ActivatePage'
 import LoginPage from '@/pages/LoginPage'
 import MatchesPage from '@/pages/MatchesPage'
 import CalibrationPage from '@/pages/CalibrationPage'
+import ErpConnectionPage from '@/pages/ErpConnectionPage'
 import WeeklyReportPage from '@/pages/WeeklyReportPage'
 import WeeklyReportsPage from '@/pages/WeeklyReportsPage'
 import MyCompaniesPage from '@/pages/MyCompaniesPage'
@@ -90,6 +91,7 @@ export default function App() {
         <Route path="/companies/members" element={<CompanyMembersPage />} />
 
         <Route path="/company" element={<CompanyPage />} />
+        <Route path="/company/erp" element={<ErpConnectionPage />} />
         <Route path="/simulation" element={<SimulationPage />} />
         <Route path="/weekly-reports" element={<WeeklyReportsPage />} />
         <Route path="/calibration" element={<CalibrationPage />} />
