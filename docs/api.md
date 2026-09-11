@@ -7,12 +7,39 @@ Enum'lar JSON'da **string** olarak taşınır. Hatalar RFC 7807 `ProblemDetails`
 
 ## Yetki politikaları
 
+İki kademe vardır ve karıştırılmamalıdır. **Politika** jetondaki kiracı/platform rolüne
+bakar ve ucun kapısıdır; **firma izni** (`CompanyPermission`) o firmadaki üyelikten
+veritabanında okunur ve asıl kararı verir. Aşağıdaki tabloların ikisi de geçerlidir:
+bölüm tablolarındaki `Read` / `Operate` / `ManageProfile` değerleri firma iznidir,
+politikanın kendisi değil.
+
 | Politika | Roller |
 |---|---|
 | `Read` | Oturum açmış tüm kullanıcılar |
 | `Operate` | SuperAdmin, CompanyManager, OperationUser, Consultant |
 | `ManageCompany` | SuperAdmin, CompanyManager |
 | `SuperAdmin` | SuperAdmin |
+| `CompanyData` | Kiracı rolleri (ReadOnly dahil). Platform rolleri ve worker **hariç** |
+| `ManageTenantCompanies` | Kiracı rolleri. Asıl karar üyelikten verilir |
+| `Rescore` | Kiracı operasyon rolleri + worker |
+| `PlatformCatalog` | PlatformCatalogManager |
+| `PlatformReview` | PlatformCatalogManager, PlatformReviewer |
+| `SystemIngest` | SystemIngest (worker) + PlatformCatalogManager |
+
+`CompanyData` platform rollerini bilinçli olarak dışarıda bırakır: veri toplama ve
+katalog işletimi kimliği müşteri verisini görmez.
+
+| Firma izni | Hangi firma rolleri karşılar |
+|---|---|
+| `Read` | Owner, Manager, Expert, Viewer |
+| `Operate` | Owner, Manager, Expert |
+| `ManageProfile` | Owner, Manager |
+| `ViewMembers` | Owner, Manager |
+| `ManageMembers` | Owner |
+
+Matris tek yerde tanımlıdır: `CompanyAccessGuard.Satisfies`. Uzman ve görüntüleyicinin
+firmadaki diğer kişilerin adını ve e-postasını görmesi için bir gerekçe yoktur; bu
+yüzden `ViewMembers` listeyi **okumayı** da sınırlar.
 
 ## Hata kodları
 
@@ -290,13 +317,79 @@ kaydı döner. Karantinadaki bir çağrı takibe alınamaz.
 Takip **silinmez**; bırakılan süreç `Vazgecildi` olur, böylece "bu ihaleye neden
 girmedik" sorusunun cevabı geçmişiyle kalır.
 
+## `/api/calibration` — uzman görüşü ve karar doğruluğu
+
+| Metot | Yol | Yetki |
+|---|---|---|
+| POST | `/api/calibration/verdicts` | Operate |
+| GET | `/api/calibration/companies/{companyId}/verdicts` | Read |
+| POST | `/api/calibration/companies/{companyId}/ai-review` | Operate |
+| GET | `/api/calibration/report` | Read |
+| POST | `/api/calibration/ai-review-batch` | SystemIngest |
+
+Uzman görüşü karar mekanizmasının **girdisi değil denetçisidir**: skoru, kararı ve
+ağırlıkları değiştirmez. Etkileseydi aynı firma–çağrı çifti geçmişte kimin baktığına
+göre farklı puan alırdı ve kayan puanın dayanağı çağrı metninde bulunmazdı.
+
+Aynı değerlendirme için ikinci kayıt açılmaz, mevcut kayıt güncellenir. Kayıt
+**silinmez** — uyumsuz çıkanların silinebilmesi, raporu istenen sonuca göre
+şekillendirmeyi mümkün kılardı.
+
+`ai-review` yapay zekâdan ikinci görüş toplar ve bu görüş de hiçbir skoru
+değiştirmez; yalnızca ayrışan vakaları insana işaret eder. Anahtar tanımlı değilse
+görüş **uydurulmaz**: yanıt `aiEnabled: false` döner ve hiçbir kayıt açılmaz.
+
+`report` iki kaynağı **ayrı** özetler (`human`, `ai`) ve ortak toplam alanı **yoktur**:
+danışman görüşü kalibrasyon ölçütüdür, yapay zekâ görüşü yalnızca taramadır. İkisi
+aynı metni okur ve aynı yanlışı birlikte yapabilirler; yüksek uyum oranı doğruluk
+değil ortak körlük olabilir. Örneklem 20'nin altındaysa rapor "yorumlanamaz"
+işaretlenir.
+
+Ayrıntı: `docs/adr/0005`.
+
+## `/api/erp` — ERP bağlantısı ve veri çekme
+
+| Metot | Yol | Yetki |
+|---|---|---|
+| GET | `/api/erp/field-map-defaults/{vendor}` | Read |
+| GET | `/api/erp/companies/{companyId}/connection` | Read |
+| PUT | `/api/erp/companies/{companyId}/connection` | ManageProfile |
+| POST | `/api/erp/companies/{companyId}/connection/enabled` | ManageProfile |
+| DELETE | `/api/erp/companies/{companyId}/connection` | ManageProfile |
+| POST | `/api/erp/companies/{companyId}/pull` | ManageProfile |
+| POST | `/api/erp/pull-batch` | SystemIngest |
+
+Bağlantı kurulmamışsa `GET .../connection` **204** döner; bu bir hata değildir.
+
+Alan eşlemesi panelden düzenlenir ve ürün varsayılanları
+`field-map-defaults/{vendor}` ile **sunucudan** alınır — arayüze kopyalanmış ikinci
+bir varsayılan listesi, iki taraf ayrıştığında sessizce yanlış alan okurdu.
+
+**Eşlemede aranıp ERP yanıtında bulunamayan alan `null` kalır, `0` yazılmaz.** Sıfır
+yazmak firmayı "hiç kadın çalışanı yok" diye kaydeder ve o firma kadın istihdamı
+şartı arayan her çağrıdan elenir. Aynı sebeple bir bölümün tamamı boşsa o bölüm hiç
+gönderilmez.
+
+Kimlik bilgisi AES-GCM ile şifrelenir ve **hiçbir yanıtta dönmez**; ERP sunucusunun
+hata gövdesi de kullanıcıya yansıtılmaz (gövde kimlik ya da personel verisi
+taşıyabilir). Özel IP'lere yalnızca "kurum içi" beyanıyla gidilir; bulut metadata
+adresi (169.254.169.254) **beyanla dahi** açılmaz.
+
+Ardışık beş başarısızlıkta bağlantı kendiliğinden devre dışı kalır.
+
+Ayrıntı: `docs/adr/0006`.
+
 ## `/api/notifications`
 
 | Metot | Yol | Yetki |
 |---|---|---|
 | GET | `/api/notifications` | Read |
 | POST | `/api/notifications/{id}/read` | Read |
-| POST | `/api/notifications/dispatch` | SuperAdmin |
+| POST | `/api/notifications/dispatch` | SystemIngest |
+
+`dispatch` ucunu bir kullanıcı değil **zamanlayıcı worker'ı** çağırır; bu yüzden
+yetkisi `SystemIngest`'tir. Kiracı yöneticisine açmak, bir kullanıcının bütün
+kiracının bildirim gönderimini tetikleyebilmesi demek olurdu.
 
 `dispatch` cevabı işlenen sayıyı değil **ne olduğunu** döner: `processedCount`,
 `sentCount`, `failedCount`, `skippedCount`.
