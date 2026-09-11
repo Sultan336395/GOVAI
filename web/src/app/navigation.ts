@@ -171,19 +171,23 @@ export function buildNavigation({
         { to: '/simulation', label: 'Senaryo Analizi', icon: 'scenario' },
       ],
     },
-    {
-      title: 'Raporlar',
-      items: [
-        { to: '/weekly-reports', label: 'Haftalık Raporlar', icon: 'report' },
-        { to: '/calibration', label: 'Karar Doğruluğu', icon: 'scenario' },
-      ],
-    },
   ]
 
   // Mevzuat kiracı kullanıcılarına da açıktır: resmî ve doğrulanmış kayıtları okurlar.
   groups.push({
     title: 'Mevzuat ve Uyum',
     items: [{ to: '/regulatory-changes', label: 'Mevzuat Değişiklikleri', icon: 'regulation' }],
+  })
+
+  // Raporlar EN ALTTA durur: diğer ekranların ÜRETTİĞİ çıktıdır, girdisi değil.
+  // Haftalık rapor firma profiline ve skorlara, karar doğruluğu da yine skorlara
+  // dayanır; ikisi de menüde beslendikleri bölümlerden sonra gelir.
+  groups.push({
+    title: 'Raporlar',
+    items: [
+      { to: '/weekly-reports', label: 'Haftalık Raporlar', icon: 'report' },
+      { to: '/calibration', label: 'Karar Doğruluğu', icon: 'scenario' },
+    ],
   })
 
   return groups

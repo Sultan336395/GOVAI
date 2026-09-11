@@ -102,12 +102,13 @@ describe('kiracı kullanıcıları', () => {
 
     // Genel en üstte, Şirket Yönetimi hemen ardından: ürünün her çıktısı firma
     // profiline dayanır, o yüzden beslediği ekranlardan önce durur.
+    // Raporlar EN ALTTA: diğer ekranların ürettiği çıktıdır, girdisi değil.
     expect(gruplar(ctx)).toEqual([
       'Genel',
       'Şirket Yönetimi',
       'Fırsat ve Analiz',
-      'Raporlar',
       'Mevzuat ve Uyum',
+      'Raporlar',
     ])
     expect(etiketler(ctx)).toContain('Mevzuat Değişiklikleri')
     expect(etiketler(ctx)).toContain('Haftalık Raporlar')
