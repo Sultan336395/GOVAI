@@ -387,6 +387,71 @@ tanımlananları yönetir; ERP kaynaklı kayıtlara dokunmaz.
 
 Ayrıntı: `docs/adr/0006`.
 
+## `/api/erp-auth` ve `/api/erp-module` — ERP entegrasyonu kimliği
+
+| Metot | Yol | Yetki |
+|---|---|---|
+| POST | `/api/erp-auth/token` | **Anonim** (imzalı beyanla) |
+| GET | `/api/erp-module/whoami` | ErpModule jetonu |
+| GET | `/api/erp-module/notifications` | ErpModule jetonu |
+| GET | `/api/erp/companies/{companyId}/service-identities` | ManageProfile |
+| POST | `/api/erp/companies/{companyId}/service-identities` | ManageProfile |
+| POST | `/api/erp/service-identities/{identityId}/keys` | ManageProfile |
+| DELETE | `/api/erp/service-identities/{identityId}/keys/{keyId}` | ManageProfile |
+| POST | `/api/erp/service-identities/{identityId}/enabled?enabled=` | ManageProfile |
+
+Müşteri çalışanlarının GOVAI hesabı **yoktur**. ERP, şirket başına tanımlı bir
+**servis kimliğiyle** bağlanır: GOVAI yalnızca ERP'nin **açık** anahtarını saklar,
+hiçbir sır tutmaz. Ayrıntılı gerekçe: `docs/adr/0007`.
+
+### Jeton alma
+
+ERP kendi özel anahtarıyla kısa ömürlü bir beyan imzalar ve `POST /api/erp-auth/token`
+ile jetona çevirir:
+
+```json
+{ "assertion": "eyJhbGciOiJFUzI1NiIsImtpZCI6Ims..." }
+```
+
+Beyanın taşıması gerekenler:
+
+| Alan | Değer |
+|---|---|
+| başlık `alg` | `ES256` veya `RS256` — kayıtlı anahtarın algoritmasıyla **birebir** aynı |
+| başlık `kid` | Kayıtlı anahtarın kimliği; yoksa reddedilir (anahtarlar tek tek denenmez) |
+| `iss` | Servis kimliğinin `clientId` değeri |
+| `sub` | ERP kullanıcısının kimliği; `iss` ile aynıysa **servis** beyanı sayılır |
+| `aud` | Jeton ucunun tam adresi |
+| `jti` | Her beyanda benzersiz; tekrar oynatmayı bu engeller |
+| `iat` / `exp` | Aradaki fark en çok **300 saniye** |
+| `name` | İsteğe bağlı; yalnızca denetim izinde kullanılır |
+
+Yanıt kısa ömürlü bir jeton, jetonun konuşabileceği **tek** şirket ve kapsamı döner.
+
+Reddedilme sebebi **ayrıştırılmadan** döner: bilinmeyen istemci, devre dışı kimlik,
+bozuk imza ve süresi dolmuş beyan aynı `401` cevabını alır. Ayırt edilseydi saldırgan
+hangi istemci kimliklerinin var olduğunu ve nerede takıldığını öğrenirdi. Sebep yalnızca
+sunucu kaydına yazılır.
+
+Uç anonimdir ve **hız sınırlıdır** (adres başına dakikada 30).
+
+### ERP modülü uçları
+
+Kiracı ve şirket **yalnızca jetondan** okunur; bu yüzden uçlarda şirket parametresi
+**yoktur** — olmayan parametre kötüye kullanılamaz. Jetonun alıcısı panel jetonundan
+ayrıdır: ERP jetonu panel uçlarında, panel jetonu ERP modülü uçlarında **geçmez**.
+
+Yüzey yalnızca **okumadır**; ERP modülü GOVAI'de hiçbir şey değiştirmez.
+
+### Anahtar yönetimi
+
+Bir kimlikte **birden çok anahtar** aynı anda etkin olabilir; değişim böylece
+kesintisizdir. İptal edilen anahtar silinmez, ne zaman iptal edildiği kalır. Son
+anahtar da iptal edilebilir — sızıntı şüphesinde entegrasyonu durdurmak, çalışır
+tutmaktan önemlidir.
+
+Kayıt ucuna **özel anahtar** yapıştırılırsa `422` ile reddedilir.
+
 ## `/api/notifications`
 
 | Metot | Yol | Yetki |

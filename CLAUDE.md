@@ -328,6 +328,39 @@ kiracı başına çalıştırılmalıdır.
 
 Koruyan testler: `NotificationChannelPolicyTests` (8), `DocumentMissingNotificationTests` (6).
 
+### 2.2.10 ERP kimliği paylaşılan sırla kurulmaz
+
+GOVAI, ERP entegrasyonu için **hiçbir sır saklamaz**; yalnızca şirketin ERP'sine ait
+**açık** anahtarı tutar. ERP her istekte en çok 300 saniyelik, tek kullanımlık bir
+beyan imzalar ve onu kısa ömürlü bir jetona çevirir (`/api/erp-auth/token`).
+
+Paylaşılan sır kullanılsaydı: GOVAI onu saklamak zorunda kalırdı (yedek, log,
+yapılandırma), sızdığında süresiz kullanılabilirdi, sızdığı anlaşılmazdı ve kurulumda
+"anahtarı bir kez gösteriyoruz" adımı olurdu — sahada en sık sızma yolu odur.
+
+Gevşetilmemesi gereken kararlar:
+
+| Karar | Neden |
+|---|---|
+| Başlıktaki `alg`, anahtarın **kayıtlı** algoritmasıyla karşılaştırılır | Yoksa saldırgan `HS256` yazıp saklanan açık anahtarı HMAC sırrı gibi kullanır; açık anahtar herkese açık olduğu için imza "geçerli" çıkar |
+| `kid` zorunlu; anahtarlar tek tek **denenmez** | İptal edilmiş anahtarın sessizce kullanılmasını ve maliyetin anahtar sayısıyla çarpılmasını önler |
+| `jti` **veritabanında** benzersiz indeksle tutulur | Önbellekte olsaydı Redis kapalıyken koruma sessizce kalkardı |
+| Beyan ömrü **300 saniyeyle** sınırlı | Aksi hâlde ERP bir kez uzun ömürlü beyan üretip düz makine anahtarına döner |
+| Kiracı ve şirket **kimlik kaydından** okunur | Beyandan okunsaydı ERP başka şirketin verisini isteyebilirdi |
+| ERP jetonunun **alıcısı ve şeması ayrı** | Aynı olsaydı dar yetkili entegrasyon jetonu bütün API'yi açardı |
+| Ret sebebi dışarıya **ayrıştırılmadan** döner | Ayırt edilseydi istemci kimliği taraması mümkün olurdu |
+
+Bir kimlikte birden çok anahtar etkin olabilir; tek anahtar zorunlu olsaydı her değişim
+kesinti demek olur, bu da anahtarların hiç değiştirilmemesine yol açardı.
+
+**Bilinen tuzak:** OpenSSL ES256 imzasını DER kodlu döner, JWT ham `r||s` bekler.
+Dönüştürülmezse beyan üretici tarafta sorunsuz görünür, doğrulayıcıda **sessizce**
+reddedilir. `ErpAssertionVerifierTests.EI14` bunu dil bağımsız sınar.
+
+Gerekçe: `docs/adr/0007`. Koruyan testler: `ErpAssertionPolicyTests` (14),
+`ErpServiceIdentityTests` alan modeli (10), `ErpAssertionVerifierTests` (14),
+`ErpServiceIdentityTests` API (18).
+
 ### 2.3 Skor ağırlıklarının toplamı 1.0'dır
 
 `ScoreWeights` yapıcısı bunu doğrular ve ihlalde `DomainException` atar.
@@ -397,7 +430,7 @@ Solution dosyası **`GovAI.slnx`**'tir (yeni XML formatı), `.sln` değil.
 
 ```bash
 dotnet build -c Release          # tüm .NET projeleri
-dotnet test                      # 1117 test (251 domain + 474 application + 392 API)
+dotnet test                      # 1173 test (275 domain + 488 application + 410 API)
 ```
 
 ```bash

@@ -5,7 +5,14 @@ entegrasyonu buradan denenecek; ileride başka ERP'ler de bağlanacağı için b
 **IKPROF'a özel yazılmaz**, bir liman (port) arkasına konur ve IKPROF yalnızca ilk
 uyarlayıcıdır (adapter).
 
-> **Durum:** Sözleşme ve iskele hazır, **gerçek bağlantı yok.** IKPROF tarafının API
+> **Durum (12.09.2026):** Kimlik doğrulama hattı **kuruldu ve iki uçta da yazıldı**
+> (ADR-0007): GOVAI'de `/api/erp-auth/token` ve `/api/erp-module/*`, IKPROF'ta
+> `GovAiAssertionSigner` + `GovAiClient` + `/govai` ekranı. GOVAI tarafı uçtan uca
+> testlerle doğrulandı. **IKPROF tarafı çalıştırılarak doğrulanmadı** — geliştirme
+> ortamında PHP yok; testleri IKPROF sunucusunda koşturulmalı. Profil aktarımı
+> (§3) hâlâ sahte uyarlayıcıyla temsil ediliyor.
+>
+> **Eski durum:** Sözleşme ve iskele hazır, **gerçek bağlantı yok.** IKPROF tarafının API
 > bilgileri gelmedi; bu belgede tanımlı uçlar GOVAI tarafında karşılanır, IKPROF tarafı
 > ise sahte (mock) uyarlayıcıyla temsil edilir. "Bağlantı kuruldu" diye raporlanmaz.
 
@@ -43,7 +50,7 @@ Sözleşmede alan olmaması bilinçli bir korumadır: alan varsa bir gün dolar.
 
 | Konu | Karar |
 |---|---|
-| Kimlik | OAuth2 **client credentials** (makine kimliği). Kullanıcı jetonu kullanılmaz; entegrasyon bir kişinin oturumuna bağlanmaz. |
+| Kimlik | **DEĞİŞTİRİLDİ (ADR-0007).** Paylaşılan sır yerine şirket başına **servis kimliği** ve kısa ömürlü **imzalı beyan** kullanılır: GOVAI yalnızca açık anahtarı saklar. ERP kullanıcısı için ayrıca kısa ömürlü kullanıcı jetonu verilir; o kullanıcının GOVAI hesabı yoktur. |
 | Kapsam (scope) | `ikprof.company.write` (gelen), `ikprof.signal.read` (giden). Tek bir istemci ikisini de alabilir ama uçlar ayrı yetkilendirilir. |
 | Kiracı yalıtımı | Jeton tek bir `tenantId` taşır. Başka kiracının şirketine yazma denemesi **404** döner — 403 değil: varlığın var olduğu bile sızdırılmaz. |
 | Şirket yalıtımı | `externalCompanyId` → GOVAI `companyId` eşlemesi kiracı içinde tekildir. Eşleme yoksa kayıt açılmaz; sessizce yeni şirket oluşturulmaz. |
@@ -51,7 +58,7 @@ Sözleşmede alan olmaması bilinçli bir korumadır: alan varsa bir gün dolar.
 | Yeniden deneme | 5xx ve ağ hatalarında üstel geri çekilme, en fazla 5 deneme. Sonrasında mesaj ölü mektup kuyruğuna gider ve operatöre görünür. |
 | Denetim kaydı | Her başarılı yazma `Integration.CompanySnapshotApplied` olarak audit log'a düşer. **Gerçekleşmeyen işlem yazılmaz.** |
 | Onay | Şirket sahibi entegrasyonu panelden açmadan hiçbir veri kabul edilmez. Onay geri alınabilir; alındığında akış durur. |
-| Sır yönetimi | `clientSecret` ve jetonlar **loglanmaz**, hata mesajına ve rapora girmez. Yapılandırmada saklanır, kod ve veritabanında düz metin tutulmaz. |
+| Sır yönetimi | **DEĞİŞTİRİLDİ (ADR-0007).** `clientSecret` artık **yoktur**; GOVAI'de saklanan hiçbir değer tek başına o şirket adına konuşmaya yetmez. IKPROF'un özel anahtarı yalnızca kendi sunucusunda, izinli bir dosyada durur; jetonlar loglanmaz. |
 | Veri minimizasyonu | Sözleşmede tanımlı olmayan alan gövdede gelse bile **yok sayılır**, saklanmaz. |
 | Silme | GOVAI, IKPROF'ta veri silemez. IKPROF'un GOVAI'de silebileceği tek şey kendi gönderdiği eşlemedir. |
 

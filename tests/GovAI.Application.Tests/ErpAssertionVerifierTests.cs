@@ -299,6 +299,81 @@ public class ErpAssertionVerifierTests
         Assert.Equal(ErpPrincipalKind.Service, sonuc.Claims!.Kind);
     }
 
+    [Fact(DisplayName = "EI14. PHP tarafının DER→P1363 dönüşümü GOVAI'de KABUL EDİLİR")]
+    public void Php_imza_donusumu_kabul_edilir()
+    {
+        // IKPROF tarafı PHP'dedir ve OpenSSL, ES256 imzasını DER kodlu döner; JWT ise
+        // iki 32 baytlık tamsayının yan yana yazıldığı (IEEE P1363) biçimi bekler.
+        // Dönüşüm yanlış olsaydı beyan PHP'de sorunsuz üretilir ama burada sessizce
+        // reddedilirdi. Aşağıdaki dönüşüm, PHP'deki derToP1363 ile ADIM ADIM AYNIDIR;
+        // bu test onun doğruluğunu dil bağımsız olarak kanıtlar.
+        var (ozel, kayit) = EcAnahtar("k1");
+
+        var basli = Base64UrlEncoder.Encode("""{"alg":"ES256","typ":"JWT","kid":"k1"}""");
+        var iat = Simdi.ToUnixTimeSeconds();
+        var govde = Base64UrlEncoder.Encode(
+            $$"""{"iss":"{{Istemci}}","sub":"u1","aud":"{{Alici}}","jti":"j-php","iat":{{iat}},"exp":{{iat + 60}}}""");
+
+        var imzalanan = Encoding.ASCII.GetBytes($"{basli}.{govde}");
+
+        // OpenSSL'in döndürdüğü biçim.
+        var der = ozel.SignData(
+            imzalanan, HashAlgorithmName.SHA256, DSASignatureFormat.Rfc3279DerSequence);
+
+        var beyan = $"{basli}.{govde}.{Base64UrlEncoder.Encode(DerdenP1363e(der))}";
+
+        var sonuc = _dogrulayici.Verify(beyan, [kayit]);
+
+        Assert.True(sonuc.IsValid, $"reddedildi: {sonuc.Rejection} — {sonuc.Detail}");
+        Assert.Equal("u1", sonuc.Claims!.Subject);
+    }
+
+    /// <summary>PHP'deki <c>derToP1363</c> ile birebir aynı algoritma.</summary>
+    private static byte[] DerdenP1363e(byte[] der)
+    {
+        var offset = 0;
+
+        Assert.Equal(0x30, der[offset++]);
+
+        var uzunluk = der[offset++];
+
+        if (uzunluk > 0x80)
+        {
+            offset += uzunluk - 0x80;
+        }
+
+        var r = DerTamsayi(der, ref offset);
+        var s = DerTamsayi(der, ref offset);
+
+        return [.. Otuzİki(r), .. Otuzİki(s)];
+    }
+
+    private static byte[] DerTamsayi(byte[] der, ref int offset)
+    {
+        Assert.Equal(0x02, der[offset++]);
+
+        var uzunluk = der[offset++];
+        var deger = der[offset..(offset + uzunluk)];
+
+        offset += uzunluk;
+
+        return deger;
+    }
+
+    /// <summary>DER en kısa biçimde yazar; değer 31 de 33 bayt da olabilir.</summary>
+    private static byte[] Otuzİki(byte[] deger)
+    {
+        var temiz = deger.SkipWhile(b => b == 0).ToArray();
+
+        Assert.True(temiz.Length <= 32);
+
+        var sonuc = new byte[32];
+
+        temiz.CopyTo(sonuc, 32 - temiz.Length);
+
+        return sonuc;
+    }
+
     [Fact(DisplayName = "EI13. Hata ayrıntısı dışarıya SIZDIRILMAZ biçimde sınıflandırılır")]
     public void Hata_siniflandirilir()
     {
