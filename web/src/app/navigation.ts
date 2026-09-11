@@ -109,37 +109,6 @@ export function buildNavigation({
     return platform
   }
 
-  const groups: NavGroup[] = [
-    {
-      title: 'Genel',
-      items: [
-        { to: '/', label: 'Genel Bakış', icon: 'overview', end: true },
-        { to: '/notifications', label: 'Bildirimler', icon: 'notifications' },
-      ],
-    },
-    {
-      title: 'Fırsat ve Analiz',
-      items: [
-        { to: '/matches', label: 'Fırsat Eşleşmelerim', icon: 'matches' },
-        { to: '/opportunities', label: 'Fon, Hibe ve İhale Kataloğu', icon: 'catalog' },
-        { to: '/simulation', label: 'Senaryo Analizi', icon: 'scenario' },
-      ],
-    },
-    {
-      title: 'Raporlar',
-      items: [
-        { to: '/weekly-reports', label: 'Haftalık Raporlar', icon: 'report' },
-        { to: '/calibration', label: 'Karar Doğruluğu', icon: 'scenario' },
-      ],
-    },
-  ]
-
-  // Mevzuat kiracı kullanıcılarına da açıktır: resmî ve doğrulanmış kayıtları okurlar.
-  groups.push({
-    title: 'Mevzuat ve Uyum',
-    items: [{ to: '/regulatory-changes', label: 'Mevzuat Değişiklikleri', icon: 'regulation' }],
-  })
-
   const companyItems: NavItem[] = [
     { to: '/companies', label: 'Şirketlerim', icon: 'companies', end: true },
     { to: '/company', label: 'Şirket Profili', icon: 'companyProfile' },
@@ -178,7 +147,43 @@ export function buildNavigation({
     })
   }
 
-  groups.push({ title: 'Şirket Yönetimi', items: companyItems })
+  const groups: NavGroup[] = [
+    // Şirket Yönetimi EN ÜSTTE durur.
+    //
+    // Ürünün her çıktısı firma profiline dayanır: profil eksikse skorlar belirsiz çıkar,
+    // haftalık rapor "değerlendirme yapılamadı" der ve ERP bağlantısı kurulmadan veri
+    // elle girilmeyi bekler. Kullanıcının önce göreceği yer, diğer ekranların beslendiği
+    // yer olmalıdır.
+    { title: 'Şirket Yönetimi', items: companyItems },
+    {
+      title: 'Genel',
+      items: [
+        { to: '/', label: 'Genel Bakış', icon: 'overview', end: true },
+        { to: '/notifications', label: 'Bildirimler', icon: 'notifications' },
+      ],
+    },
+    {
+      title: 'Fırsat ve Analiz',
+      items: [
+        { to: '/matches', label: 'Fırsat Eşleşmelerim', icon: 'matches' },
+        { to: '/opportunities', label: 'Fon, Hibe ve İhale Kataloğu', icon: 'catalog' },
+        { to: '/simulation', label: 'Senaryo Analizi', icon: 'scenario' },
+      ],
+    },
+    {
+      title: 'Raporlar',
+      items: [
+        { to: '/weekly-reports', label: 'Haftalık Raporlar', icon: 'report' },
+        { to: '/calibration', label: 'Karar Doğruluğu', icon: 'scenario' },
+      ],
+    },
+  ]
+
+  // Mevzuat kiracı kullanıcılarına da açıktır: resmî ve doğrulanmış kayıtları okurlar.
+  groups.push({
+    title: 'Mevzuat ve Uyum',
+    items: [{ to: '/regulatory-changes', label: 'Mevzuat Değişiklikleri', icon: 'regulation' }],
+  })
 
   return groups
 }

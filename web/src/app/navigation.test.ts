@@ -100,12 +100,14 @@ describe('kiracı kullanıcıları', () => {
   it('mevzuat şirket kullanıcısına açıktır, platform ekranları değildir', () => {
     const ctx = baglam()
 
+    // Şirket Yönetimi EN ÜSTTEDİR: ürünün her çıktısı firma profiline dayanır,
+    // kullanıcının önce göreceği yer diğer ekranların beslendiği yer olmalıdır.
     expect(gruplar(ctx)).toEqual([
+      'Şirket Yönetimi',
       'Genel',
       'Fırsat ve Analiz',
       'Raporlar',
       'Mevzuat ve Uyum',
-      'Şirket Yönetimi',
     ])
     expect(etiketler(ctx)).toContain('Mevzuat Değişiklikleri')
     expect(etiketler(ctx)).toContain('Haftalık Raporlar')
