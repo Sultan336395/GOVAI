@@ -70,6 +70,9 @@ public class GovAiDbContext(
     public DbSet<WeeklyReport> WeeklyReports => Set<WeeklyReport>();
     public DbSet<ExpertVerdict> ExpertVerdicts => Set<ExpertVerdict>();
     public DbSet<ErpConnection> ErpConnections => Set<ErpConnection>();
+    public DbSet<ErpServiceIdentity> ErpServiceIdentities => Set<ErpServiceIdentity>();
+    public DbSet<ErpSigningKey> ErpSigningKeys => Set<ErpSigningKey>();
+    public DbSet<ErpAssertionUse> ErpAssertionUses => Set<ErpAssertionUse>();
     public DbSet<ReportInquiry> ReportInquiries => Set<ReportInquiry>();
     public DbSet<TenderPursuit> TenderPursuits => Set<TenderPursuit>();
     public DbSet<TenderPursuitEvent> TenderPursuitEvents => Set<TenderPursuitEvent>();
@@ -165,6 +168,16 @@ public class GovAiDbContext(
 
         modelBuilder.Entity<ErpConnection>()
             .HasQueryFilter(c => c.TenantId == _tenantId);
+
+        modelBuilder.Entity<ErpServiceIdentity>()
+            .HasQueryFilter(i => i.TenantId == _tenantId);
+
+        modelBuilder.Entity<ErpSigningKey>()
+            .HasQueryFilter(k => k.TenantId == _tenantId);
+
+        // ErpAssertionUse BİLEREK süzgeçsizdir: kimlik doğrulamanın iç izidir, müşteri
+        // verisi değildir ve jeton ucu oturumsuz çalıştığı için süzgeç onu görünmez
+        // yapar, tekrar koruması sessizce devre dışı kalırdı.
 
         modelBuilder.Entity<ReportInquiry>()
             .HasQueryFilter(i => i.TenantId == _tenantId);

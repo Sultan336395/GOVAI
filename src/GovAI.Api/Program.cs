@@ -8,7 +8,9 @@ using GovAI.Persistence;
 using GovAI.Persistence.Seed;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
+using System.Threading.RateLimiting;
 using Microsoft.OpenApi;
 using Serilog;
 
@@ -34,6 +36,11 @@ builder.Services.AddScoped<DatabaseSeeder>();
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
     ?? throw new InvalidOperationException("Jwt bölümü tanımlı değil.");
 
+var erpAuthOptions = builder.Configuration
+    .GetSection(GovAI.Infrastructure.Options.ErpAuthOptions.SectionName)
+    .Get<GovAI.Infrastructure.Options.ErpAuthOptions>()
+    ?? new GovAI.Infrastructure.Options.ErpAuthOptions();
+
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -46,6 +53,23 @@ builder.Services
             ValidateIssuerSigningKey = true,
             ValidIssuer = jwtOptions.Issuer,
             ValidAudience = jwtOptions.Audience,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SigningKey)),
+            ClockSkew = TimeSpan.FromMinutes(1)
+        };
+    })
+    // ERP modülü jetonu AYRI bir şemadır ve ayrı bir ALICI (audience) doğrular.
+    // Tek şema kullanılsaydı, ERP için verilen kısa ömürlü jeton panelin bütün
+    // uçlarında da geçerli olurdu; oysa o jeton ne rol ne kiracı kapsamı taşır.
+    .AddJwtBearer(ErpModuleDefaults.Scheme, options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = jwtOptions.Issuer,
+            ValidAudience = erpAuthOptions.TokenAudience,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SigningKey)),
             ClockSkew = TimeSpan.FromMinutes(1)
         };
@@ -108,6 +132,17 @@ builder.Services.AddAuthorization(options =>
         nameof(GovAI.Domain.Common.UserRole.Consultant),
         nameof(GovAI.Domain.Common.UserRole.ReadOnly)));
 
+    // ERP modülü: YALNIZCA kendi şeması kabul edilir ve kapsam claim'i aranır.
+    // Şema kısıtlanmasaydı, panel kullanıcısının jetonu da bu uçları açardı.
+    options.AddPolicy(ErpModuleDefaults.Policy, policy => policy
+        .AddAuthenticationSchemes(ErpModuleDefaults.Scheme)
+        .RequireAuthenticatedUser()
+        .RequireClaim(
+            GovAI.Infrastructure.Integrations.ErpModuleClaims.Scope,
+            GovAI.Application.Integrations.ErpTokenService.Scope)
+        .RequireClaim(GovAI.Infrastructure.Integrations.ErpModuleClaims.CompanyId)
+        .RequireClaim(GovAI.Infrastructure.Integrations.ErpModuleClaims.TenantId));
+
     options.AddPolicy(Policies.Read, policy => policy.RequireAuthenticatedUser());
 });
 
@@ -159,6 +194,26 @@ builder.Services.AddCors(options => options.AddPolicy(CorsPolicy, policy => poli
     .AllowAnyMethod()
     .AllowCredentials()));
 
+// ---- Hız sınırı ----
+// Yalnızca ERP jeton ucu için. Uç anonimdir ve imza doğrulaması ucuz değildir;
+// sınırsız bırakılırsa hem kaynak tüketim aracı hem de istemci kimliği tarama aracı
+// olur. Anahtar istemci kimliğine değil ADRESE göredir: istemci kimliği saldırganın
+// kontrolündedir ve her istekte değiştirilebilirdi.
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    options.AddPolicy(GovAI.Api.Controllers.ErpAuthController.RateLimitPolicy, http =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            http.Connection.RemoteIpAddress?.ToString() ?? "bilinmeyen",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 30,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+            }));
+});
+
 var app = builder.Build();
 
 app.UseExceptionHandler();
@@ -179,6 +234,7 @@ else
 }
 
 app.UseCors(CorsPolicy);
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 

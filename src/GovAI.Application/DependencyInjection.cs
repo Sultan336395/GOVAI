@@ -47,6 +47,9 @@ public static class DependencyInjection
         services.AddScoped<ReportInquiryService>();
         services.AddScoped<TenderPursuitService>();
         services.AddScoped<NotificationRecipientService>();
+        services.AddScoped<ErpTokenService>();
+        services.AddScoped<ErpModuleService>();
+        services.AddScoped<ErpServiceIdentityService>();
         services.AddScoped<DashboardInsightsService>();
         services.AddScoped<CalibrationService>();
         services.AddScoped<AiSecondOpinionService>();

@@ -43,6 +43,11 @@ public static class DependencyInjection
         services.Configure<RedisOptions>(configuration.GetSection(RedisOptions.SectionName));
         services.Configure<RabbitMqOptions>(configuration.GetSection(RabbitMqOptions.SectionName));
         services.Configure<EmailOptions>(configuration.GetSection(EmailOptions.SectionName));
+        services.Configure<ErpAuthOptions>(configuration.GetSection(ErpAuthOptions.SectionName));
+
+        services.AddSingleton<ErpAssertionVerifier>();
+        services.AddSingleton<IErpAssertionReader, ErpAssertionReader>();
+        services.AddSingleton<IErpTokenIssuer, ErpTokenIssuer>();
 
         services.AddHttpContextAccessor();
         services.AddSingleton<IDateTimeProvider, SystemDateTimeProvider>();

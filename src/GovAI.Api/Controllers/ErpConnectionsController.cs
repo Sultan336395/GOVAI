@@ -27,8 +27,61 @@ namespace GovAI.Api.Controllers;
 public sealed class ErpConnectionsController(
     ErpConnectionService connections,
     ErpPullService pull,
-    NotificationRecipientService recipients) : ControllerBase
+    NotificationRecipientService recipients,
+    ErpServiceIdentityService serviceIdentities) : ControllerBase
 {
+    /// <summary>
+    /// Firmanın ERP servis kimlikleri.
+    ///
+    /// <para>
+    /// Yanıtta <b>hiçbir sır yoktur</b> — saklanan tek şey ERP'nin açık anahtarıdır.
+    /// Düz makine anahtarında burada "anahtarı bir kez gösteriyoruz" adımı olurdu ve o
+    /// an ekran görüntüsüne, sohbete ve bilet sistemine düşerdi.
+    /// </para>
+    /// </summary>
+    [HttpGet("companies/{companyId:guid}/service-identities")]
+    [Produces("application/json")]
+    public async Task<ActionResult<IReadOnlyList<ErpServiceIdentityDto>>> ServiceIdentities(
+        Guid companyId,
+        CancellationToken cancellationToken) =>
+        Ok(await serviceIdentities.ListAsync(companyId, cancellationToken));
+
+    /// <summary>Yeni servis kimliği tanımlar; ERP'nin açık anahtarını kaydeder.</summary>
+    [HttpPost("companies/{companyId:guid}/service-identities")]
+    [Audited("ErpServiceIdentity.Created", "Company", RouteKey = "companyId")]
+    public async Task<ActionResult<ErpServiceIdentityDto>> CreateServiceIdentity(
+        Guid companyId,
+        [FromBody] CreateErpIdentityRequest request,
+        CancellationToken cancellationToken) =>
+        Ok(await serviceIdentities.CreateAsync(companyId, request, cancellationToken));
+
+    /// <summary>Anahtar ekler. Değişim sırasında iki anahtar birlikte etkin kalabilir.</summary>
+    [HttpPost("service-identities/{identityId:guid}/keys")]
+    [Audited("ErpServiceIdentity.KeyAdded", "ErpServiceIdentity", RouteKey = "identityId")]
+    public async Task<ActionResult<ErpServiceIdentityDto>> AddKey(
+        Guid identityId,
+        [FromBody] AddErpKeyRequest request,
+        CancellationToken cancellationToken) =>
+        Ok(await serviceIdentities.AddKeyAsync(identityId, request, cancellationToken));
+
+    /// <summary>Anahtarı iptal eder. Kayıt silinmez; ne zaman iptal edildiği kalır.</summary>
+    [HttpDelete("service-identities/{identityId:guid}/keys/{keyId}")]
+    [Audited("ErpServiceIdentity.KeyRevoked", "ErpServiceIdentity", RouteKey = "identityId")]
+    public async Task<ActionResult<ErpServiceIdentityDto>> RevokeKey(
+        Guid identityId,
+        string keyId,
+        CancellationToken cancellationToken) =>
+        Ok(await serviceIdentities.RevokeKeyAsync(identityId, keyId, cancellationToken));
+
+    /// <summary>Kimliği açar veya kapatır. Kapatma dakikalar içinde etkili olur.</summary>
+    [HttpPost("service-identities/{identityId:guid}/enabled")]
+    [Audited("ErpServiceIdentity.EnabledChanged", "ErpServiceIdentity", RouteKey = "identityId")]
+    public async Task<ActionResult<ErpServiceIdentityDto>> SetIdentityEnabled(
+        Guid identityId,
+        [FromQuery] bool enabled,
+        CancellationToken cancellationToken) =>
+        Ok(await serviceIdentities.SetEnabledAsync(identityId, enabled, cancellationToken));
+
     /// <summary>
     /// Şirketin bildirim sorumluları.
     ///

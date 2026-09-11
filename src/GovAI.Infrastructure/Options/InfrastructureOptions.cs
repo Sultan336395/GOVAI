@@ -134,3 +134,38 @@ public sealed class EmailOptions
         && Port > 0
         && !string.IsNullOrWhiteSpace(FromAddress);
 }
+
+/// <summary>
+/// ERP servis kimliği ile kimlik doğrulama.
+///
+/// <para>
+/// Burada <b>hiçbir sır yoktur</b> ve olmamalıdır: GOVAI yalnızca ERP'lerin açık
+/// anahtarlarını saklar. Ayarlar yalnızca alıcı adları ve ömürlerden ibarettir.
+/// </para>
+/// </summary>
+public sealed class ErpAuthOptions
+{
+    public const string SectionName = "ErpAuth";
+
+    /// <summary>
+    /// Beyanın <c>aud</c> alanında yazması gereken değer.
+    ///
+    /// <para>
+    /// Jeton ucunun tam adresidir. ERP'nin başka bir servis için ürettiği geçerli imzalı
+    /// beyan böylece GOVAI'de kullanılamaz.
+    /// </para>
+    /// </summary>
+    public string AssertionAudience { get; set; } = "https://govai.yuppi.cloud/api/erp-auth/token";
+
+    /// <summary>
+    /// Verilen jetonun alıcısı. Kullanıcı jetonunun alıcısından <b>ayrıdır</b>;
+    /// aynı olsaydı ERP modülü jetonu panelin bütün uçlarında geçerli olurdu.
+    /// </summary>
+    public string TokenAudience { get; set; } = "govai-erp-module";
+
+    /// <summary>
+    /// Jeton ömrü (saniye). Kısa tutulur: uzun ömür modeli düz makine anahtarına
+    /// çevirir ve kimliği iptal etmenin etkisini geciktirir.
+    /// </summary>
+    public int TokenLifetimeSeconds { get; set; } = 600;
+}
