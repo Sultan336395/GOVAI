@@ -69,6 +69,7 @@ public class GovAiDbContext(
     public DbSet<WeeklyReport> WeeklyReports => Set<WeeklyReport>();
     public DbSet<ExpertVerdict> ExpertVerdicts => Set<ExpertVerdict>();
     public DbSet<ErpConnection> ErpConnections => Set<ErpConnection>();
+    public DbSet<ReportInquiry> ReportInquiries => Set<ReportInquiry>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<AuditLogEntry> AuditLog => Set<AuditLogEntry>();
 
@@ -160,6 +161,9 @@ public class GovAiDbContext(
 
         modelBuilder.Entity<ErpConnection>()
             .HasQueryFilter(c => c.TenantId == _tenantId);
+
+        modelBuilder.Entity<ReportInquiry>()
+            .HasQueryFilter(i => i.TenantId == _tenantId);
 
         modelBuilder.Entity<AnalysisRun>()
             .HasQueryFilter(r => r.TenantId == _tenantId);

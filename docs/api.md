@@ -218,6 +218,41 @@ Simülasyon firma kaydına **dokunmaz**.
 
 Dışa aktarım uçları dosya döner (`Content-Disposition: attachment`).
 
+## `/api/reports/weekly` — otonom haftalık rapor
+
+| Metot | Yol | Yetki |
+|---|---|---|
+| GET | `/api/reports/weekly/companies/{companyId}` | Read |
+| GET | `/api/reports/weekly/{reportId}` | Read |
+| POST | `/api/reports/weekly/companies/{companyId}` | Read |
+| GET | `/api/reports/weekly/{reportId}/pdf` | Read |
+| GET | `/api/reports/weekly/{reportId}/excel` | Read |
+| GET | `/api/reports/weekly/{reportId}/questions` | Read |
+| POST | `/api/reports/weekly/{reportId}/questions` | Operate |
+| POST | `/api/reports/weekly-batch` | SystemIngest |
+
+Rapor bir **anlık görüntüdür**: üretildiği andaki değerlendirmeleri taşır ve sonradan
+yeniden hesaplanmaz. `POST .../companies/{companyId}` aynı hafta için ikinci kayıt
+açmaz, mevcut kaydı günceller.
+
+Toplu üretimi (`weekly-batch`) kullanıcı değil zamanlayıcı çağırır ve kiracının
+tamamına dokunur; bu yüzden ayrı ve daha dar bir yetki altındadır.
+
+### Rapora soru sorma
+
+`POST .../questions` gövdesi yalnızca **anahtar** alır, serbest metin almaz:
+
+```json
+{ "questionKey": "BasvuruOnceligi", "parentInquiryId": null }
+```
+
+Tanınmayan anahtar 404 döner ve kayıt açılmaz. Her rapor için **5 soru hakkı** vardır;
+hak cevap üretilince harcanır. Daha önce sorulmuş bir soru yeniden açılırsa kayıtlı
+cevap döner ve hak harcanmaz. Hak bittiğinde yeni soru 400 ile reddedilir.
+
+Cevap sunucuda **rapordan hesaplanır**; model çağrısı yoktur, bu yüzden uç OpenAI
+anahtarı tanımlı olmadan da çalışır.
+
 ## `/api/notifications`
 
 | Metot | Yol | Yetki |

@@ -952,3 +952,96 @@ tbody tr:hover {
   font-size: 14px;
   line-height: 1.55;
 }
+
+/* ---- rapora soru sorma ---- */
+
+.soru-baslik {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.hak-sayaci {
+  text-align: right;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.hak-sayaci strong {
+  font-size: 20px;
+}
+
+.hak-noktalar {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.hak-nokta {
+  width: 12px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--primary);
+}
+
+.hak-nokta.dolu {
+  background: var(--border);
+}
+
+.soru-listesi {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/*
+  Sorular tam genişlikte ve sola hizalı: soru metinleri uzun ve birbirinden farklı
+  uzunlukta; yan yana dizilen rozetler hâlinde satır sonlarında kırılıp hangi metnin
+  hangi düğmeye ait olduğunu belirsizleştiriyordu.
+*/
+.soru-dugmesi {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-alt);
+  font-size: 14px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.soru-dugmesi:hover:not(:disabled) {
+  border-color: var(--primary);
+}
+
+.soru-dugmesi:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.soru-dugmesi.sorulmus {
+  background: transparent;
+  border-style: dashed;
+}
+
+.soru-cevap {
+  margin-top: 10px;
+  padding: 14px 16px;
+  border-left: 3px solid var(--primary);
+  background: var(--surface-alt);
+  border-radius: 0 8px 8px 0;
+  font-size: 14px;
+  line-height: 1.6;
+  /* Cevap girintili satırlar taşır ("   Gerekçe: ..."); boşluklar korunmalı. */
+  white-space: pre-wrap;
+}
+
+.cevap-bosluk {
+  height: 10px;
+}

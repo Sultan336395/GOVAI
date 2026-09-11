@@ -188,6 +188,30 @@ tazelenir; ters sırada firma dün düzelttiği eksiğin sonucunu bir gün sonra
 Gerekçe: `docs/adr/0006`. Koruyan testler: `ErpFieldMapTests` (4), `ErpConnectionTests`
 alan modeli (5) ve API (12).
 
+### 2.2.5 Rapora soru sorulur, soru yazılmaz
+
+Haftalık raporun soru bölümü kullanıcının yazdığı metni **kabul etmez**;
+`POST /api/reports/weekly/{id}/questions` yalnızca `questionKey` alır. Sorular da
+cevaplar da rapordan **deterministik** üretilir (`ReportQuestionCatalog`,
+`ReportAnswerBuilder`); model çağrısı yoktur.
+
+Üç sebeple böyle:
+
+| Karar | Neden |
+|---|---|
+| Serbest metin yok | Metin, cevabı raporun dışına taşır ve modele yönlendirme (prompt injection) kapısı açardı |
+| Model çağrısı yok | Cevap raporla çelişemez, aynı soru her seferinde aynı cevabı verir, anahtar tanımlı değilken de çalışır |
+| Anahtar sabit kümeden | Her sorunun rapordaki hangi veriden cevaplanacağı önceden bellidir |
+
+Hak **rapor bazındadır** (`ReportInquiryQuota.PerReport = 5`) ve **cevap üretilince**
+harcanır. Firma düzeyinde tek havuz olsaydı yoğun bir hafta sonraki haftanın raporunu
+sorusuz bırakırdı. Sorulmuş bir soruyu yeniden açmak harcamaz; aksi hâlde kullanıcı
+okuduğu cevaba geri dönmekten çekinirdi. Kayıt **silinmez** — silinebilse hak sayacı
+sıfırlanabilirdi.
+
+Koruyan testler: `ReportQuestionTests` (14), `ReportInquiryTests` (9),
+`cevapMetni.test.ts` (8).
+
 ### 2.3 Skor ağırlıklarının toplamı 1.0'dır
 
 `ScoreWeights` yapıcısı bunu doğrular ve ihlalde `DomainException` atar.
@@ -257,11 +281,11 @@ Solution dosyası **`GovAI.slnx`**'tir (yeni XML formatı), `.sln` değil.
 
 ```bash
 dotnet build -c Release          # tüm .NET projeleri
-dotnet test                      # 547 test (73 domain + 239 application + 235 API)
+dotnet test                      # 995 test (238 domain + 399 application + 358 API)
 ```
 
 ```bash
-cd workers && .venv/Scripts/python -m pytest -q      # 394 test
+cd workers && .venv/Scripts/python -m pytest -q      # 458 test
 cd workers && .venv/Scripts/python -m ruff check .   # lint (satır sınırı 100)
 ```
 
@@ -276,7 +300,7 @@ cd web && npm ci && npm run lint && npm run typecheck && npm run test && npm run
 ```
 
 `npm run lint` **`--max-warnings 0`** ile çalışır; uyarı da hatadır.
-`npm run test` vitest'i tek seferlik koşturur (55 test); şu an yalnızca `lib/`
+`npm run test` vitest'i tek seferlik koşturur (164 test); şu an yalnızca `lib/`
 altındaki saf fonksiyonlar kapsanır (menü görünürlüğü, parola kuralı, etiket
 haritaları) — ekran testleri hâlâ yok.
 

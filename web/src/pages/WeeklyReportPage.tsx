@@ -11,6 +11,7 @@ import type {
 import {
   EmptyState, ErrorBox, InfoBox, Kpi, Loading, ScoreCell, SectorFitBadge, VerdictBadge,
 } from '@/components/Common'
+import ReportQuestions from '@/components/ReportQuestions'
 import { formatDate, formatDeadline } from '@/lib/format'
 
 /**
@@ -75,6 +76,13 @@ export default function WeeklyReportPage() {
           ))}
         </InfoBox>
       ) : null}
+
+      {/*
+        Soru bölümü tabloların ÜSTÜNDE durur. Sorular raporun tamamını özetleyen
+        "önce neye bakayım" türünden sorulardır; sekiz tablonun altına konsaydı
+        tam da yönlendirmesi gereken okuyucu oraya varmadan karar vermiş olurdu.
+      */}
+      <ReportQuestions reportId={data.id} />
 
       <Bolum baslik="Öncelikli Yapılacaklar" bos="Bu dönem için açık bir iş çıkmadı.">
         {todos.length > 0 ? <TodoTablosu satirlar={todos} /> : null}

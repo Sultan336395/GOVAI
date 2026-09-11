@@ -32,12 +32,6 @@ public sealed class WeeklyReportService(
 {
     private const int DefaultHistoryLimit = 52;
 
-    private static readonly JsonSerializerOptions ContentJsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        Converters = { new JsonStringEnumConverter() },
-    };
-
     // ── Üretim ──────────────────────────────────────────────────────────────
 
     /// <summary>Tek bir firmanın raporunu üretir. Aynı hafta yeniden istenirse kayıt güncellenir.</summary>
@@ -120,7 +114,7 @@ public sealed class WeeklyReportService(
         var input = await CollectAsync(companyId, companyName, week, now, cancellationToken);
         var content = WeeklyReportBuilder.Build(input);
         var counters = WeeklyReportBuilder.Counters(content);
-        var json = JsonSerializer.Serialize(content, ContentJsonOptions);
+        var json = JsonSerializer.Serialize(content, WeeklyReportJson.Options);
 
         var mevcut = await reports.GetForWeekAsync(companyId, week.Start, cancellationToken);
 
@@ -265,7 +259,7 @@ public sealed class WeeklyReportService(
         new(report.Id, report.Trigger, Deserialize(report));
 
     private WeeklyReportContent Deserialize(WeeklyReport report) =>
-        JsonSerializer.Deserialize<WeeklyReportContent>(report.ContentJson, ContentJsonOptions)
+        JsonSerializer.Deserialize<WeeklyReportContent>(report.ContentJson, WeeklyReportJson.Options)
         ?? throw new DomainException($"Rapor gövdesi okunamadı. ReportId={report.Id}");
 
     // ── Dışa aktarım ────────────────────────────────────────────────────────

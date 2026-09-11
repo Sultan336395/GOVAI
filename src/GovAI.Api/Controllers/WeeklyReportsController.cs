@@ -17,7 +17,9 @@ namespace GovAI.Api.Controllers;
 [ApiController]
 [Route("api/reports/weekly")]
 [Authorize(Policy = Policies.CompanyData)]
-public sealed class WeeklyReportsController(WeeklyReportService service) : ControllerBase
+public sealed class WeeklyReportsController(
+    WeeklyReportService service,
+    ReportInquiryService inquiries) : ControllerBase
 {
     /// <summary>Firmanın rapor geçmişi; en yeni hafta başta.</summary>
     [HttpGet("companies/{companyId:guid}")]
@@ -51,6 +53,40 @@ public sealed class WeeklyReportsController(WeeklyReportService service) : Contr
         [FromBody] GenerateWeeklyReportRequest? request,
         CancellationToken cancellationToken) =>
         Ok(await service.GenerateAsync(companyId, request ?? new GenerateWeeklyReportRequest(), cancellationToken));
+
+    /// <summary>
+    /// Rapora sorulabilecek sorular, sorulmuş olanlar ve kalan hak.
+    ///
+    /// <para>
+    /// Sorular rapordan üretilir; kullanıcı soru <b>yazmaz</b>, listeden seçer. Sabit soru
+    /// kümesi, her sorunun rapordaki hangi veriden cevaplanacağının önceden belli olmasını
+    /// sağlar.
+    /// </para>
+    /// </summary>
+    [HttpGet("{reportId:guid}/questions")]
+    [Produces("application/json")]
+    public async Task<ActionResult<ReportInquiryStateDto>> Questions(
+        Guid reportId,
+        CancellationToken cancellationToken) =>
+        Ok(await inquiries.GetStateAsync(reportId, cancellationToken));
+
+    /// <summary>
+    /// Seçilen soruyu cevaplar.
+    ///
+    /// <para>
+    /// Hak cevap üretilince harcanır. Daha önce sorulmuş bir soru yeniden açılırsa kayıtlı
+    /// cevap döner ve <b>hak harcanmaz</b> — kullanıcı listeye dönüp okuduğunu tekrar
+    /// görebilmelidir.
+    /// </para>
+    /// </summary>
+    [HttpPost("{reportId:guid}/questions")]
+    [Audited("WeeklyReport.QuestionAnswered", "WeeklyReport", RouteKey = "reportId")]
+    public async Task<ActionResult<AnswerQuestionResultDto>> Answer(
+        Guid reportId,
+        [FromBody] AnswerQuestionRequest request,
+        CancellationToken cancellationToken) =>
+        Ok(await inquiries.AnswerAsync(
+            reportId, request.QuestionKey, request.ParentInquiryId, cancellationToken));
 
     [HttpGet("{reportId:guid}/pdf")]
     [Audited("WeeklyReport.PdfExported", "WeeklyReport", RouteKey = "reportId")]

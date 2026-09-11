@@ -1325,6 +1325,55 @@ export interface WeeklyReportDetail {
   content: WeeklyReportContent
 }
 
+// ---- rapora soru sorma (+5 hak) ----
+
+export type ReportQuestionKind =
+  | 'EnAcilIs'
+  | 'EnEtkiliEksik'
+  | 'BasvuruOnceligi'
+  | 'CagriNedenSartli'
+  | 'SektorUyumu'
+  | 'EksikBelgeler'
+  | 'MevzuatEtkisi'
+  | 'GecmisDonemEksikleri'
+  | 'EksikProfilEtkisi'
+  | 'TeknolojiIhaleleri'
+
+export interface ReportQuestion {
+  kind: ReportQuestionKind
+  /** Sunucunun tanıdığı tek girdi. Kullanıcı soru yazmaz, anahtar seçer. */
+  key: string
+  text: string
+  opportunityId?: string | null
+}
+
+export interface ReportInquiry {
+  id: string
+  kind: ReportQuestionKind
+  questionKey: string
+  questionText: string
+  answerText: string
+  opportunityId?: string | null
+  parentInquiryId?: string | null
+  askedAt: string
+  askedBy: string
+}
+
+export interface ReportInquiryState {
+  reportId: string
+  available: ReportQuestion[]
+  asked: ReportInquiry[]
+  usedCount: number
+  remainingCount: number
+  totalQuota: number
+}
+
+export interface AnswerQuestionResult {
+  inquiry: ReportInquiry
+  followUps: ReportQuestion[]
+  remainingCount: number
+}
+
 // ---- uzman değerlendirmesi ve kalibrasyon ----
 
 export type VerdictDisagreementReason =

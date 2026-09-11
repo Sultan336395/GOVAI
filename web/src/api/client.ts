@@ -41,6 +41,8 @@ import type {
   VerificationRequest,
   WeeklyReportSummary,
   WeeklyReportDetail,
+  ReportInquiryState,
+  AnswerQuestionResult,
   ExpertVerdict,
   CalibrationReport,
   RecordExpertVerdictRequest,
@@ -272,6 +274,22 @@ export const api = {
 
   weeklyReportExportUrl: (reportId: string, format: 'excel' | 'pdf') =>
     `${BASE_URL}/api/reports/weekly/${reportId}/${format}`,
+
+  /** Sorulabilir sorular, sorulmuş cevaplar ve kalan hak. */
+  getReportQuestions: (reportId: string) =>
+    request<ReportInquiryState>(`/api/reports/weekly/${reportId}/questions`),
+
+  /**
+   * Seçilen soruyu cevaplatır.
+   *
+   * Yalnızca anahtar gönderilir; serbest metin yoktur. Daha önce sorulmuş bir soru
+   * yeniden açılırsa kayıtlı cevap döner ve hak harcanmaz.
+   */
+  answerReportQuestion: (reportId: string, questionKey: string, parentInquiryId?: string | null) =>
+    request<AnswerQuestionResult>(`/api/reports/weekly/${reportId}/questions`, {
+      method: 'POST',
+      body: JSON.stringify({ questionKey, parentInquiryId: parentInquiryId ?? null }),
+    }),
 
   // ---- uzman değerlendirmesi ve kalibrasyon ----
 
