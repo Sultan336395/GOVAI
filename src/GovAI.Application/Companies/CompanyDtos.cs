@@ -35,26 +35,40 @@ public sealed record CompanyDetailDto(
     int ProfileVersion,
     decimal ProfileCompleteness);
 
+/// <summary>
+/// Personel yapısı.
+///
+/// <para>
+/// Kırılım alanları <b>boş bırakılabilir</b> ve boş olmak "sıfır" demek değildir:
+/// <c>null</c> beyan edilmedi, <c>0</c> ise firmanın "yok" beyanıdır. API cevabında
+/// beyan edilmemiş alan hiç görünmez (null alanlar yazılmaz), böylece istemci
+/// "girilmemiş" ile "sıfır"ı ayırt edebilir.
+/// </para>
+/// </summary>
 public sealed record WorkforceDto(
     int EmployeeCount,
-    int WomenEmployeeCount,
-    int YoungEmployeeCount,
-    int RAndDEmployeeCount,
-    int DisabledEmployeeCount)
+    int? WomenEmployeeCount,
+    int? YoungEmployeeCount,
+    int? RAndDEmployeeCount,
+    int? DisabledEmployeeCount,
+    /// <summary>Firmanın genç çalışan sayarken kullandığı azami yaş.</summary>
+    int? YoungEmployeeMaxAge = null)
 {
     public Workforce ToDomain() => new(
         EmployeeCount,
         WomenEmployeeCount,
         YoungEmployeeCount,
         RAndDEmployeeCount,
-        DisabledEmployeeCount);
+        DisabledEmployeeCount,
+        YoungEmployeeMaxAge);
 
     public static WorkforceDto FromDomain(Workforce workforce) => new(
         workforce.EmployeeCount,
         workforce.WomenEmployeeCount,
         workforce.YoungEmployeeCount,
         workforce.RAndDEmployeeCount,
-        workforce.DisabledEmployeeCount);
+        workforce.DisabledEmployeeCount,
+        workforce.YoungEmployeeMaxAge);
 }
 
 public sealed record FinancialsDto(

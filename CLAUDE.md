@@ -53,9 +53,39 @@ OpenAI anahtarı yoksa sistem çalışmaya devam eder: kural çıkarımı determ
 | Alan | Boş değer | Sonuç |
 |---|---|---|
 | `Financials.*` | `0` | `Unknown` |
-| `Workforce.*` | `EmployeeCount == 0` | Tüm personel alanları `Unknown` |
+| `Workforce.EmployeeCount` | `0` | Tüm personel alanları `Unknown` (kaba süzgeç) |
+| `Workforce` kırılımı | `null` | `Unknown` — **`0` DEĞİL**; `0` firmanın "yok" beyanıdır |
 | `Company.NaceCodes`, `Cities`, `Nuts2Codes` | boş küme | `Unknown` |
 | `Company.Certificates` | boş küme | **Bilinen değer** — "belgemiz yok" geçerli bir cevaptır |
+
+**Personel kırılımı açık beyan ister.** `WomenEmployeeCount`, `YoungEmployeeCount`,
+`RAndDEmployeeCount` ve `DisabledEmployeeCount` boş bırakılabilir (`int?`) ve boş olmak
+"sıfır" demek **değildir**.
+
+Sahadan gelen hata: pilot firmanın profilinde personel 50 yazıyordu ama kırılım hiç
+girilmemişti; alanlar `int` olduğu için 0 duruyordu ve motor bunları gerçek sıfır
+sayıyordu. Firma "kadın çalışanı yok" ve "Ar-Ge personeli yok" diye kaydedilip o
+şartları arayan çağrılardan **eleniyordu** — `Unknown` değil `NotSatisfied` alıyordu.
+Bu, §2'nin üçüncü iddiasının fiilen çiğnenmesiydi.
+
+Üç yerde birden korunur; biri gevşerse ayrım kaybolur:
+
+| Yer | Ne yapar |
+|---|---|
+| `Workforce` (Domain) | Alanlar `int?`; oranlar da `decimal?` — pay beyansızsa oran da bilinmez |
+| `CompanyFieldResolver.Headcount` | İki kapı: toplam girilmemişse hiçbiri, alan `null` ise o alan `Unknown` |
+| `companyForm.ts` + `CompanyForm.tsx` | Varsayılan **beyansız**; boş girdi `undefined` gönderir, `0` göndermez |
+
+`MyCompanyDto` kırılımı taşır ve düzenleme ekranı onu geri yükler. Taşımasaydı form
+alanları bilmeden gönderir ve **her düzenleme firmanın beyanını silerdi** — sessiz veri
+kaybı. Ekranda beyan edilmemiş alan `0` olarak **gösterilmez**, "Beyan edilmedi" yazar.
+
+Migration (`PersonelKirilimiAcikBeyan`) mevcut sıfırları `NULL`'a çevirir. Çevirmeseydi
+değişiklik mevcut veride hiçbir işe yaramazdı. Yön güvenli taraftan seçildi: bugün `0`
+ile "girilmedi" ayrılamıyor, dolayısıyla her `0` belirsizdir — belirsizi "bilinmiyor"
+saymak kararı askıya alır, "sıfır" saymak firmayı eler.
+
+Koruyan testler: `PersonelKirilimiAcikBeyanTests` (22), `companyForm.test.ts` (12).
 
 Sertifika istisnası bilinçlidir; onu da `Unknown` yaparsan "ISO 9001 eksik, temin edin"
 aksiyonu kaybolur. Gerekçe: `docs/adr/0003`. Koruyan test:
@@ -430,7 +460,7 @@ Solution dosyası **`GovAI.slnx`**'tir (yeni XML formatı), `.sln` değil.
 
 ```bash
 dotnet build -c Release          # tüm .NET projeleri
-dotnet test                      # 1186 test (275 domain + 488 application + 423 API)
+dotnet test                      # 1208 test (297 domain + 488 application + 423 API)
 ```
 
 ```bash
@@ -449,7 +479,7 @@ cd web && npm ci && npm run lint && npm run typecheck && npm run test && npm run
 ```
 
 `npm run lint` **`--max-warnings 0`** ile çalışır; uyarı da hatadır.
-`npm run test` vitest'i tek seferlik koşturur (166 test); şu an yalnızca `lib/`
+`npm run test` vitest'i tek seferlik koşturur (178 test); şu an yalnızca `lib/`
 altındaki saf fonksiyonlar kapsanır (menü görünürlüğü, parola kuralı, etiket
 haritaları) — ekran testleri hâlâ yok.
 

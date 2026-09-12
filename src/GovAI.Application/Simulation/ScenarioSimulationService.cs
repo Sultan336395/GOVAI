@@ -143,7 +143,11 @@ public sealed class ScenarioSimulationService(
             request.WomenEmployeeCount ?? workforce.WomenEmployeeCount,
             request.YoungEmployeeCount ?? workforce.YoungEmployeeCount,
             request.RAndDEmployeeCount ?? workforce.RAndDEmployeeCount,
-            request.DisabledEmployeeCount ?? workforce.DisabledEmployeeCount));
+            request.DisabledEmployeeCount ?? workforce.DisabledEmployeeCount,
+            // Genç tanımı senaryoda da taşınmalı: taşınmazsa simülasyon "genç çalışan
+            // sayısını artırırsam ne olur" sorusuna, tanım kaybolduğu için her zaman
+            // "bilinmiyor" cevabını verirdi.
+            workforce.YoungEmployeeMaxAge));
 
         var financials = company.Financials;
         clone.UpdateFinancials(new Financials(

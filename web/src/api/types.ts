@@ -122,14 +122,22 @@ export interface CompanySummary {
   profileVersion: number
 }
 
+/**
+ * Personel yapısı.
+ *
+ * Kırılım alanları BOŞ BIRAKILABİLİR ve boş olmak "sıfır" demek değildir:
+ * alan gelmiyorsa beyan edilmemiştir, `0` ise firmanın "yok" beyanıdır. İkisi farklı
+ * sonuç doğurur — biri kararı belirsiz bırakır, diğeri koşulu sağlamadığını söyler.
+ * API null alanları hiç yazmaz, bu yüzden alanlar isteğe bağlıdır.
+ */
 export interface Workforce {
   employeeCount: number
-  womenEmployeeCount: number
-  youngEmployeeCount: number
+  womenEmployeeCount?: number | null
+  youngEmployeeCount?: number | null
   /** Firmanın genç çalışanı sayarken kullandığı azami yaş; sistem varsaymaz. */
   youngEmployeeMaxAge?: number | null
-  rAndDEmployeeCount: number
-  disabledEmployeeCount: number
+  rAndDEmployeeCount?: number | null
+  disabledEmployeeCount?: number | null
 }
 
 export interface Financials {
@@ -679,6 +687,12 @@ export interface MyCompany {
   mainSector: string | null
   city: string | null
   employeeCount: number
+  /** Kırılım alanları: alan yoksa BEYAN EDİLMEMİŞ demektir, sıfır değil. */
+  womenEmployeeCount?: number | null
+  youngEmployeeCount?: number | null
+  youngEmployeeMaxAge?: number | null
+  rAndDEmployeeCount?: number | null
+  disabledEmployeeCount?: number | null
   annualRevenue: number
   profileCompletionPercentage: number
   isActive: boolean

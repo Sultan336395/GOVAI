@@ -19,11 +19,14 @@ export function emptyCompanyForm(): CompanyFormValues {
     subSectors: [],
     targetCountries: [],
     employeeCount: 0,
-    rAndDEmployeeCount: 0,
-    womenEmployeeCount: 0,
-    youngEmployeeCount: 0,
+    // Kırılım alanları BEYANSIZ başlar. Sıfırla başlatılsaydı, dokunulmadan
+    // kaydedilen her firma "kadın çalışanı yok / Ar-Ge personeli yok" beyan etmiş
+    // olur ve o şartları arayan çağrılardan elenirdi.
+    rAndDEmployeeCount: undefined,
+    womenEmployeeCount: undefined,
+    youngEmployeeCount: undefined,
     youngEmployeeMaxAge: null,
-    disabledEmployeeCount: 0,
+    disabledEmployeeCount: undefined,
     annualRevenue: 0,
     balanceSize: 0,
     isInTechnopark: false,
@@ -44,6 +47,13 @@ export function companyToForm(company: MyCompany): CompanyFormValues {
     legalType: company.legalType,
     city: company.city,
     employeeCount: company.employeeCount,
+    // Kırılım geri yüklenmezse form onları bilmeden gönderir ve HER DÜZENLEME
+    // firmanın beyanını siler. Bu sessiz veri kaybıydı.
+    womenEmployeeCount: company.womenEmployeeCount ?? undefined,
+    youngEmployeeCount: company.youngEmployeeCount ?? undefined,
+    youngEmployeeMaxAge: company.youngEmployeeMaxAge ?? null,
+    rAndDEmployeeCount: company.rAndDEmployeeCount ?? undefined,
+    disabledEmployeeCount: company.disabledEmployeeCount ?? undefined,
     annualRevenue: company.annualRevenue,
     groupId: company.groupId,
     parentCompanyId: company.parentCompanyId,
@@ -77,10 +87,17 @@ export function validateCompanyForm(values: CompanyFormValues): Record<string, s
   const toplam = values.employeeCount ?? 0
 
   for (const [alan, etiket] of [
+    ['womenEmployeeCount', 'Kadın çalışan sayısı'],
     ['youngEmployeeCount', 'Genç çalışan sayısı'],
+    ['rAndDEmployeeCount', 'Ar-Ge personeli sayısı'],
     ['disabledEmployeeCount', 'Engelli çalışan sayısı'],
   ] as const) {
-    const deger = values[alan] ?? 0
+    const deger = values[alan]
+
+    // Beyan edilmemiş alan denetlenmez; boş bırakmak geçerli bir cevaptır.
+    if (deger === undefined || deger === null) {
+      continue
+    }
 
     if (deger < 0) {
       errors[alan] = `${etiket} negatif olamaz.`

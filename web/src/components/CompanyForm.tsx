@@ -380,9 +380,12 @@ export default function CompanyForm({
               id="womenEmployeeCount"
               type="number"
               min={0}
-              value={values.womenEmployeeCount ?? 0}
-              onChange={(e) => set('womenEmployeeCount', Number(e.target.value))}
+              placeholder="Beyan edilmedi"
+              value={values.womenEmployeeCount ?? ''}
+              onChange={(e) => set('womenEmployeeCount', e.target.value === '' ? undefined : Number(e.target.value))}
             />
+            <div className="field-hint">Boş bırakmak "beyan edilmedi" demektir; <b>0</b> ise "yok" beyanıdır.</div>
+            <FieldError message={fieldError('womenEmployeeCount')} />
           </div>
 
           <div className="field">
@@ -393,10 +396,10 @@ export default function CompanyForm({
               min={0}
               step={1}
               inputMode="numeric"
-              value={values.youngEmployeeCount ?? 0}
-              onChange={(e) => set('youngEmployeeCount', Number(e.target.value))}
+              value={values.youngEmployeeCount ?? ''}
+              onChange={(e) => set('youngEmployeeCount', e.target.value === '' ? undefined : Number(e.target.value))}
             />
-            <div className="field-hint">İsteğe bağlı. Boş bırakırsanız belirtilmemiş sayılır.</div>
+            <div className="field-hint">Boş bırakmak "beyan edilmedi" demektir; <b>0</b> ise "yok" beyanıdır.</div>
             <FieldError message={fieldError('youngEmployeeCount')} />
           </div>
 
@@ -434,9 +437,11 @@ export default function CompanyForm({
               min={0}
               step={1}
               inputMode="numeric"
-              value={values.disabledEmployeeCount ?? 0}
-              onChange={(e) => set('disabledEmployeeCount', Number(e.target.value))}
+              value={values.disabledEmployeeCount ?? ''}
+              onChange={(e) => set('disabledEmployeeCount', e.target.value === '' ? undefined : Number(e.target.value))}
             />
+            <div className="field-hint">Boş bırakmak "beyan edilmedi" demektir; <b>0</b> ise "yok" beyanıdır.</div>
+            <FieldError message={fieldError('disabledEmployeeCount')} />
             <div className="field-hint">İsteğe bağlı. Yalnızca toplam sayı; kişi bilgisi istenmez.</div>
             <FieldError message={fieldError('disabledEmployeeCount')} />
           </div>
@@ -447,9 +452,11 @@ export default function CompanyForm({
               id="rAndDEmployeeCount"
               type="number"
               min={0}
-              value={values.rAndDEmployeeCount ?? 0}
-              onChange={(e) => set('rAndDEmployeeCount', Number(e.target.value))}
+              value={values.rAndDEmployeeCount ?? ''}
+              onChange={(e) => set('rAndDEmployeeCount', e.target.value === '' ? undefined : Number(e.target.value))}
             />
+            <div className="field-hint">Boş bırakmak "beyan edilmedi" demektir; <b>0</b> ise "yok" beyanıdır.</div>
+            <FieldError message={fieldError('rAndDEmployeeCount')} />
           </div>
 
           <div className="field">

@@ -285,7 +285,8 @@ public sealed class ErpPullService(
                     goruntu.WomenEmployeeCount ?? mevcut.Workforce.WomenEmployeeCount,
                     goruntu.YoungEmployeeCount ?? mevcut.Workforce.YoungEmployeeCount,
                     goruntu.RAndDEmployeeCount ?? mevcut.Workforce.RAndDEmployeeCount,
-                    goruntu.DisabledEmployeeCount ?? mevcut.Workforce.DisabledEmployeeCount)
+                    goruntu.DisabledEmployeeCount ?? mevcut.Workforce.DisabledEmployeeCount,
+                    goruntu.YoungEmployeeMaxAge ?? mevcut.Workforce.YoungEmployeeMaxAge)
                 : null,
 
             Financials = maliVar

@@ -3,6 +3,7 @@ using System;
 using GovAI.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace GovAI.Persistence.Migrations
 {
     [DbContext(typeof(GovAiDbContext))]
-    partial class GovAiDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260912001555_PersonelKirilimiAcikBeyan")]
+    partial class PersonelKirilimiAcikBeyan
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

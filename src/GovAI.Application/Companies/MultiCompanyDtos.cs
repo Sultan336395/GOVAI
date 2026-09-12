@@ -33,14 +33,27 @@ public sealed record CreateCompanyRequest
     public IReadOnlyList<string> TargetCountries { get; init; } = [];
 
     public int EmployeeCount { get; init; }
-    public int RAndDEmployeeCount { get; init; }
-    public int WomenEmployeeCount { get; init; }
+
+    /// <summary>
+    /// Personel kırılımı alanları <b>boş bırakılabilir</b> ve boş olmak "sıfır" demek
+    /// değildir: <c>null</c> beyan edilmedi, <c>0</c> ise firmanın "yok" beyanıdır.
+    ///
+    /// <para>
+    /// Eskiden bu alanlar <c>int</c>'ti; gönderilmeyen alan 0 olarak kaydediliyor ve
+    /// firma o koşulu <b>sağlamıyor</b> sayılıyordu. Sahada 50 kişilik pilot firma
+    /// "kadın çalışanı yok" diye kaydedilip kadın istihdamı şartı arayan çağrılardan
+    /// elenmişti.
+    /// </para>
+    /// </summary>
+    public int? RAndDEmployeeCount { get; init; }
+
+    public int? WomenEmployeeCount { get; init; }
 
     /// <summary>
     /// Genç çalışan sayısı. İsteğe bağlıdır; boş bırakılırsa "belirtilmemiş" sayılır.
     /// Kişi bazlı hiçbir bilgi istenmez — yalnızca toplu sayı.
     /// </summary>
-    public int YoungEmployeeCount { get; init; }
+    public int? YoungEmployeeCount { get; init; }
 
     /// <summary>
     /// Firmanın genç çalışanı sayarken kullandığı azami yaş. Sistem bunu VARSAYMAZ:
@@ -50,7 +63,7 @@ public sealed record CreateCompanyRequest
     public int? YoungEmployeeMaxAge { get; init; }
 
     /// <summary>Engelli çalışan sayısı. Kişi bazlı engel bilgisi istenmez ve saklanmaz.</summary>
-    public int DisabledEmployeeCount { get; init; }
+    public int? DisabledEmployeeCount { get; init; }
 
     public decimal AnnualRevenue { get; init; }
     public decimal BalanceSize { get; init; }
@@ -111,6 +124,22 @@ public sealed record MyCompanyDto(
     string? MainSector,
     string? City,
     int EmployeeCount,
+
+    /// <summary>
+    /// Personel kırılımı. Düzenleme ekranı bunları <b>geri yazmak zorunda</b> olduğu
+    /// için özet DTO'da taşınır: taşınmasaydı form onları bilmeden gönderir ve her
+    /// düzenleme firmanın beyanını silerdi. <c>null</c> "beyan edilmedi" demektir.
+    /// </summary>
+    int? WomenEmployeeCount,
+
+    int? YoungEmployeeCount,
+
+    int? YoungEmployeeMaxAge,
+
+    int? RAndDEmployeeCount,
+
+    int? DisabledEmployeeCount,
+
     decimal AnnualRevenue,
     int ProfileCompletionPercentage,
     bool IsActive,

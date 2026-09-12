@@ -154,7 +154,7 @@ public static class CompanyFieldResolver
     /// Genç çalışan alanları, yaş tanımı beyan edilmediği sürece <b>bilinmiyor</b>dur.
     /// Gerekçe <see cref="Companies.Workforce.YoungEmployeeMaxAge"/> üzerinde yazılıdır.
     /// </summary>
-    private static FieldValue Young(Company company, decimal value) =>
+    private static FieldValue Young(Company company, decimal? value) =>
         company.Workforce.YoungEmployeeMaxAge is null
             ? FieldValue.Unknown()
             : Headcount(company, value);
@@ -178,9 +178,26 @@ public static class CompanyFieldResolver
     private static FieldValue Money(decimal value) =>
         value == 0m ? FieldValue.Unknown() : FieldValue.FromNumber(value);
 
-    /// <summary>Toplam çalışan sayısı girilmemişse personel kırılımlarının hiçbiri değerlendirilemez.</summary>
-    private static FieldValue Headcount(Company company, decimal value) =>
-        company.Workforce.EmployeeCount == 0 ? FieldValue.Unknown() : FieldValue.FromNumber(value);
+    /// <summary>
+    /// Personel kırılımı.
+    ///
+    /// <para>
+    /// İki ayrı kapı vardır. Önce kaba olan: toplam çalışan sayısı girilmemişse
+    /// kırılımların hiçbiri değerlendirilemez. Sonra ince olan: alanın kendisi beyan
+    /// edilmemişse (<c>null</c>) o alan bilinmiyordur.
+    /// </para>
+    ///
+    /// <para>
+    /// İkincisi eskiden yoktu ve girilmemiş alan <c>0</c> olarak duruyordu. Sahada
+    /// sonucu şuydu: 50 kişilik firma "kadın çalışanı yok" sayılıp kadın istihdamı
+    /// şartı arayan çağrılardan <b>elendi</b>. Beyan edilmiş <c>0</c> ise hâlâ gerçek
+    /// bir cevaptır ve koşulu sağlamadığını söyler — ikisi karıştırılmamalıdır.
+    /// </para>
+    /// </summary>
+    private static FieldValue Headcount(Company company, decimal? value) =>
+        company.Workforce.EmployeeCount == 0 || value is null
+            ? FieldValue.Unknown()
+            : FieldValue.FromNumber(value.Value);
 
     /// <summary>Zorunlu koleksiyon alanları: boşsa "girilmemiş" kabul edilir.</summary>
     private static FieldValue RequiredSet(IEnumerable<string> values)

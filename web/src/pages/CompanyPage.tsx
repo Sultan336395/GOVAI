@@ -60,16 +60,21 @@ export default function CompanyPage() {
 
       <div className="grid kpis" style={{ marginBottom: 16 }}>
         <Kpi label="Toplam çalışan" value={data.workforce.employeeCount} />
+        {/*
+          Beyan edilmemiş alan "0" olarak GÖSTERİLMEZ. Gösterilseydi kullanıcı firmanın
+          kadın çalışanı olmadığını sanır, girilmemiş bir alanı düzeltmesi gerektiğini
+          hiç fark etmezdi.
+        */}
         <Kpi
           label="Kadın çalışan"
-          value={data.workforce.womenEmployeeCount}
-          hint={
-            data.workforce.employeeCount > 0
-              ? formatPercent(data.workforce.womenEmployeeCount / data.workforce.employeeCount)
-              : '—'
-          }
+          value={beyan(data.workforce.womenEmployeeCount)}
+          hint={oran(data.workforce.womenEmployeeCount, data.workforce.employeeCount)}
         />
-        <Kpi label="Ar-Ge personeli" value={data.workforce.rAndDEmployeeCount} />
+        <Kpi
+          label="Ar-Ge personeli"
+          value={beyan(data.workforce.rAndDEmployeeCount)}
+          hint={oran(data.workforce.rAndDEmployeeCount, data.workforce.employeeCount)}
+        />
         <Kpi label="Yıllık ciro" value={formatCurrency(data.financials.annualRevenue)} />
         <Kpi label="Bilanço" value={formatCurrency(data.financials.balanceSize)} />
         <Kpi
@@ -186,4 +191,23 @@ export default function CompanyPage() {
       </div>
     </>
   )
+}
+
+/**
+ * Beyan edilmemiş sayıyı sıfır gibi göstermez.
+ *
+ * <b>0</b> firmanın "yok" beyanıdır ve öyle gösterilir; alan hiç girilmemişse bu
+ * ayrı bir durumdur ve kullanıcının görmesi gereken şey odur.
+ */
+function beyan(deger: number | null | undefined): string {
+  return deger === null || deger === undefined ? 'Beyan edilmedi' : String(deger)
+}
+
+/** Beyan yoksa oran da hesaplanmaz; 0 göstermek "oranı sıfır" demek olurdu. */
+function oran(pay: number | null | undefined, toplam: number): string {
+  if (pay === null || pay === undefined || toplam <= 0) {
+    return '—'
+  }
+
+  return formatPercent(pay / toplam)
 }
