@@ -31,17 +31,46 @@ export function Kpi({
   label,
   value,
   hint,
+  onClick,
+  acik,
+  panelId,
 }: {
   label: string
   value: ReactNode
   hint?: ReactNode
+  /** Verilirse kart tıklanabilir olur ve altında kırılım paneli açılır. */
+  onClick?: () => void
+  acik?: boolean
+  panelId?: string
 }) {
-  return (
-    <div className="card">
+  const icerik = (
+    <>
       <div className="kpi-label">{label}</div>
       <div className="kpi-value">{value}</div>
       {hint ? <div className="kpi-hint">{hint}</div> : null}
-    </div>
+    </>
+  )
+
+  if (!onClick) {
+    return <div className="card">{icerik}</div>
+  }
+
+  // Gerçek bir <button>: klavyeyle odaklanır, boşluk/enter ile açılır ve ekran
+  // okuyucuya "genişletilebilir" olduğunu söyler. Tıklanabilir <div> bunların
+  // hiçbirini vermez ve kart sadece fareyle kullanılabilir olurdu.
+  return (
+    <button
+      type="button"
+      className={`card kpi-tiklanabilir${acik ? ' kpi-acik' : ''}`}
+      onClick={onClick}
+      aria-expanded={acik}
+      aria-controls={panelId}
+    >
+      {icerik}
+      <span className="kpi-isaret" aria-hidden="true">
+        {acik ? 'Kapat' : 'Listele'}
+      </span>
+    </button>
   )
 }
 

@@ -437,6 +437,86 @@ select {
   margin-top: 4px;
 }
 
+/* ---- tıklanabilir özet kartı ---- */
+
+/*
+  Kart gerçek bir <button>'dır; tarayıcının düğme görünümü sıfırlanıp kart görünümü
+  geri veriliyor. Hizalama açıkça yazılır: düğme varsayılanı ortalar, kartın metni
+  ise sola dayalı olmalıdır.
+*/
+.kpi-tiklanabilir {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  position: relative;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+.kpi-tiklanabilir:hover {
+  border-color: var(--primary);
+  transform: translateY(-1px);
+}
+
+/* Klavye odağı görünür kalmalı; kartın kendi gölgesi odağı yutmamalı. */
+.kpi-tiklanabilir:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.kpi-tiklanabilir.kpi-acik {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+/* "Listele" ipucu yalnızca fare üzerindeyken ya da kart açıkken görünür: altı kartın
+   hepsinde sürekli durursa ekran kalabalıklaşır. */
+.kpi-isaret {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--primary);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.kpi-tiklanabilir:hover .kpi-isaret,
+.kpi-tiklanabilir:focus-visible .kpi-isaret,
+.kpi-acik .kpi-isaret {
+  opacity: 1;
+}
+
+/* Panel karta bağlı görünsün diye üstten boşluk bırakmaz, sol kenarı vurgulanır. */
+.kpi-kirilim {
+  border-left: 3px solid var(--primary);
+  margin-top: 12px;
+}
+
+.uyari {
+  background: var(--warning-soft);
+  color: var(--warning);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kpi-tiklanabilir,
+  .kpi-isaret {
+    transition: none;
+  }
+
+  .kpi-tiklanabilir:hover {
+    transform: none;
+  }
+}
+
 /* ---- tablo ---- */
 
 .table-wrap {

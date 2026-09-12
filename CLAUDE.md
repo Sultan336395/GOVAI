@@ -460,11 +460,11 @@ Solution dosyası **`GovAI.slnx`**'tir (yeni XML formatı), `.sln` değil.
 
 ```bash
 dotnet build -c Release          # tüm .NET projeleri
-dotnet test                      # 1208 test (297 domain + 488 application + 423 API)
+dotnet test                      # 1224 test (297 domain + 488 application + 439 API)
 ```
 
 ```bash
-cd workers && .venv/Scripts/python -m pytest -q      # 458 test
+cd workers && .venv/Scripts/python -m pytest -q      # 467 test
 cd workers && .venv/Scripts/python -m ruff check .   # lint (satır sınırı 100)
 ```
 
@@ -479,9 +479,10 @@ cd web && npm ci && npm run lint && npm run typecheck && npm run test && npm run
 ```
 
 `npm run lint` **`--max-warnings 0`** ile çalışır; uyarı da hatadır.
-`npm run test` vitest'i tek seferlik koşturur (178 test); şu an yalnızca `lib/`
-altındaki saf fonksiyonlar kapsanır (menü görünürlüğü, parola kuralı, etiket
-haritaları) — ekran testleri hâlâ yok.
+`npm run test` vitest'i tek seferlik koşturur (214 test). Ağırlık `lib/` altındaki
+saf fonksiyonlardadır (menü görünürlüğü, parola kuralı, etiket haritaları, özet kartı
+kırılımı); birkaç bileşen de Testing Library ile sınanır (analiz paneli, fırsat kartı,
+özet kartı ve kırılım paneli). Sayfa düzeyinde test hâlâ yok.
 
 ### EF Core
 

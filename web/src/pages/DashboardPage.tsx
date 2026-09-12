@@ -1,5 +1,5 @@
+import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
 import {
   Bar,
   BarChart,
@@ -15,15 +15,30 @@ import {
 } from 'recharts'
 import { api } from '@/api/client'
 import { useCompanies } from '@/app/contexts'
-import { EmptyState, ErrorBox, Kpi, Loading, ScoreCell, SectorFitBadge, VerdictBadge } from '@/components/Common'
+import { EmptyState, ErrorBox, Kpi, Loading } from '@/components/Common'
 import DashboardInsights from '@/components/DashboardInsights'
-import { formatCurrency, formatDeadline, formatPercent } from '@/lib/format'
+import KpiKirilimPaneli, { KPI_PANEL_ID } from '@/components/KpiKirilimPaneli'
+import MatchTable from '@/components/MatchTable'
+import { formatPercent } from '@/lib/format'
+import { type KpiAnahtari } from '@/lib/kpiKirilimi'
 
 const VERDICT_COLORS = ['#15803d', '#b45309', '#b91c1c', '#64748b']
+
+/** Karttaki sayının panodan okunacağı yer; panel bu sayıyla listeyi karşılaştırır. */
+const KART_SAYILARI: Record<KpiAnahtari, (d: import('@/api/types').Dashboard) => number> = {
+  uygun: (d) => d.eligibleCount,
+  sartli: (d) => d.conditionallyEligibleCount,
+  ortalama: (d) => d.averageScore,
+  kapanan: (d) => d.closingWithin15Days,
+  belge: (d) => d.missingMandatoryDocumentTotal,
+  bosluk: (d) => d.dataGapTotal,
+}
 
 export default function DashboardPage() {
   const { selectedCompanyId } = useCompanies()
   const queryClient = useQueryClient()
+
+  const [acikKpi, setAcikKpi] = useState<KpiAnahtari | null>(null)
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['dashboard', selectedCompanyId],
@@ -86,30 +101,70 @@ export default function DashboardPage() {
 
       {rescore.error ? <ErrorBox error={rescore.error} /> : null}
 
-      <div className="grid kpis" style={{ marginBottom: 16 }}>
-        <Kpi label="Uygun fırsat" value={data.eligibleCount} hint="Tüm koşullar sağlanıyor" />
+      {/*
+        Kartlar tıklanabilir: sayıyı görmek tek başına "hangileri?" sorusunu
+        cevaplamıyordu ve kullanıcı her seferinde eşleşmeler ekranına gidip aynı
+        süzgeci elle kuruyordu. Kırılım kartın hemen altında, aynı ekranda açılır.
+      */}
+      <div className="grid kpis" style={{ marginBottom: acikKpi ? 0 : 16 }}>
+        <Kpi
+          label="Uygun fırsat"
+          value={data.eligibleCount}
+          hint="Tüm koşullar sağlanıyor"
+          onClick={() => setAcikKpi((o) => (o === 'uygun' ? null : 'uygun'))}
+          acik={acikKpi === 'uygun'}
+          panelId={KPI_PANEL_ID}
+        />
         <Kpi
           label="Şartlı uygun"
           value={data.conditionallyEligibleCount}
           hint="Eksikler kapatılırsa uygun"
+          onClick={() => setAcikKpi((o) => (o === 'sartli' ? null : 'sartli'))}
+          acik={acikKpi === 'sartli'}
+          panelId={KPI_PANEL_ID}
         />
-        <Kpi label="Ortalama skor" value={data.averageScore.toFixed(1)} hint="100 üzerinden" />
+        <Kpi
+          label="Ortalama skor"
+          value={data.averageScore.toFixed(1)}
+          hint="100 üzerinden"
+          onClick={() => setAcikKpi((o) => (o === 'ortalama' ? null : 'ortalama'))}
+          acik={acikKpi === 'ortalama'}
+          panelId={KPI_PANEL_ID}
+        />
         <Kpi
           label="15 günde kapanan"
           value={data.closingWithin15Days}
           hint="Aksiyon gerektiren fırsatlar"
+          onClick={() => setAcikKpi((o) => (o === 'kapanan' ? null : 'kapanan'))}
+          acik={acikKpi === 'kapanan'}
+          panelId={KPI_PANEL_ID}
         />
         <Kpi
           label="Eksik zorunlu belge"
           value={data.missingMandatoryDocumentTotal}
           hint="Tüm fırsatlar toplamı"
+          onClick={() => setAcikKpi((o) => (o === 'belge' ? null : 'belge'))}
+          acik={acikKpi === 'belge'}
+          panelId={KPI_PANEL_ID}
         />
         <Kpi
           label="Veri boşluğu"
           value={data.dataGapTotal}
           hint="Profil eksikliği nedeniyle karar verilemeyen koşul"
+          onClick={() => setAcikKpi((o) => (o === 'bosluk' ? null : 'bosluk'))}
+          acik={acikKpi === 'bosluk'}
+          panelId={KPI_PANEL_ID}
         />
       </div>
+
+      {acikKpi ? (
+        <KpiKirilimPaneli
+          anahtar={acikKpi}
+          companyId={selectedCompanyId}
+          karttakiSayi={KART_SAYILARI[acikKpi](data)}
+          onKapat={() => setAcikKpi(null)}
+        />
+      ) : null}
 
       {/*
         Aksiyonlar ve profil göstergesi grafiklerin ÜSTÜNDE durur: ekranın işi önce
@@ -165,58 +220,5 @@ export default function DashboardPage() {
         )}
       </div>
     </>
-  )
-}
-
-function MatchTable({ matches }: { matches: import('@/api/types').OpportunityMatch[] }) {
-  if (matches.length === 0) {
-    return <EmptyState>Henüz eşleşme yok. "Yeniden skorla" ile hesaplama başlatabilirsiniz.</EmptyState>
-  }
-
-  return (
-    <div className="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Fırsat</th>
-            <th>Sektör Uyumu</th>
-            <th>Skor</th>
-            <th>Karar</th>
-            <th>Son Başvuru</th>
-            <th>Azami Tutar</th>
-            <th>Eksikler</th>
-          </tr>
-        </thead>
-        <tbody>
-          {matches.map((match) => (
-            <tr key={match.assessmentId}>
-              <td>
-                <Link to={`/matches/${match.assessmentId}`}>{match.opportunityTitle}</Link>
-                <div className="muted" style={{ fontSize: 12 }}>
-                  {match.publisher}
-                </div>
-              </td>
-              <td>
-                <SectorFitBadge fit={match.sectorFit} />
-              </td>
-              <td>
-                <ScoreCell score={match.finalScore} />
-              </td>
-              <td>
-                <VerdictBadge verdict={match.verdict} />
-              </td>
-              <td>{formatDeadline(match.daysUntilDeadline)}</td>
-              <td>{formatCurrency(match.maxAmount)}</td>
-              <td>
-                {match.missingConditionCount} koşul
-                <div className="muted" style={{ fontSize: 12 }}>
-                  {match.missingMandatoryDocumentCount} belge
-                </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
   )
 }
