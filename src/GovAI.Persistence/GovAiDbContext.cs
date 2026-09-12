@@ -203,6 +203,26 @@ public class GovAiDbContext(
             .HasQueryFilter(a => a.TenantId == _tenantId);
     }
 
+    /// <summary>
+    /// Bu bağlamda silme isteklerinin <b>gerçekten silmesi</b> için açılır.
+    ///
+    /// <para>
+    /// Varsayılan davranış pasifleştirmedir (aşağıya bakınız) ve öyle kalmalıdır. Bu
+    /// anahtar <b>tek bir iş için</b> vardır: tanıtım simülasyonu kurulurken eski demo
+    /// firmalarının veritabanından tamamen çıkması gerekir. Pasifleştirilselerdi
+    /// "sildim" denen kayıtlar satır olarak durur, vergi numarası tekilliğini işgal
+    /// eder ve ham veritabanı sorgularında görünmeye devam ederdi.
+    /// </para>
+    ///
+    /// <para>
+    /// Normal iş akışlarında <b>kullanılmaz</b>. Bağlam kapsamlıdır (scoped), bu yüzden
+    /// açılması yalnızca o isteği etkiler; kalıcı bir ayar değildir.
+    /// </para>
+    /// </summary>
+    public void KaliciSilmeyiEtkinlestir() => _kaliciSilme = true;
+
+    private bool _kaliciSilme;
+
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         ApplyAuditInformation();
@@ -241,6 +261,12 @@ public class GovAiDbContext(
         }
 
         // Silme istekleri fiziksel silme yerine pasifleştirmeye çevrilir (KVKK ve izlenebilirlik).
+        // Tek istisna için bkz. KaliciSilmeyiEtkinlestir.
+        if (_kaliciSilme)
+        {
+            return;
+        }
+
         foreach (var entry in ChangeTracker.Entries<ISoftDeletable>())
         {
             if (entry.State != EntityState.Deleted)

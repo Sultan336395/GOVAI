@@ -31,6 +31,7 @@ builder.Services.AddPersistence(connectionString);
 builder.Services.AddInfrastructure(builder.Configuration, builder.Environment.EnvironmentName);
 builder.Services.AddApplication();
 builder.Services.AddScoped<DatabaseSeeder>();
+builder.Services.AddScoped<SimulasyonSeeder>();
 
 // ---- Kimlik doğrulama ve yetkilendirme ----
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
@@ -266,6 +267,19 @@ static async Task ApplyStartupTasksAsync(WebApplication app)
             app.Logger.LogError(ex, "Migration uygulanamadı. Veritabanı erişilebilir mi?");
             throw;
         }
+    }
+
+    // Tanıtım simülasyonu. Başlangıç verisinden AYRI bir bayrakla çalışır: bu iş
+    // bilerek yıkıcıdır (mevcut firma verisini siler) ve "demo verisi yükle" niyetiyle
+    // açılan bir bayrağın yanına konulamaz. Bayrak açık unutulursa ikinci açılışta
+    // hiçbir şey silinmez; seeder grubun varlığına bakıp kendini durdurur.
+    if (app.Configuration.GetValue("Simulation:Enabled", false))
+    {
+        using var simScope = app.Services.CreateScope();
+        var simulasyon = simScope.ServiceProvider.GetRequiredService<SimulasyonSeeder>();
+        var sonuc = await simulasyon.KurAsync();
+
+        app.Logger.LogInformation("Tanıtım simülasyonu sonucu: {Sonuc}", sonuc);
     }
 
     if (!app.Configuration.GetValue("Seed:Enabled", false))
