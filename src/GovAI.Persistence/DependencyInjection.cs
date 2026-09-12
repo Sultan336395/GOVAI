@@ -42,6 +42,7 @@ public static class DependencyInjection
         services.AddScoped<IErpServiceIdentityRepository, ErpServiceIdentityRepository>();
         services.AddScoped<IErpAssertionReplayGuard, ErpAssertionReplayGuard>();
         services.AddScoped<INotificationRecipientRepository, NotificationRecipientRepository>();
+        services.AddScoped<IErpProcessEventRepository, ErpProcessEventRepository>();
         services.AddScoped<IAnalysisRunRepository, AnalysisRunRepository>();
         services.AddScoped<ICatalogRepairRepository, CatalogRepairRepository>();
         services.AddScoped<IRuleEvidenceBackfillRepository, RuleEvidenceBackfillRepository>();

@@ -37,6 +37,12 @@ public sealed record ErpSnapshot
     public IReadOnlyList<ErpCertificate> Certificates { get; init; } = [];
 
     /// <summary>
+    /// Süreç olay günlüğü. <c>null</c> ise bölüm hiç istenmedi ya da yanıtta yoktu —
+    /// "olay olmadı" ile karıştırılmamalıdır.
+    /// </summary>
+    public IReadOnlyList<ErpProcessEventRow>? ProcessEvents { get; init; }
+
+    /// <summary>
     /// ERP'de tanımlı bildirim sorumluları.
     ///
     /// <para>
@@ -93,3 +99,22 @@ public interface ISecretProtector
 
     string Unprotect(string protectedText);
 }
+
+
+/// <summary>
+/// ERP yanıtından çıkarılmış ham süreç olayı satırı.
+///
+/// <para>
+/// Alanlar gevşektir (hepsi <c>null</c> olabilir) çünkü eşleme yanlışsa ya da ERP
+/// alanı boş bıraktıysa satır yine de sayılabilmeli. Zorunlu üçlüsü eksik olan satır
+/// <see cref="GovAI.Application.Integrations.ErpProcessEventSync"/> tarafından
+/// ayıklanır ve <b>sayılır</b>; sessizce yok sayılmaz.
+/// </para>
+/// </summary>
+public sealed record ErpProcessEventRow(
+    string? CaseId,
+    string? Activity,
+    DateTimeOffset? OccurredAt,
+    string? Resource,
+    string? Department,
+    string? ExternalId);

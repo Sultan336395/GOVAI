@@ -267,6 +267,7 @@ public sealed class HttpErpDataSource(
                 YoungEmployeeMaxAge = Adet(esleme.YoungEmployeeMaxAge, "Genç çalışan üst yaşı"),
                 Certificates = Belgeler(kok, esleme, bulunamayan),
                 NotificationRecipients = Aliciar(kok, esleme, bulunamayan),
+                ProcessEvents = SurecOlaylari(kok, esleme, bulunamayan),
                 MissingFields = bulunamayan,
             };
         }
@@ -343,6 +344,83 @@ public sealed class HttpErpDataSource(
     /// sessizce bildirimsiz bırakırdı.
     /// </para>
     /// </summary>
+    /// <summary>
+    /// Süreç olay günlüğünü çıkarır.
+    ///
+    /// <para>
+    /// Bölüm ya da zorunlu alanlardan biri eşlemede tanımlı değilse <c>null</c> döner
+    /// ve günlük hiç istenmez: eksik eşlemeyle çekilen günlük, bozuk bir ölçüm zemini
+    /// üretirdi. Bölüm tanımlı ama yanıtta yoksa da <c>null</c> döner ve eksik alan
+    /// olarak bildirilir — geçici bir arızayı "olay olmadı" saymak, süreç sıklıklarını
+    /// sessizce düşürürdü.
+    /// </para>
+    /// </summary>
+    private static IReadOnlyList<ErpProcessEventRow>? SurecOlaylari(
+        JsonElement kok,
+        ErpFieldMap esleme,
+        List<string> bulunamayan)
+    {
+        if (!esleme.SupportsProcessEvents)
+        {
+            return null;
+        }
+
+        if (!Bul(kok, esleme.ProcessEvents!, out var deger))
+        {
+            bulunamayan.Add("Süreç olayları");
+            return null;
+        }
+
+        if (deger.ValueKind != JsonValueKind.Array)
+        {
+            // Olay günlüğü yalnızca dizi olabilir; metin ya da nesne biçimi bir eşleme
+            // hatasıdır ve tahminle düzeltilmez.
+            bulunamayan.Add("Süreç olayları (dizi bekleniyordu)");
+            return null;
+        }
+
+        var liste = new List<ErpProcessEventRow>();
+
+        foreach (var oge in deger.EnumerateArray())
+        {
+            if (oge.ValueKind != JsonValueKind.Object)
+            {
+                continue;
+            }
+
+            liste.Add(new ErpProcessEventRow(
+                Metin(oge, esleme.EventCaseIdField),
+                Metin(oge, esleme.EventActivityField),
+                Zaman(oge, esleme.EventTimestampField!),
+                // Kaynak alanına kişi ADI eşlenmemelidir; bkz. ErpProcessEvent notu.
+                Metin(oge, esleme.EventResourceField),
+                Metin(oge, esleme.EventDepartmentField),
+                Metin(oge, esleme.EventExternalIdField)));
+        }
+
+        return liste;
+    }
+
+    /// <summary>
+    /// Olay zamanı. Biçim tanınmazsa <c>null</c> döner ve satır geçersiz sayılır;
+    /// "herhâlde bugündür" gibi bir varsayım, olayları yanlış sıraya dizerdi.
+    /// </summary>
+    private static DateTimeOffset? Zaman(JsonElement oge, string alan)
+    {
+        if (!oge.TryGetProperty(alan, out var deger) || deger.ValueKind != JsonValueKind.String)
+        {
+            return null;
+        }
+
+        return DateTimeOffset.TryParse(
+            deger.GetString(),
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+            out var zaman)
+            ? zaman
+            : null;
+    }
+
     private static IReadOnlyList<ErpRecipient>? Aliciar(
         JsonElement kok,
         ErpFieldMap esleme,

@@ -68,6 +68,51 @@ public sealed record ErpFieldMap
     /// <summary>Alıcı adı alanı. Yoksa yalnızca adres kullanılır.</summary>
     public string? RecipientNameField { get; init; }
 
+    /// <summary>
+    /// Süreç olay günlüğü listesi (sipariş, fatura, işe alım akışları).
+    ///
+    /// <para>
+    /// Profil alanları firmanın <i>durumunu</i>, olay günlüğü <i>nasıl çalıştığını</i>
+    /// söyler. Bölüm eşlemede tanımlı değilse günlük çekilmez ve bu bir eksiklik
+    /// değildir: çoğu ERP kurulumunda süreç günlüğü dışarı açılmaz. Tanımlanmadığı
+    /// sürece GOVAI bu veriyi istemez.
+    /// </para>
+    /// </summary>
+    public string? ProcessEvents { get; init; }
+
+    /// <summary>Olaydaki vaka kimliği alanı. Süreç madenciliğinin zorunlu alanı.</summary>
+    public string? EventCaseIdField { get; init; }
+
+    /// <summary>Olaydaki faaliyet adı alanı. Zorunlu.</summary>
+    public string? EventActivityField { get; init; }
+
+    /// <summary>Olay zamanı alanı. Zorunlu; sıralama buna dayanır.</summary>
+    public string? EventTimestampField { get; init; }
+
+    /// <summary>
+    /// İşi yapan kaynağın ERP kodu alanı.
+    ///
+    /// <para>
+    /// Bu alana <b>kişi adı taşıyan</b> bir alan eşlenmemelidir; süreç madenciliği için
+    /// "aynı kaynak mı" bilgisi yeterlidir. Ad eşlenirse uyum analizi için toplanan veri
+    /// çalışan izlemeye dönüşür.
+    /// </para>
+    /// </summary>
+    public string? EventResourceField { get; init; }
+
+    /// <summary>Olayın geçtiği birim alanı; mevzuat etkisinin departman dağılımı için.</summary>
+    public string? EventDepartmentField { get; init; }
+
+    /// <summary>ERP'deki olay kimliği; mükerrer çekmeyi önler.</summary>
+    public string? EventExternalIdField { get; init; }
+
+    /// <summary>Olay günlüğü çekmek için gereken üç zorunlu alan tanımlı mı?</summary>
+    public bool SupportsProcessEvents =>
+        !string.IsNullOrWhiteSpace(ProcessEvents)
+        && !string.IsNullOrWhiteSpace(EventCaseIdField)
+        && !string.IsNullOrWhiteSpace(EventActivityField)
+        && !string.IsNullOrWhiteSpace(EventTimestampField);
+
     /// <summary>Alıcı görevi alanı (ör. "Mali İşler Müdürü"). Yalnızca gösterim içindir.</summary>
     public string? RecipientRoleField { get; init; }
 

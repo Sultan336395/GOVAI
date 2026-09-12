@@ -44,6 +44,7 @@ public sealed class ErpPullService(
     IErpConnectionRepository connections,
     ICompanyRepository companies,
     INotificationRecipientRepository recipients,
+    IErpProcessEventRepository processEvents,
     CompanyProfileService profiles,
     IErpDataSource dataSource,
     IUnitOfWork unitOfWork,
@@ -131,6 +132,68 @@ public sealed class ErpPullService(
     /// profil sürümünü artırır ve gereksiz yere bütün çağrıları yeniden skorlatırdı.
     /// </para>
     /// </summary>
+    /// <summary>
+    /// ERP'den gelen süreç olaylarını günlüğe ekler.
+    ///
+    /// <para>
+    /// Günlük yalnızca büyür: var olan olay güncellenmez, silinmez. Mükerrer kayıt
+    /// bir faaliyeti olduğundan sık gösterir, kayıp kayıt bir adımı hiç olmamış sayar;
+    /// ikisi de hata mesajı üretmeden ölçümü bozar.
+    /// </para>
+    ///
+    /// <para>
+    /// Tekilleştirme penceresi son olaydan biraz geriye alınır: ERP geç gelen kayıtları
+    /// (arka tarihli düzeltmeler) gönderebilir ve pencere tam son olayda başlasaydı
+    /// bunlar mükerrer sayılmadan tekrar eklenirdi.
+    /// </para>
+    /// </summary>
+    private async Task SurecOlaylariniIsleAsync(
+        ErpConnection connection,
+        ErpSnapshot goruntu,
+        CancellationToken cancellationToken)
+    {
+        if (goruntu.ProcessEvents is null)
+        {
+            return;
+        }
+
+        var sonOlay = await processEvents.LatestOccurredAtAsync(connection.CompanyId, cancellationToken);
+        var pencere = (sonOlay ?? DateTimeOffset.MinValue).AddDays(-GecGelenOlayPenceresiGun);
+
+        var mevcutAnahtarlar = await processEvents.ListKeysAsync(
+            connection.CompanyId, pencere, cancellationToken);
+
+        var sonuc = ErpProcessEventSync.Reconcile(
+            connection.TenantId,
+            connection.CompanyId,
+            [.. goruntu.ProcessEvents.Select(o => new ProcessEventCandidate
+            {
+                CaseId = o.CaseId,
+                Activity = o.Activity,
+                OccurredAt = o.OccurredAt,
+                Resource = o.Resource,
+                Department = o.Department,
+                ExternalId = o.ExternalId,
+            })],
+            mevcutAnahtarlar);
+
+        if (sonuc.ToInsert.Count > 0)
+        {
+            await processEvents.AddRangeAsync(sonuc.ToInsert, cancellationToken);
+        }
+
+        logger.LogInformation(
+            "ERP süreç günlüğü alındı. CompanyId={CompanyId} Eklenen={Added} Mükerrer={Duplicate} "
+            + "Geçersiz={Invalid}",
+            connection.CompanyId, sonuc.ToInsert.Count, sonuc.Duplicates, sonuc.Invalid);
+    }
+
+    /// <summary>
+    /// Tekilleştirme penceresinin son olaydan kaç gün geriye açılacağı. Arka tarihli
+    /// düzeltmelerin mükerrer eklenmesini önler.
+    /// </summary>
+    private const int GecGelenOlayPenceresiGun = 7;
+
     private async Task<RecipientSyncResult> AliciarıUzlastirAsync(
         ErpConnection connection,
         ErpSnapshot goruntu,
@@ -197,6 +260,11 @@ public sealed class ErpPullService(
         // da işlenir: ERP'sinde yalnızca sorumlu listesi tanımlı bir firmada, profil
         // alanları bulunamadı diye sorumlular da atlanırsa firma bildirimsiz kalırdı.
         var aliciSonucu = await AliciarıUzlastirAsync(connection, goruntu, cancellationToken);
+
+        // Süreç günlüğü de profilden ayrı işlenir ve AYNI SEBEPLE profil boş olsa da
+        // alınır: yalnızca olay günlüğü açan bir firmada profil alanları bulunamadı
+        // diye günlüğü atlamak, nedensel ikizin ham maddesini hiç toplamamak olurdu.
+        await SurecOlaylariniIsleAsync(connection, goruntu, cancellationToken);
 
         if (goruntu.IsEmpty)
         {

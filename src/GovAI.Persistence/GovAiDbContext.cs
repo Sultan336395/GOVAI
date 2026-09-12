@@ -73,6 +73,9 @@ public class GovAiDbContext(
     public DbSet<ErpServiceIdentity> ErpServiceIdentities => Set<ErpServiceIdentity>();
     public DbSet<ErpSigningKey> ErpSigningKeys => Set<ErpSigningKey>();
     public DbSet<ErpAssertionUse> ErpAssertionUses => Set<ErpAssertionUse>();
+
+    /// <summary>Süreç olay günlüğü (Regulatory Causal Twin'in ham maddesi).</summary>
+    public DbSet<ErpProcessEvent> ErpProcessEvents => Set<ErpProcessEvent>();
     public DbSet<ReportInquiry> ReportInquiries => Set<ReportInquiry>();
     public DbSet<TenderPursuit> TenderPursuits => Set<TenderPursuit>();
     public DbSet<TenderPursuitEvent> TenderPursuitEvents => Set<TenderPursuitEvent>();
@@ -196,6 +199,9 @@ public class GovAiDbContext(
 
         modelBuilder.Entity<NotificationRecipient>()
             .HasQueryFilter(r => r.TenantId == _tenantId);
+
+        modelBuilder.Entity<ErpProcessEvent>()
+            .HasQueryFilter(e => e.TenantId == _tenantId);
 
         // AuditLogEntry.TenantId nullable'dır (kiracı belirlenemeden oluşan kayıtlar için).
         // Kiracısı olmayan kayıtlar hiçbir kiracıya gösterilmez.
