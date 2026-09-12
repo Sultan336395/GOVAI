@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { api } from '@/api/client'
 import { useCompanies } from '@/app/contexts'
 import { EmptyState, ErrorBox, Kpi, Loading } from '@/components/Common'
+import EvidenceReliabilityPanel from '@/components/EvidenceReliabilityPanel'
 import { categoryLabels, formatCurrency, formatDate, formatPercent } from '@/lib/format'
 
 const sizeLabels: Record<string, string> = {
@@ -126,6 +127,15 @@ export default function CompanyPage() {
             </ul>
           )}
         </div>
+      </div>
+
+      {/*
+        Kanıt güvenilirliği belge listesinin ÜSTÜNDE durur: liste "neyim var" sorusunu,
+        panel "hangisine bugün güvenebilirim" sorusunu cevaplar ve ikincisi aksiyon
+        gerektiren sorudur.
+      */}
+      <div style={{ marginBottom: 16 }}>
+        <EvidenceReliabilityPanel companyId={data.id} />
       </div>
 
       <div className="grid two">

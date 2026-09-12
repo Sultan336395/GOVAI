@@ -1,4 +1,5 @@
 import type {
+  EvidencePortfolio,
   OpportunityAnalysis,
   RegulationImpactAnalysis,
   ActiveCompanyResult,
@@ -176,6 +177,10 @@ export const api = {
   }) => request<PagedResult<OpportunitySummary>>(`/api/opportunities${query(params)}`),
 
   // ---- uygunluk ----
+  /** Firmanın kanıt portföyü: hangi belge hâlâ güvenilir, hangisi eskimiş. */
+  getEvidencePortfolio: (companyId: string) =>
+    request<EvidencePortfolio>(`/api/evidence/companies/${companyId}`),
+
   listMatches: (
     companyId: string,
     params: {

@@ -1693,3 +1693,43 @@ export interface DashboardInsights {
   activity: ActivityItem[]
   notes: string[]
 }
+
+/** Kanıt eskime motoru (Evidence Half-Life) — bkz. src/GovAI.Domain/Evidence. */
+export type EvidenceKind =
+  | 'Certificate'
+  | 'FinancialStatement'
+  | 'WorkforceDeclaration'
+  | 'ErpSnapshot'
+  | 'RegulationClause'
+
+export type EvidenceStatus = 'Bilinmiyor' | 'Guvenilir' | 'Zayifliyor' | 'Guvenilmez' | 'Gecersiz'
+
+export interface EvidenceReliabilityItem {
+  label: string
+  kind: EvidenceKind
+  kindLabel: string
+  status: EvidenceStatus
+  statusLabel: string
+  /** 0..1. Durum "Bilinmiyor" ise alan gelmez. */
+  score?: number
+  ageDays?: number
+  halfLifeDays: number
+  weakensOn?: string
+  reason: string
+  isDependable: boolean
+}
+
+export interface EvidencePortfolio {
+  companyId: string
+  companyName: string
+  asOf: string
+  total: number
+  dependable: number
+  weakening: number
+  undependable: number
+  expired: number
+  unknown: number
+  averageScore?: number
+  needsAttention: number
+  items: EvidenceReliabilityItem[]
+}

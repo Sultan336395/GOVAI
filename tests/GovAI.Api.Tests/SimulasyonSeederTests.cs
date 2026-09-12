@@ -163,7 +163,7 @@ public sealed class SimulasyonSeederTests
         await Kurucu(db).KurAsync();
 
         var firmalar = await db.Companies.IgnoreQueryFilters().ToListAsync();
-        var ana = Assert.Single(firmalar.Where(f => f.IsHeadCompany));
+        var ana = Assert.Single(firmalar, f => f.IsHeadCompany);
 
         Assert.Null(ana.ParentCompanyId);
         Assert.Equal(CompanyRelationshipType.HeadCompany, ana.RelationshipType);
