@@ -15,11 +15,35 @@
 # Yeniden derleme `latest`i üzerine yazar ve eski imaj isimsiz kalır — geri dönüş
 # imkânsızlaşır.
 #
-# ── 11.09.2026 · Menü düzeni ve ERP ekran düzeltmesi öncesi çalışan sürüm ──
+# ── 12.09.2026 · Personel kırılımı açık beyan + zamanlayıcı saati öncesi sürüm ──
 #
-#   govai-api:69b8e31
-#   govai-web:69b8e31
-#   govai-worker:69b8e31
+#   govai-api:e41f142
+#   govai-web:e41f142
+#   govai-worker:e41f142
+#
+# !! BU SÜRÜME DÖNERKEN VERİ DE GERİ ALINMALIDIR !!
+#
+# 94f61e0 yayını ilk kez EKLEMELİ OLMAYAN bir migration içerir:
+# PersonelKirilimiAcikBeyan, personel kırılım kolonlarını nullable yapar ve
+# "girilmediği için 0 duran" değerleri NULL'a çevirir. e41f142 ve öncesi bu
+# kolonları `int` (null kabul etmez) olarak okur; NULL gören eski sürüm firma
+# kaydını OKUYAMAZ ve hata verir.
+#
+# Yani yalnızca imajı geri almak YETMEZ. Önce veri eski biçime döndürülür:
+#
+#   docker exec govai-postgres-1 psql -U govai -d govai -c "
+#     UPDATE govai.companies SET
+#       women_employee_count    = COALESCE(women_employee_count, 0),
+#       young_employee_count    = COALESCE(young_employee_count, 0),
+#       rnd_employee_count      = COALESCE(rnd_employee_count, 0),
+#       disabled_employee_count = COALESCE(disabled_employee_count, 0);"
+#
+# Bu UPDATE, yayın anında NULL'a çevrilen değerleri 0'a geri getirir; yayından
+# SONRA girilmiş gerçek beyanlar varsa onlar korunur, yalnızca beyansız alanlar
+# tekrar 0 görünür. Kolonların nullable olması eski sürümü rahatsız etmez.
+#
+# Sıra: önce bu UPDATE, sonra aşağıdaki compose komutu. Ters sırada eski sürüm
+# açılır açılmaz firma sayfalarında hata verir.
 #
 # DÖRT WORKER AYNI İMAJI PAYLAŞIR. Bu dosya eskiden her worker'ı ayrı bir imaj
 # adına (`govai-collector:…`, `govai-parser:…`) sabitliyordu; o adlar artık
@@ -27,35 +51,41 @@
 # bölümüne düşerek SUNUCUDA DERLEME başlatırdı. Geri dönüşün kendisi arıza
 # üretmemelidir.
 #
-# ÖNCEKİ SÜRÜMLER (artık hedef değil): d517aa2, 023f6b2, eda245c, f28ca80, 14953a2, cc49454, 398f84e, cff2322, 2a5382d, 492b40c, 0d42f3f, c8bf41d, bc6a53a, 5cb1a7f, c202352, cffc2b5, 9c35582, c202352, b13f0c2, 3e9b9ab. O etiketli imajlar
+# ÖNCEKİ SÜRÜMLER (artık hedef değil): 69b8e31, d517aa2, 023f6b2, eda245c, f28ca80, 14953a2, cc49454, 398f84e, cff2322, 2a5382d, 492b40c, 0d42f3f, c8bf41d, bc6a53a, 5cb1a7f, c202352, cffc2b5, 9c35582, c202352, b13f0c2, 3e9b9ab. O etiketli imajlar
 # silinmedi; gerekirse bu dosyanın bir kopyasıyla hedeflenebilirler.
 #
-# VERİTABANI: Bu dosya veritabanına DOKUNMAZ. Geri dönüş otomatik restore İÇERMEZ —
-# Faz 3 migration'larının tamamı eklemelidir (yeni tablo ve yeni nullable kolonlar),
-# bu yüzden b13f0c2 imajı yeni şemayla çalışmaya devam eder. Veri uyumsuzluğu
-# görülürse doğrulanmış yedekle karşılaştırılır ve ayrıca onay istenir.
+# VERİTABANI: Bu dosya veritabanına DOKUNMAZ ve otomatik restore İÇERMEZ.
+#
+# Faz 3 migration'larının tamamı eklemeliydi (yeni tablo, yeni nullable kolon), bu
+# yüzden eski imajlar yeni şemayla sorunsuz çalışıyordu. 94f61e0 ile bu artık
+# geçerli DEĞİL: yukarıdaki uyarıda anlatılan veri dönüşümü olmadan geri dönüş
+# çalışmaz. Yeni bir yayın eklemeli olmayan migration içeriyorsa, geri dönüşün
+# veri adımı bu dosyaya yazılmadan yayın yapılmaz.
+#
+# Veri bozulması görülürse doğrulanmış yedekle karşılaştırılır ve gerçek
+# veritabanına geri yükleme ayrıca onay ister.
 
 services:
   api:
-    image: govai-api:69b8e31
+    image: govai-api:e41f142
     pull_policy: never
 
   web:
-    image: govai-web:69b8e31
+    image: govai-web:e41f142
     pull_policy: never
 
   collector:
-    image: govai-worker:69b8e31
+    image: govai-worker:e41f142
     pull_policy: never
 
   parser:
-    image: govai-worker:69b8e31
+    image: govai-worker:e41f142
     pull_policy: never
 
   scoring:
-    image: govai-worker:69b8e31
+    image: govai-worker:e41f142
     pull_policy: never
 
   scheduler:
-    image: govai-worker:69b8e31
+    image: govai-worker:e41f142
     pull_policy: never
