@@ -13,7 +13,9 @@ from __future__ import annotations
 import signal
 import sys
 from types import FrameType
+from zoneinfo import ZoneInfo
 
+from apscheduler.schedulers.base import BaseScheduler
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
@@ -23,6 +25,29 @@ from govai_workers.api_client import ApiError, GovAiClient
 from govai_workers.logging_setup import configure_logging, get_logger
 
 log = get_logger(__name__)
+
+#: Tüm gece işlerinin takvimi Türkiye saatine göredir.
+ISTANBUL = ZoneInfo("Europe/Istanbul")
+
+
+def _takvim(**alanlar: object) -> CronTrigger:
+    """Türkiye saatine bağlı cron tetikleyici üretir.
+
+    Saat dilimi burada AÇIKÇA verilir; zamanlayıcıya verilen saat dilimi bu işi
+    görmez. APScheduler, ``add_job`` çağrısına hazır bir tetikleyici nesnesi
+    geçildiğinde onu olduğu gibi kabul eder (``_create_trigger``: ``isinstance``
+    kontrolünden dönen erken ``return``) ve kendi saat dilimini YALNIZCA tetikleyiciyi
+    kendisi üretirken (``trigger="cron"`` gibi) uygular. Saat dilimi verilmeyen
+    ``CronTrigger`` ise ``get_localzone()`` ile makinenin yerel saatine düşer;
+    konteynerde ``tzdata`` kurulu olmadığından bu UTC demektir.
+
+    Sahadaki sonuç şuydu: zamanlayıcı ``Europe/Istanbul`` ile kurulmuş olmasına
+    rağmen gece turu 03:30 UTC'de, yani Türkiye saatiyle 06:30'da çalışıyordu —
+    üç saat geç. ERP çekme (02:45) ve haftalık rapor (Pazartesi 07:30) da aynı
+    kaymayı yaşıyordu, dolayısıyla "önce ERP, sonra skorlama, sonra rapor" sırası
+    korunuyor ama tamamı mesai saatine taşınıyordu.
+    """
+    return CronTrigger(timezone=ISTANBUL, **alanlar)
 
 
 def _trigger_due_crawls(client: GovAiClient) -> None:
@@ -173,17 +198,17 @@ def _weekly_reports(client: GovAiClient) -> None:
         log.exception("weekly_reports_failed")
 
 
-def main() -> int:
-    configure_logging()
+def isleri_kur(scheduler: BaseScheduler, client: GovAiClient) -> None:
+    """Zamanlanmış işleri kaydeder.
 
-    client = GovAiClient()
-    scheduler = BlockingScheduler(timezone="Europe/Istanbul")
-
+    ``main`` içinden ayrı durur ki takvimler zamanlayıcı başlatılmadan sınanabilsin;
+    aksi halde tek sınama yolu gerçek saati beklemek olurdu.
+    """
     # Kaynak taramaları: her gün 07:00 ve 19:00 (kaynak bazlı cron API tarafında saklanır;
     # burada iki tur tetikleyip kaynak kendi takvimine göre atlama kararını verir).
     scheduler.add_job(
         _trigger_due_crawls,
-        CronTrigger(hour="7,19", minute=0),
+        _takvim(hour="7,19", minute=0),
         args=[client],
         id="trigger-crawls",
         max_instances=1,
@@ -201,7 +226,7 @@ def main() -> int:
 
     scheduler.add_job(
         _nightly_rescore,
-        CronTrigger(hour=3, minute=30),
+        _takvim(hour=3, minute=30),
         args=[client],
         id="nightly-rescore",
         max_instances=1,
@@ -215,7 +240,7 @@ def main() -> int:
     # eksiğin sonucunu bir gün sonra görür.
     scheduler.add_job(
         _erp_pull,
-        CronTrigger(hour=2, minute=45),
+        _takvim(hour=2, minute=45),
         args=[client],
         id="erp-pull",
         max_instances=1,
@@ -228,7 +253,7 @@ def main() -> int:
     # bir gün eski karara bakmış olur ve ayrışma gerçek değil takvim kaynaklı çıkardı.
     scheduler.add_job(
         _ai_second_opinions,
-        CronTrigger(hour=4, minute=15),
+        _takvim(hour=4, minute=15),
         args=[client],
         id="ai-second-opinions",
         max_instances=1,
@@ -242,7 +267,7 @@ def main() -> int:
     # (geçmiş rapor bilerek yeniden hesaplanmaz).
     scheduler.add_job(
         _weekly_reports,
-        CronTrigger(day_of_week="mon", hour=7, minute=30),
+        _takvim(day_of_week="mon", hour=7, minute=30),
         args=[client],
         id="weekly-reports",
         max_instances=1,
@@ -258,6 +283,15 @@ def main() -> int:
         max_instances=1,
         coalesce=True,
     )
+
+
+def main() -> int:
+    configure_logging()
+
+    client = GovAiClient()
+    scheduler = BlockingScheduler(timezone=ISTANBUL)
+
+    isleri_kur(scheduler, client)
 
     def _shutdown(_signum: int, _frame: FrameType | None) -> None:
         log.info("scheduler_stopping")
