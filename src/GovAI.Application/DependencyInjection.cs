@@ -52,6 +52,7 @@ public static class DependencyInjection
         services.AddScoped<ErpServiceIdentityService>();
         services.AddScoped<DashboardInsightsService>();
         services.AddScoped<Evidence.EvidenceReliabilityService>();
+        services.AddScoped<Leverage.ComplianceLeverageService>();
         services.AddScoped<CalibrationService>();
         services.AddScoped<AiSecondOpinionService>();
         services.AddScoped<ErpConnectionService>();

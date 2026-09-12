@@ -1733,3 +1733,43 @@ export interface EvidencePortfolio {
   needsAttention: number
   items: EvidenceReliabilityItem[]
 }
+
+/** Uyumu fırsata çeviren motor — bkz. src/GovAI.Domain/Leverage. */
+export type GapKind = 'Declaration' | 'Capability' | 'Document'
+
+export interface OpportunityUpside {
+  opportunityId: string
+  title: string
+  maxAmount?: number
+  /** Bu eksik kapatılınca çağrıda başka engel kalmıyor mu? */
+  unlockedByThisAlone: boolean
+  remainingGapCount: number
+}
+
+export interface ComplianceGap {
+  key: string
+  requirement: string
+  kind: GapKind
+  kindLabel: string
+  suggestedAction?: string
+  unlockCount: number
+  affectedCount: number
+  /** Yalnızca bu eksik kapatılarak açılacak çağrıların bilinen toplamı. */
+  unlockedAmount?: number
+  /** Açılacak çağrıların bir kısmının tutarı bilinmiyor. */
+  amountIsPartial: boolean
+  /** Beyan eksiklerinde getiri koşulludur: cevap olumsuz da çıkabilir. */
+  isConditional: boolean
+  opportunities: OpportunityUpside[]
+}
+
+export interface ComplianceLeverage {
+  companyId: string
+  companyName: string
+  evaluatedOpportunityCount: number
+  gapCount: number
+  unlockableOpportunityCount: number
+  unlockableAmount?: number
+  amountIsPartial: boolean
+  gaps: ComplianceGap[]
+}

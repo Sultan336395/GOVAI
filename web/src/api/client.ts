@@ -1,4 +1,5 @@
 import type {
+  ComplianceLeverage,
   EvidencePortfolio,
   OpportunityAnalysis,
   RegulationImpactAnalysis,
@@ -177,6 +178,10 @@ export const api = {
   }) => request<PagedResult<OpportunitySummary>>(`/api/opportunities${query(params)}`),
 
   // ---- uygunluk ----
+  /** Uyum eksiklerinin fırsat karşılığı: neyi kapatırsam hangi çağrıya girerim. */
+  getComplianceLeverage: (companyId: string) =>
+    request<ComplianceLeverage>(`/api/leverage/companies/${companyId}`),
+
   /** Firmanın kanıt portföyü: hangi belge hâlâ güvenilir, hangisi eskimiş. */
   getEvidencePortfolio: (companyId: string) =>
     request<EvidencePortfolio>(`/api/evidence/companies/${companyId}`),

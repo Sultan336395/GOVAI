@@ -16,6 +16,7 @@ import {
 import { api } from '@/api/client'
 import { useCompanies } from '@/app/contexts'
 import { EmptyState, ErrorBox, Kpi, Loading } from '@/components/Common'
+import ComplianceLeveragePanel from '@/components/ComplianceLeveragePanel'
 import DashboardInsights from '@/components/DashboardInsights'
 import KpiKirilimPaneli, { KPI_PANEL_ID } from '@/components/KpiKirilimPaneli'
 import MatchTable from '@/components/MatchTable'
@@ -171,6 +172,14 @@ export default function DashboardPage() {
         "bugün ne yapmalıyım" sorusuna cevap vermek, sonra genel resmi göstermektir.
       */}
       <DashboardInsights companyId={selectedCompanyId} />
+
+      {/*
+        Eksiklerin getirisi, aksiyon listesinin hemen ardında: "ne yapmalıyım"
+        sorusunun cevabı "neden yapmalıyım" ile yan yana durmalı.
+      */}
+      <div style={{ marginBottom: 16 }}>
+        <ComplianceLeveragePanel companyId={selectedCompanyId} />
+      </div>
 
       <div className="grid two" style={{ marginBottom: 16 }}>
         <div className="card">
