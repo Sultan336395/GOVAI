@@ -15,35 +15,20 @@
 # Yeniden derleme `latest`i üzerine yazar ve eski imaj isimsiz kalır — geri dönüş
 # imkânsızlaşır.
 #
-# ── 12.09.2026 · Personel kırılımı açık beyan + zamanlayıcı saati öncesi sürüm ──
+# ── 12.09.2026 · Kanıt eskimesi ve fırsat kaldıracı öncesi sürüm ──
 #
-#   govai-api:e41f142
-#   govai-web:e41f142
-#   govai-worker:e41f142
+#   govai-api:e288b82
+#   govai-web:e288b82
+#   govai-worker:e288b82
 #
-# !! BU SÜRÜME DÖNERKEN VERİ DE GERİ ALINMALIDIR !!
+# VERİ ADIMI GEREKMEZ. 678a17e yayınındaki tek migration EKLEMELİDİR (yeni tablo
+# erp_process_events + üç indeks); e288b82 o tabloyu hiç okumaz ve varlığı onu
+# rahatsız etmez.
 #
-# 94f61e0 yayını ilk kez EKLEMELİ OLMAYAN bir migration içerir:
-# PersonelKirilimiAcikBeyan, personel kırılım kolonlarını nullable yapar ve
-# "girilmediği için 0 duran" değerleri NULL'a çevirir. e41f142 ve öncesi bu
-# kolonları `int` (null kabul etmez) olarak okur; NULL gören eski sürüm firma
-# kaydını OKUYAMAZ ve hata verir.
-#
-# Yani yalnızca imajı geri almak YETMEZ. Önce veri eski biçime döndürülür:
-#
-#   docker exec govai-postgres-1 psql -U govai -d govai -c "
-#     UPDATE govai.companies SET
-#       women_employee_count    = COALESCE(women_employee_count, 0),
-#       young_employee_count    = COALESCE(young_employee_count, 0),
-#       rnd_employee_count      = COALESCE(rnd_employee_count, 0),
-#       disabled_employee_count = COALESCE(disabled_employee_count, 0);"
-#
-# Bu UPDATE, yayın anında NULL'a çevrilen değerleri 0'a geri getirir; yayından
-# SONRA girilmiş gerçek beyanlar varsa onlar korunur, yalnızca beyansız alanlar
-# tekrar 0 görünür. Kolonların nullable olması eski sürümü rahatsız etmez.
-#
-# Sıra: önce bu UPDATE, sonra aşağıdaki compose komutu. Ters sırada eski sürüm
-# açılır açılmaz firma sayfalarında hata verir.
+# DİKKAT — DAHA ESKİYE dönülecekse: 94f61e0 öncesine (e41f142 ve altı) inmek için
+# personel kırılım kolonları eski biçime çevrilmelidir, çünkü o sürümler NULL kabul
+# etmez. Gereken komut ve sıra bu dosyanın 94f61e0 sürümündeki hâlinde yazılıdır
+# (git geçmişinden alınabilir). e288b82'ye dönüş bu adımı GEREKTİRMEZ.
 #
 # DÖRT WORKER AYNI İMAJI PAYLAŞIR. Bu dosya eskiden her worker'ı ayrı bir imaj
 # adına (`govai-collector:…`, `govai-parser:…`) sabitliyordu; o adlar artık
@@ -51,7 +36,7 @@
 # bölümüne düşerek SUNUCUDA DERLEME başlatırdı. Geri dönüşün kendisi arıza
 # üretmemelidir.
 #
-# ÖNCEKİ SÜRÜMLER (artık hedef değil): 69b8e31, d517aa2, 023f6b2, eda245c, f28ca80, 14953a2, cc49454, 398f84e, cff2322, 2a5382d, 492b40c, 0d42f3f, c8bf41d, bc6a53a, 5cb1a7f, c202352, cffc2b5, 9c35582, c202352, b13f0c2, 3e9b9ab. O etiketli imajlar
+# ÖNCEKİ SÜRÜMLER (artık hedef değil): e41f142, 94f61e0, 69b8e31, d517aa2, 023f6b2, eda245c, f28ca80, 14953a2, cc49454, 398f84e, cff2322, 2a5382d, 492b40c, 0d42f3f, c8bf41d, bc6a53a, 5cb1a7f, c202352, cffc2b5, 9c35582, c202352, b13f0c2, 3e9b9ab. O etiketli imajlar
 # silinmedi; gerekirse bu dosyanın bir kopyasıyla hedeflenebilirler.
 #
 # VERİTABANI: Bu dosya veritabanına DOKUNMAZ ve otomatik restore İÇERMEZ.
@@ -67,25 +52,25 @@
 
 services:
   api:
-    image: govai-api:e41f142
+    image: govai-api:e288b82
     pull_policy: never
 
   web:
-    image: govai-web:e41f142
+    image: govai-web:e288b82
     pull_policy: never
 
   collector:
-    image: govai-worker:e41f142
+    image: govai-worker:e288b82
     pull_policy: never
 
   parser:
-    image: govai-worker:e41f142
+    image: govai-worker:e288b82
     pull_policy: never
 
   scoring:
-    image: govai-worker:e41f142
+    image: govai-worker:e288b82
     pull_policy: never
 
   scheduler:
-    image: govai-worker:e41f142
+    image: govai-worker:e288b82
     pull_policy: never
