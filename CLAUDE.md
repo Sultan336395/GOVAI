@@ -460,7 +460,7 @@ Solution dosyası **`GovAI.slnx`**'tir (yeni XML formatı), `.sln` değil.
 
 ```bash
 dotnet build -c Release          # tüm .NET projeleri
-dotnet test                      # 1224 test (297 domain + 488 application + 439 API)
+dotnet test                      # 1315 test (340 domain + 517 application + 458 API)
 ```
 
 ```bash
@@ -558,6 +558,8 @@ Demo verisi için `SEED_ENABLED=true` + `SEED_ADMIN_PASSWORD=...`.
 src/GovAI.Domain/Eligibility/    ← ürünün kalbi: kural motoru
 src/GovAI.Domain/Scoring/        ← ağırlıklar, boyut puanları, zamanlama skoru
 src/GovAI.Domain/Calibration/    ← uzman görüşüyle karşılaştırma; skoru ÖLÇER, değiştirmez
+src/GovAI.Domain/Evidence/       ← kanıt eskimesi: "belge var" ile "hâlâ güvenilir" ayrımı
+src/GovAI.Domain/Leverage/       ← uyumu fırsata çevirir: "şunu kapatırsan şu çağrı açılır"
 src/GovAI.Application/           ← use-case servisleri (her modül kendi klasöründe)
 src/GovAI.Persistence/           ← EF Core yapılandırmaları, repository'ler, seed
 src/GovAI.Infrastructure/        ← OpenAI, Redis, RabbitMQ, JWT, PDF/Excel
@@ -570,6 +572,10 @@ scripts/                         ← sözleşme senkron denetimi
 
 Okuma sırası önerisi:
 `docs/architecture.md` → `docs/scoring.md` → `EligibilityEngine.cs` → `docs/adr/`.
+
+Derin teknoloji iddialarının koddaki karşılığı ve gerçekçi mesafesi: `docs/deeptech.md`.
+Hangi yeteneğin bugün gösterilebilir olduğunu, hangisinin önünde **veri** engeli
+olduğunu ayırır.
 
 Proje dosyasındaki 10 modülün kod karşılıkları `docs/architecture.md` §3'te tablo hâlinde.
 
