@@ -430,7 +430,7 @@ Solution dosyası **`GovAI.slnx`**'tir (yeni XML formatı), `.sln` değil.
 
 ```bash
 dotnet build -c Release          # tüm .NET projeleri
-dotnet test                      # 1173 test (275 domain + 488 application + 410 API)
+dotnet test                      # 1186 test (275 domain + 488 application + 423 API)
 ```
 
 ```bash

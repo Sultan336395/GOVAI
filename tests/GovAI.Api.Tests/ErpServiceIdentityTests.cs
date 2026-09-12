@@ -364,6 +364,89 @@ public sealed class ErpServiceIdentityTests(GovAiApiFactory factory)
         Assert.NotEqual(_factory.TenantB.CompanyId, kim.GetProperty("companyId").GetGuid());
     }
 
+    [Fact(DisplayName = "EK19. BAŞKA KİRACI, kimlikleri ne görebilir ne oluşturabilir")]
+    public async Task Baska_kiraci_kimlik_yonetemez()
+    {
+        await KimlikKurAsync();
+
+        var digerKiraci = await _factory.CreateAuthenticatedClientAsync(_factory.TenantB);
+
+        var oku = await digerKiraci.GetAsync($"/api/erp/companies/{_companyId}/service-identities");
+
+        var olustur = await digerKiraci.PostAsJsonAsync(
+            $"/api/erp/companies/{_companyId}/service-identities",
+            new
+            {
+                displayName = "Sızma denemesi",
+                keyId = "k1",
+                algorithm = "ES256",
+                publicKeyPem = ECDsa.Create(ECCurve.NamedCurves.nistP256).ExportSubjectPublicKeyInfoPem(),
+            });
+
+        Assert.NotEqual(HttpStatusCode.OK, oku.StatusCode);
+        Assert.NotEqual(HttpStatusCode.OK, olustur.StatusCode);
+    }
+
+    [Fact(DisplayName = "EK20. BAŞKA KİRACI, mevcut kimliğin anahtarına dokunamaz")]
+    public async Task Baska_kiraci_anahtara_dokunamaz()
+    {
+        // Kimlik kimliği (id) tahmin edilebilseydi bile yetki kapısı geçilmemeli.
+        var erp = await KimlikKurAsync();
+
+        var liste = await _tenantAdmin.GetFromJsonAsync<JsonElement>(
+            $"/api/erp/companies/{_companyId}/service-identities");
+
+        var kimlikId = liste.EnumerateArray()
+            .Single(k => k.GetProperty("clientId").GetString() == erp.ClientId)
+            .GetProperty("id").GetGuid();
+
+        var digerKiraci = await _factory.CreateAuthenticatedClientAsync(_factory.TenantB);
+
+        var anahtarEkle = await digerKiraci.PostAsJsonAsync(
+            $"/api/erp/service-identities/{kimlikId}/keys",
+            new
+            {
+                keyId = "sizma",
+                algorithm = "ES256",
+                publicKeyPem = ECDsa.Create(ECCurve.NamedCurves.nistP256).ExportSubjectPublicKeyInfoPem(),
+            });
+
+        var iptal = await digerKiraci.DeleteAsync(
+            $"/api/erp/service-identities/{kimlikId}/keys/{erp.KeyId}");
+
+        var kapat = await digerKiraci.PostAsync(
+            $"/api/erp/service-identities/{kimlikId}/enabled?enabled=false", null);
+
+        Assert.NotEqual(HttpStatusCode.OK, anahtarEkle.StatusCode);
+        Assert.NotEqual(HttpStatusCode.OK, iptal.StatusCode);
+        Assert.NotEqual(HttpStatusCode.OK, kapat.StatusCode);
+
+        // Saldırı kimliği BOZMAMIŞ olmalı: kendi beyanımız hâlâ çalışıyor.
+        (await JetonAlAsync(Beyan(erp))).EnsureSuccessStatusCode();
+    }
+
+    [Fact(DisplayName = "EK21. Jeton VERİ DÜZEYİNDE de kendi kiracısıyla sınırlı")]
+    public async Task Jeton_veri_duzeyinde_sinirli()
+    {
+        // Yapısal koruma (şirket parametresi yok) tek başına yetmez; dönen verinin
+        // gerçekten yalnızca kendi kiracısına ait olduğu da görülmeli.
+        var erp = await KimlikKurAsync();
+        var client = await ErpIstemcisiAsync(erp);
+
+        var bildirimler = await client.GetFromJsonAsync<JsonElement>(
+            "/api/erp-module/notifications?pageSize=100");
+
+        Assert.Equal(_companyId, bildirimler.GetProperty("companyId").GetGuid());
+
+        // Tohumda her kiracının bildiriminde kendi adı geçer; diğerininki SIZMAMALI.
+        foreach (var n in bildirimler.GetProperty("items").EnumerateArray())
+        {
+            var metin = n.GetProperty("title").GetString() + " " + n.GetProperty("body").GetString();
+
+            Assert.DoesNotContain(_factory.TenantB.Name, metin, StringComparison.Ordinal);
+        }
+    }
+
     [Fact(DisplayName = "EK14. Kayıtta hiçbir SIR tutulmaz; yanıt da sır döndürmez")]
     public async Task Sir_tutulmaz()
     {
